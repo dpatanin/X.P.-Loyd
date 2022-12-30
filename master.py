@@ -1,12 +1,10 @@
 import math
 import random
 import numpy as np
-import pandas as pd
 import tensorflow as tf
-import matplotlib.pyplot as plt
 from pandas_datareader import data as pdr
 
-from tqdm import tqdm_notebook, tqdm
+from tqdm import tqdm
 from collections import deque
 
 import yfinance as yf
@@ -121,16 +119,19 @@ for episode in range(1, episodes + 1):
         reward = 0
 
         if action == 1:  # Buying
-          trader.inventory.append(data[t])
-          print("AI Trader bought: ", stocks_price_format(data[t]))
+            trader.inventory.append(data[t])
+            print("AI Trader bought: ", stocks_price_format(data[t]))
 
         elif action == 2 and len(trader.inventory) > 0:  # Selling
-          buy_price = trader.inventory.pop(0)
+            buy_price = trader.inventory.pop(0)
 
-          reward = max(data[t] - buy_price, 0)
-          total_profit += data[t] - buy_price
-          print("AI Trader sold: ", stocks_price_format(
-              data[t]), " Profit: " + stocks_price_format(data[t] - buy_price))
+            reward = max(data[t] - buy_price, 0)
+            total_profit += data[t] - buy_price
+            print(
+                "AI Trader sold: ",
+                stocks_price_format(data[t]),
+                f" Profit: {stocks_price_format(data[t] - buy_price)}",
+            )
 
         done = t == data_samples - 1
         trader.memory.append((state, action, reward, next_state, done))
