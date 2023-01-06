@@ -47,7 +47,7 @@ class AI_Trader():
 
     #* Trade function that takes state as an input and returns an action
     #* to perform in particular state
-    def trade(self, state):
+    def trade(self):
 
         #* Should we perform a random generated action or action defined in model?
 
