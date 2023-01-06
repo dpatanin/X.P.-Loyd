@@ -47,7 +47,7 @@ class AI_Trader():
 
     #* Trade function that takes state as an input and returns an action
     #* to perform in particular state
-    def trade(self):
+    def trade(self, state):
 
         #* Should we perform a random generated action or action defined in model?
 
@@ -57,7 +57,7 @@ class AI_Trader():
             return random.randrange(self.action_space)
 
         #* If our random is greater than epsilon then we will use model to perform action
-        actions = self.model.predict(actions[0])
+        actions = self.model.predict(state)
         #* return only a one number defining an action (#Stay - 0 , Buy - 1, Sell - 2)
         #* that has maximum probability
         return np.argmax(actions[0])
