@@ -19,6 +19,4 @@ From the root directory run:
 
 Run `master.py`
 
-(Currently not working, WIP)
-
 [guide]: https://www.mlq.ai/deep-reinforcement-learning-for-trading-with-tensorflow-2-0/
