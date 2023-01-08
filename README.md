@@ -33,11 +33,11 @@ Insight it you should find the following folders:
 Copy these and navigate to the install location of CUDA. By default it should be `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.2`.
 Now paste the copied folders, replacing the existing ones.
 
-Next open copy the path to the bin folder, e.g.: `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.2\bin`.
+Next copy the path to the bin folder, e.g.: `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.2\bin`.
 You want to add this to your `Path` environment variable. Though it may be that the installation already added it by default.
 Repeat this step for the libnvvp folder.
 
-After this is done you might want to restart your computer, though it might not be necessary.
+After this is done you might want to restart your computer, though this might not be necessary.
 
 ### Dependencies
 
