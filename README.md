@@ -47,6 +47,13 @@ Once the above steps are done, from the root directory run:
     pip install -r requirements.txt
 ```
 
+Tensorflow uses by default the GPU. The script will check for available GPUs but if you want to manually check you can run:
+
+```console
+    print(tf.config.list_physical_devices('GPU')) // To see number of GPUs detected
+    print(device_lib.list_local_devices()) // To see full list of devices
+```
+
 ## Run
 
 Run `master.py`

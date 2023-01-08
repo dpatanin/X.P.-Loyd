@@ -2,6 +2,7 @@ import math
 import random
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.client import device_lib
 from pandas_datareader import data as pdr
 
 from tqdm import tqdm
@@ -140,7 +141,16 @@ data_samples = len(data) - 1  # discard last value, that we will predict on
 
 trader = AI_Trader(window_size)
 trader.model.summary()
-   
+
+#* Check for GPU utilization
+if len(tf.config.list_physical_devices('GPU')) == 0:
+    print("##################################################################")
+    print("No GPU detected by tensorflow.")
+    print("Available devices:")
+    print(device_lib.list_local_devices())
+    input("Press any key if you want to continue, ctrl + c if otherwise.")
+    print("##################################################################")
+
 for episode in range(1, episodes + 1):
 
     #* To keep track of training process
