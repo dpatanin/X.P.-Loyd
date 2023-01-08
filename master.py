@@ -131,10 +131,10 @@ def state_creator(data, timestep, window_size):
 
 
 #* Loading data (from Apple)
-data = pdr.get_data_yahoo("AAPL")["Adj Close"]
+data = pdr.get_data_yahoo("AAPL", start='2022-01-01', end='2022-12-31')["Adj Close"]
 
 window_size = 10
-episodes = 1000
+episodes = 100
 
 batch_size = 32
 data_samples = len(data) - 1  # discard last value, that we will predict on
