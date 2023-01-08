@@ -140,75 +140,71 @@ data_samples = len(data) - 1  # discard last value, that we will predict on
 
 trader = AI_Trader(window_size)
 trader.model.summary()
+   
+for episode in range(1, episodes + 1):
 
-#* Safety check to not waste your time
-if len(tf.config.list_physical_devices('GPU')) == 0:
-    print("There is no GPU available. Please make sure to configure tensorflow correctly.")
-else:    
-    for episode in range(1, episodes + 1):
+    #* To keep track of training process
+    #* .format populates {} with variables in .format(x,y)
+    print(f"Episode: {episode}/{episodes}")
 
-        #* To keep track of training process
-        #* .format populates {} with variables in .format(x,y)
-        print(f"Episode: {episode}/{episodes}")
+    #* Create state
+    #* second parameter is timestep = 0
+    state = state_creator(data, 0, window_size + 1)
 
-        #* Create state
-        #* second parameter is timestep = 0
-        state = state_creator(data, 0, window_size + 1)
+    total_profit = 0
+    #* Empty inventory before starting episode
+    trader.inventory = []
 
-        total_profit = 0
-        #* Empty inventory before starting episode
-        trader.inventory = []
+    #* One timestep is one day so number of timesteps we have represent data we have
+    #* tqdm is used for visualization
+    for t in tqdm(range(data_samples)):
 
-        #* One timestep is one day so number of timesteps we have represent data we have
-        #* tqdm is used for visualization
-        for t in tqdm(range(data_samples)):
+        #* First we will access action that is going to be taken by model
+        action = trader.trade(state)
 
-            #* First we will access action that is going to be taken by model
-            action = trader.trade(state)
+        #* Use action to get to next state(t+)
+        next_state = state_creator(data, t+1, window_size + 1)
+        #* As we did not calculate anything up to this point reward is 0
+        reward = 0
 
-            #* Use action to get to next state(t+)
-            next_state = state_creator(data, t+1, window_size + 1)
-            #* As we did not calculate anything up to this point reward is 0
-            reward = 0
+        if action == 1:  # Buying
+            #* Put bought stock to inventory to trade with
+            trader.inventory.append(data[t])
+            print("AI Trader bought: ", stocks_price_format(data[t]))
 
-            if action == 1:  # Buying
-                #* Put bought stock to inventory to trade with
-                trader.inventory.append(data[t])
-                print("AI Trader bought: ", stocks_price_format(data[t]))
+        #* To sell we need to have something in inventory
+        elif action == 2 and len(trader.inventory) > 0:  # Selling
+            #* Check buy price, pop removes first value from list
+            buy_price = trader.inventory.pop(0)
 
-            #* To sell we need to have something in inventory
-            elif action == 2 and len(trader.inventory) > 0:  # Selling
-                #* Check buy price, pop removes first value from list
-                buy_price = trader.inventory.pop(0)
+            #* If we gain money (current price - buy price) we have reward
+            #* if we lost money then reward is 0
+            reward = max(data[t] - buy_price, 0)
+            total_profit += data[t] - buy_price
+            print(
+                "AI Trader sold: ",
+                stocks_price_format(data[t]),
+                f" Profit: {stocks_price_format(data[t] - buy_price)}",
+            )
 
-                #* If we gain money (current price - buy price) we have reward
-                #* if we lost money then reward is 0
-                reward = max(data[t] - buy_price, 0)
-                total_profit += data[t] - buy_price
-                print(
-                    "AI Trader sold: ",
-                    stocks_price_format(data[t]),
-                    f" Profit: {stocks_price_format(data[t] - buy_price)}",
-                )
+        #* if t is last sample in our dateset we are done
+        #* we do not have any steps to perform in current episode
+        done = t == data_samples - 1
+        #* Append all data to trader-agent memory, experience buffer
+        trader.memory.append((state, action, reward, next_state, done))
 
-            #* if t is last sample in our dateset we are done
-            #* we do not have any steps to perform in current episode
-            done = t == data_samples - 1
-            #* Append all data to trader-agent memory, experience buffer
-            trader.memory.append((state, action, reward, next_state, done))
+        #* change state to next state, so we are done with an episode
+        state = next_state
 
-            #* change state to next state, so we are done with an episode
-            state = next_state
+        if done:
+            print("########################")
+            print(f"TOTAL PROFIT: {total_profit}")
+            print("########################")
 
-            if done:
-                print("########################")
-                print(f"TOTAL PROFIT: {total_profit}")
-                print("########################")
+        #* Check if we have more information in our memory than batch size
+        if len(trader.memory) > batch_size:
+            trader.batch_train(batch_size)
 
-            #* Check if we have more information in our memory than batch size
-            if len(trader.memory) > batch_size:
-                trader.batch_train(batch_size)
-
-        #* Save the model every 10 episodes
-        if episode % 10 == 0:
-            trader.model.save(f"ai_trader_{episode}.h5")
+    #* Save the model every 10 episodes
+    if episode % 10 == 0:
+        trader.model.save(f"ai_trader_{episode}.h5")
