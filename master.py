@@ -14,8 +14,7 @@ yf.pdr_override()
 class AI_Trader():
 
     def __init__(self, state_size, action_space=3, model_name="AITrader"):  #* Stay, Buy, Sell
-
-
+        
         self.state_size = state_size
         self.action_space = action_space
         self.memory = deque(maxlen = 2000)
@@ -143,13 +142,10 @@ trader = AI_Trader(window_size)
 trader.model.summary()
 
 #* Check for GPU utilization
-if len(tf.config.list_physical_devices('GPU')) == 0:
-    print("##################################################################")
-    print("No GPU detected by tensorflow.")
-    print("Available devices:")
-    print(device_lib.list_local_devices())
-    input("Press any key if you want to continue, ctrl + c if otherwise.")
-    print("##################################################################")
+device_name = tf.test.gpu_device_name()
+if not device_name:
+  raise SystemError('GPU device not found')
+print('Found GPU at: {}'.format(device_name))
 
 for episode in range(1, episodes + 1):
 
