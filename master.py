@@ -151,9 +151,6 @@ data_samples = len(data) - 1  # discard last value, that we will predict on
 trader = AI_Trader(window_size)
 trader.model.summary()
 
-logs = "logs/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-tb_callback = tf.keras.callbacks.TensorBoard(log_dir=logs, profile_batch="20, 40")
-
 # * Check for GPU utilization
 device_name = tf.test.gpu_device_name()
 if not device_name:
