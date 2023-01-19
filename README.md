@@ -17,7 +17,6 @@ You can find an overview table for your OS [here](https://www.tensorflow.org/ins
 
 ### CUDA
 
-Make sure to install CUDA 11.0.
 When installing CUDA it may happen that you encounter an error that says you already have a newer version of some software installed.
 This can be due to several reasons, especially if you have other Nvidia software such as e.g. Geforce Experience installed.
 In any case, uninstall manually the named software and attempt the CUDA installation again.
