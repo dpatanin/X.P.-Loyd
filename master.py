@@ -3,16 +3,23 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-
+import os
 
 class FinancialModel:
     def __init__(self, window_size=60):
         self.window_size = window_size
         self.scaler = MinMaxScaler()
         self.model = LinearRegression()
+        self.data = None
 
-    def load_data(self, file_path):
+    def load_data(self, file_path: str):
+        assert os.path.exists(file_path), f'{file_path} does not exist.'
         self.data = pd.read_csv(file_path)
+        
+         # Check for the presence of specific columns
+        required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        assert set(required_columns).issubset(self.data.columns), f'File {file_path} does not contain the required columns: {required_columns}'
+        
         self.data["diff"] = self.data["Close"] - self.data["Close"].shift(1)
         self.data.dropna(inplace=True)
         self.data[
