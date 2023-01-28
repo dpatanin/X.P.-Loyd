@@ -1,40 +1,41 @@
-import tensorflow as tf
-import yfinance as yf
-
-from datetime import datetime
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from pandas_datareader import data as pdr
+from sklearn.linear_model import LinearRegression
 
-# Shows which device is used for operations
-# tf.debugging.set_log_device_placement(True)
+# load the data
+data = pd.read_csv("futures.csv")
 
-# Load your data
-yf.pdr_override()
-data = pdr.get_data_yahoo("AAPL", start="2012-01-01", end="2022-12-31")
+# create a new column with the difference of the close price
+data['diff'] = data['Close'] - data['Close'].shift(1)
 
-# Prepare the data for training
-X = data[["Open", "High", "Low", "Volume"]]
-y = data["Adj Close"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+# drop missing values
+data.dropna(inplace=True)
 
-# Define the model architecture
-model = tf.keras.Sequential()
-model.add(tf.keras.layers.Dense(32, input_shape=(X_train.shape[1],), activation="relu"))
-model.add(tf.keras.layers.Dense(16, activation="relu"))
-model.add(tf.keras.layers.Dense(1))
+# normalize the data
+scaler = MinMaxScaler()
+data[['Open', 'High', 'Low', 'Close', 'Volume']] = scaler.fit_transform(data[['Open', 'High', 'Low', 'Close', 'Volume']])
 
-# Compile the model
-model.compile(optimizer="adam", loss="mean_squared_error", metrics=["mae"])
+# create the windowed dataset
+window_size = 60
+X = []
+y = []
+for i in range(window_size, len(data)):
+    X.append(data[i-window_size:i][['Open', 'High', 'Low', 'Volume']])
+    y.append(data['Close'][i])
 
-# Train the model
-model.fit(X_train, y_train, epochs=1000, batch_size=32)
+# split into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(np.array(X), np.array(y), test_size=0.2)
 
-# Evaluate the model on the test data
-test_loss, test_mae = model.evaluate(X_test, y_test)
-print("Test loss:", test_loss)
-print("Test MAE:", test_mae)
+# reshape dim-3 array to dim-2
+X_train = X_train.reshape(X_train.shape[0], X_train.shape[1]*X_train.shape[2])
+X_test = X_test.reshape(X_test.shape[0], X_test.shape[1]*X_test.shape[2])
 
-model.save(f"models/model_AAPL_{datetime.now()}.h5")
+# create and train the model
+model = LinearRegression()
+model.fit(X_train, y_train)
 
-# Use the model to make predictions on new data
-# future_prices = model.predict(new_data)
+# evaluate the model
+score = model.score(X_test, y_test)
+print("Model score: {:.2f}".format(score))
