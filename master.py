@@ -5,6 +5,7 @@ import os
 import pickle
 import tensorflow as tf
 
+
 class FinancialModel:
     def __init__(self, window_size=60):
         self.window_size = window_size
@@ -15,10 +16,10 @@ class FinancialModel:
         model = tf.keras.Sequential()
         model.add(tf.keras.layers.LSTM(32, input_shape=(self.window_size, 4)))
         model.add(tf.keras.layers.Dense(1))
-        model.compile(loss='mean_squared_error', optimizer='adam')
+        model.compile(loss="mean_squared_error", optimizer="adam")
 
         return model
-    
+
     def load_data(self, file_path: str):
         assert os.path.exists(file_path), f"{file_path} does not exist."
         self.data = pd.read_csv(file_path)
@@ -54,8 +55,8 @@ class FinancialModel:
             self.X_test.shape[0], self.window_size, self.X_test.shape[2]
         )
 
-    def train_model(self):
-        self.model.fit(self.X_train, self.y_train, epochs=100, batch_size=32, verbose=0)
+    def train_model(self, epochs=100, batch_size=32, verbose=0):
+        self.model.fit(self.X_train, self.y_train, batch_size, epochs, verbose)
 
     def evaluate_model(self):
         y_pred = self.model.predict(self.X_test)
