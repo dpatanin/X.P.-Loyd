@@ -1,20 +1,26 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
 import os
 import pickle
+import tensorflow as tf
 
+# tf.debugging.set_log_device_placement(True)
 
 class FinancialModel:
     def __init__(self, window_size=60):
         self.window_size = window_size
-        self.scaler = MinMaxScaler()
-        self.model = LinearRegression()
         self.data = None
+        self.model = self.build_model()
 
+    def build_model(self):
+        model = tf.keras.Sequential()
+        model.add(tf.keras.layers.LSTM(32, input_shape=(self.window_size, 4)))
+        model.add(tf.keras.layers.Dense(1))
+        model.compile(loss='mean_squared_error', optimizer='adam')
+
+        return model
+    
     def load_data(self, file_path: str):
         assert os.path.exists(file_path), f"{file_path} does not exist."
         self.data = pd.read_csv(file_path)
@@ -27,11 +33,6 @@ class FinancialModel:
 
         self.data["diff"] = self.data["Close"] - self.data["Close"].shift(1)
         self.data.dropna(inplace=True)
-        self.data[
-            ["Open", "High", "Low", "Close", "Volume"]
-        ] = self.scaler.fit_transform(
-            self.data[["Open", "High", "Low", "Close", "Volume"]]
-        )
 
     def create_windowed_dataset(self):
         self.X = []
@@ -49,21 +50,19 @@ class FinancialModel:
             self.X, self.y, test_size=test_size, random_state=42
         )
         self.X_train = self.X_train.reshape(
-            self.X_train.shape[0], self.X_train.shape[1] * self.X_train.shape[2]
+            self.X_train.shape[0], self.window_size, self.X_train.shape[2]
         )
         self.X_test = self.X_test.reshape(
-            self.X_test.shape[0], self.X_test.shape[1] * self.X_test.shape[2]
+            self.X_test.shape[0], self.window_size, self.X_test.shape[2]
         )
 
     def train_model(self):
-        self.model.fit(self.X_train, self.y_train)
+        self.model.fit(self.X_train, self.y_train, epochs=100, batch_size=32, verbose=0)
 
     def evaluate_model(self):
         y_pred = self.model.predict(self.X_test)
-        mse = mean_squared_error(y_pred, self.y_test)
-        r2 = r2_score(y_pred, self.y_test)
-        print("Model score: {:.2f}".format(r2))
-        print("Mean Squared Error: {:.2f}".format(mse))
+        mse = tf.keras.losses.mean_squared_error(y_pred, self.y_test).numpy()
+        print("Mean Squared Error: {:.2f}".format(mse.mean()))
 
     def save_model(self, filename):
         with open(filename, "wb") as f:
@@ -83,4 +82,4 @@ class FinancialModel:
 model = FinancialModel()
 model.load_data("data/ES_futures_sample/ES_continuous_1min_sample.csv")
 model.fit_model()
-model.save_model("models/financial_model.pkl")
+model.save_model("models/financial_model_tensorflow_v0.1.pkl")
