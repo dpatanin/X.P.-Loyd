@@ -5,8 +5,6 @@ import os
 import pickle
 import tensorflow as tf
 
-# tf.debugging.set_log_device_placement(True)
-
 class FinancialModel:
     def __init__(self, window_size=60):
         self.window_size = window_size
