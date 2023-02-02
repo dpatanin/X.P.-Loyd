@@ -77,6 +77,51 @@ class FinancialModel:
         self.train_model()
         self.evaluate_model()
 
+class State:
+    def __init__(self, data, balance, contracts, price_per_contract):
+        self.data = data
+        self.balance = balance
+        self.contracts = contracts
+        self.price_per_contract = price_per_contract
+    
+    def __repr__(self):
+        return f"State(balance={self.balance}, contracts={self.contracts})"
+
+class Action:
+    BUY = 0
+    SELL = 1
+    SIT = 2
+    
+    def __init__(self, action):
+        self.action = action
+    
+    def __repr__(self):
+        if self.action == self.BUY:
+            return "Action(BUY)"
+        elif self.action == self.SELL:
+            return "Action(SELL)"
+        else:
+            return "Action(SIT)"
+
+def reward_function(state, next_state):
+    reward = next_state.balance - state.balance
+    if state.balance - next_state.balance > state.balance:
+        reward = -1000000  # Add a large negative reward for breaking the "balance cannot turn negative" restriction
+    if next_state.contracts != 0:
+        reward = -1000000  # Add a large negative reward for breaking the "contracts must be 0 at the end of the day" restriction
+    return reward
+
+def next_state_function(state, action):
+    next_state = State(data=state.data, balance=state.balance, contracts=state.contracts, price_per_contract=state.price_per_contract)
+    
+    if action.action == Action.BUY:
+        next_state.balance -= state.contracts * state.price_per_contract
+        next_state.contracts += state.contracts
+    elif action.action == Action.SELL:
+        next_state.balance += state.contracts * state.price_per_contract
+        next_state.contracts -= state.contracts
+    return next_state
+
 
 model = FinancialModel()
 model.load_data("data/ES_futures_sample/ES_continuous_1min_sample.csv")
