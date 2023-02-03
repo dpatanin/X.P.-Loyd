@@ -1,67 +1,75 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
 import os
 import pickle
 import tensorflow as tf
+import random
+from tqdm import tqdm
 
 
-class FinancialModel:
-    def __init__(self, window_size=60):
+class FreeLaborTrader:
+    def __init__(
+        self, state_size, action_space=4, window_size=60, balance=10000, position=0
+    ):
+        self.state_size = state_size
+        self.action_space = action_space
         self.window_size = window_size
-        self.data = None
+        self.balance = balance
+        self.position = position
+
+        self.gamma = 0.95
+        self.epsilon = 1.0
+        self.epsilon_final = 0.01
+        self.epsilon_decay = 0.995
+
         self.model = self.build_model()
 
     def build_model(self):
         model = tf.keras.Sequential()
-        model.add(tf.keras.layers.LSTM(32, input_shape=(self.window_size, 4)))
-        model.add(tf.keras.layers.Dense(1))
+        model.add(
+            tf.keras.layers.LSTM(32, input_shape=(self.window_size, self.state_size))
+        )
+        model.add(tf.keras.layers.Dense(units=128, activation="relu"))
+        model.add(tf.keras.layers.Dense(units=self.action_space, activation="linear"))
         model.compile(loss="mean_squared_error", optimizer="adam")
 
         return model
 
-    def load_data(self, file_path: str):
-        assert os.path.exists(file_path), f"{file_path} does not exist."
-        self.data = pd.read_csv(file_path)
+    def trade(self, state):
+        if random.random() <= self.epsilon:
+            return random.randrange(self.action_space)
 
-        # Check for the presence of specific columns
-        required_columns = ["Open", "High", "Low", "Close", "Volume"]
-        assert set(required_columns).issubset(
-            self.data.columns
-        ), f"File {file_path} does not contain the required columns: {required_columns}"
+        actions = self.model.predict(state)
+        return np.argmax(actions[0])
 
-        self.data["diff"] = self.data["Close"] - self.data["Close"].shift(1)
-        self.data.dropna(inplace=True)
+    def batch_train(self, batch_size):
+        batch = [
+            self.memory[i]
+            for i in range(len(self.memory) - batch_size + 1, len(self.memory))
+        ]
 
-    def create_windowed_dataset(self):
-        self.X = []
-        self.y = []
-        for i in range(self.window_size, len(self.data)):
-            self.X.append(
-                self.data[i - self.window_size : i][["Open", "High", "Low", "Volume"]]
-            )
-            self.y.append(self.data["Close"][i])
-        self.X = np.array(self.X)
-        self.y = np.array(self.y)
+        for state, action, reward, next_state, done in batch:
+            # Reward if agent is in terminal state
+            reward = reward
 
-    def split_data(self, test_size=0.2):
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            self.X, self.y, test_size=test_size, random_state=42
-        )
-        self.X_train = self.X_train.reshape(
-            self.X_train.shape[0], self.window_size, self.X_train.shape[2]
-        )
-        self.X_test = self.X_test.reshape(
-            self.X_test.shape[0], self.window_size, self.X_test.shape[2]
-        )
+            if not done:
+                reward = next_state.balance - state.balance
+                if state.balance - next_state.balance > state.balance:
+                    reward = (
+                        -1000000
+                    )  # Add a large negative reward for breaking the "balance cannot turn negative" restriction
+            elif next_state.contracts != 0:
+                reward = (
+                    -1000000
+                )  # Add a large negative reward for breaking the "contracts must be 0 at the end of the day" restriction
 
-    def train_model(self, epochs=100, batch_size=32, verbose=0):
-        self.model.fit(self.X_train, self.y_train, batch_size, epochs, verbose)
+            target = self.model.predict(state)
+            target[0][action] = reward
 
-    def evaluate_model(self):
-        y_pred = self.model.predict(self.X_test)
-        mse = tf.keras.losses.mean_squared_error(y_pred, self.y_test).numpy()
-        print("Mean Squared Error: {:.2f}".format(mse.mean()))
+            self.model.fit(state, target, epochs=1, verbose=0)
+
+        if self.epsilon > self.epsilon_final:
+            self.epsilon *= self.epsilon_decay
 
     def save_model(self, filename):
         with open(filename, "wb") as f:
@@ -71,59 +79,93 @@ class FinancialModel:
         with open(filename, "rb") as f:
             self.model = pickle.load(f)
 
-    def fit_model(self):
-        self.create_windowed_dataset()
-        self.split_data()
-        self.train_model()
-        self.evaluate_model()
 
-class State:
-    def __init__(self, data, balance, contracts, price_per_contract):
-        self.data = data
-        self.balance = balance
-        self.contracts = contracts
-        self.price_per_contract = price_per_contract
-    
-    def __repr__(self):
-        return f"State(balance={self.balance}, contracts={self.contracts})"
+def load_data(file_path: str):
+    assert os.path.exists(file_path), f"{file_path} does not exist."
+    data = pd.read_csv(file_path)
 
-class Action:
-    BUY = 0
-    SELL = 1
-    SIT = 2
-    
-    def __init__(self, action):
-        self.action = action
-    
-    def __repr__(self):
-        if self.action == self.BUY:
-            return "Action(BUY)"
-        elif self.action == self.SELL:
-            return "Action(SELL)"
-        else:
-            return "Action(SIT)"
+    # Check for the presence of specific columns
+    required_columns = ["Open", "High", "Low", "Close", "Volume"]
+    assert set(required_columns).issubset(
+        data.columns
+    ), f"File {file_path} does not contain the required columns: {required_columns}"
 
-def reward_function(state, next_state):
-    reward = next_state.balance - state.balance
-    if state.balance - next_state.balance > state.balance:
-        reward = -1000000  # Add a large negative reward for breaking the "balance cannot turn negative" restriction
-    if next_state.contracts != 0:
-        reward = -1000000  # Add a large negative reward for breaking the "contracts must be 0 at the end of the day" restriction
-    return reward
+    # data["diff"] = data["Close"] - data["Close"].shift(1)
+    # data.dropna(inplace=True)
 
-def next_state_function(state, action):
-    next_state = State(data=state.data, balance=state.balance, contracts=state.contracts, price_per_contract=state.price_per_contract)
-    
-    if action.action == Action.BUY:
-        next_state.balance -= state.contracts * state.price_per_contract
-        next_state.contracts += state.contracts
-    elif action.action == Action.SELL:
-        next_state.balance += state.contracts * state.price_per_contract
-        next_state.contracts -= state.contracts
-    return next_state
+    return data
 
 
-model = FinancialModel()
-model.load_data("data/ES_futures_sample/ES_continuous_1min_sample.csv")
-model.fit_model()
-model.save_model("models/financial_model_tensorflow_v0.1.pkl")
+def state_creator(data, timestep, balance, position):
+    state = data[timestep]
+    state["Balance"] = balance
+    state["Position"] = position
+    return np.array([state])
+
+
+data = load_data("data/ES_futures_sample/ES_continuous_1min_sample.csv")
+window_size = 10
+episodes = 100
+batch_size = 32
+data_samples = len(data) - 1
+tick_size = 0.25
+tick_value = 12.50
+
+trader = FreeLaborTrader(window_size)
+trader.model.summary()
+trader.save_model("models/financial_model_tensorflow_v0.1.pkl")
+
+
+for episode in range(1, episodes + 1):
+    print(f"Episode: {episode}/{episodes}")
+
+    state = state_creator(data, 0, trader.balance, trader.position)
+
+    total_profit = 0
+    trader.position = 0 # Reset position before starting episode
+
+    # tqdm is used for visualization
+    for t in tqdm(range(data_samples)):
+        action = trader.trade(state)
+
+        if action == 1 and trader.position == 0:  # Buying; enter long position
+            # TODO: Make possible to buy multiple contracts based on current balance
+            trader.position += 1
+            print("FreeLaborTrader entered long: ", trader.position)
+
+        elif action == 2 and trader.position == 0:  # Selling; enter short position
+            # TODO: Make possible to sell short multiple contracts based on current balance
+            trader.position -= 1
+            print("FreeLaborTrader entered short: ", trader.position)
+
+        elif action == 3 and trader.position != 0: # Exit; sell bought or buy short, i.e. close current position
+            # TODO: Calculate actual profit
+            # TODO: Calculate reward based on position exit
+            trader.position = 0
+            print("FreeLaborTrader exited position: ", trader.position)
+
+        next_state = state_creator(data, t + 1, window_size + 1)
+        # * As we did not calculate anything up to this point reward is 0
+        reward = 0
+        
+        # * if t is last sample in our dateset we are done
+        # * we do not have any steps to perform in current episode
+        done = t == data_samples - 1
+        # * Append all data to trader-agent memory, experience buffer
+        trader.memory.append((state, action, reward, next_state, done))
+
+        # * change state to next state, so we are done with an episode
+        state = next_state
+
+        if done:
+            print("########################")
+            print(f"TOTAL PROFIT: {total_profit}")
+            print("########################")
+
+        # * Check if we have more information in our memory than batch size
+        if len(trader.memory) > batch_size:
+            trader.batch_train(batch_size)
+
+    # * Save the model every 10 episodes
+    if episode % 10 == 0:
+        trader.model.save(f"ai_trader_{episode}_epochs.h5")
