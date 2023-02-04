@@ -25,10 +25,7 @@ class FreeLaborTrader:
 
     def build_model(self):
         model = tf.keras.Sequential()
-        # TODO: Make LSTM work, input shape differs from state shape
-        # model.add(
-        #     tf.keras.layers.LSTM(32, input_shape=(self.window_size, self.state_size))
-        # )
+        # TODO: Use tf.keras.layers.CuDNNLSTM
         model.add(
             tf.keras.layers.Dense(
                 units=32, activation="relu", input_dim=self.state_size
@@ -70,14 +67,6 @@ class FreeLaborTrader:
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
-
-    def save_model(self, filename):
-        with open(filename, "wb") as f:
-            pickle.dump(self.model, f)
-
-    def load_model(self, filename):
-        with open(filename, "rb") as f:
-            self.model = pickle.load(f)
 
 
 def load_data(file_path: str):
@@ -258,4 +247,4 @@ for episode in range(1, episodes + 1):
 
     # Save the model every 10 episodes
     if episode % 10 == 0:
-        trader.save_model(f"models/v0.1_ep{episode}.pkl")
+        trader.model.save(f"models/v0.1_ep{episode}.pkl")
