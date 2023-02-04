@@ -33,7 +33,7 @@ class FreeLaborTrader:
         )
         model.add(tf.keras.layers.Dense(units=128, activation="relu"))
         model.add(tf.keras.layers.Dense(units=self.action_space, activation="linear"))
-        model.compile(loss="mean_squared_error", optimizer="adam")
+        model.compile(loss="mean_squared_error", optimizer=tf.keras.optimizers.Adamax())
 
         return model
 
@@ -188,8 +188,6 @@ initial_balance = 10000
 
 trader = FreeLaborTrader(state_size=8)
 trader.model.summary()
-trader.save_model("models/financial_model_tensorflow_v0.1.pkl")
-
 
 for episode in range(1, episodes + 1):
     print(f"Episode: {episode}/{episodes}")
@@ -247,4 +245,4 @@ for episode in range(1, episodes + 1):
 
     # Save the model every 10 episodes
     if episode % 10 == 0:
-        trader.model.save(f"models/v0.1_ep{episode}.pkl")
+        trader.model.save(f"models/v0.1_ep{episode}.h5")
