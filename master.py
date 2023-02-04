@@ -206,8 +206,6 @@ for episode in range(1, episodes + 1):
     print(f"Episode: {episode}/{episodes}")
     state = state_creator(data, 0)
 
-    print(state.to_df().to_numpy())
-
     # tqdm is used for visualization
     for t in tqdm(range(data_samples)):
         action = trader.trade(state.to_df().to_numpy())
