@@ -18,6 +18,7 @@ class FreeLaborTrader:
         self.epsilon_decay = 0.995
 
         self.model = self.build_model()
+        self.target_model = self.build_model()
 
     def build_model(self):
         model = tf.keras.Sequential()
@@ -49,10 +50,9 @@ class FreeLaborTrader:
             # Reward if agent is in terminal state
             reward = reward
 
-            # TODO: Do we need diminished returns?
             if not done:
                 reward = reward + self.gamma * np.amax(
-                    self.model.predict(next_state)[0]
+                    self.target_model.predict(next_state)[0]
                 )
 
             target = self.model.predict(state)
@@ -62,3 +62,8 @@ class FreeLaborTrader:
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
+        
+        self.update_target_model()
+
+    def update_target_model(self):
+        self.target_model.set_weights(self.model.get_weights())
