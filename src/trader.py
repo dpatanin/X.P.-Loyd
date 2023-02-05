@@ -23,8 +23,8 @@ class FreeLaborTrader:
     def build_model(self):
         model = tf.keras.Sequential()
         model.add(
-            tf.keras.layers.Dense(
-                units=32, activation="relu", input_dim=self.state_size
+            tf.keras.layers.LSTM(
+                units=32, input_shape=(self.window_size, self.state_size)
             )
         )
         model.add(tf.keras.layers.Dense(units=128, activation="relu"))
