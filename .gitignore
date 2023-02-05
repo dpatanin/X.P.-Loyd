@@ -1,2 +1,5 @@
 .vs
 env
+data
+models
+__pycache__

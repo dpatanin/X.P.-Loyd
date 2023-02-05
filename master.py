@@ -1,40 +1,94 @@
-import tensorflow as tf
-import yfinance as yf
+from src.data_preprocess import load_data
+from src.trader import FreeLaborTrader
+from src.state import State
+import pandas as pd
 
-from datetime import datetime
-from sklearn.model_selection import train_test_split
-from pandas_datareader import data as pdr
+from tqdm import tqdm
 
-# Shows which device is used for operations
-# tf.debugging.set_log_device_placement(True)
 
-# Load your data
-yf.pdr_override()
-data = pdr.get_data_yahoo("AAPL", start="2012-01-01", end="2022-12-31")
+def state_creator(data: pd.DataFrame, timestep: int, state: State = None):
+    new_data = data.iloc[[timestep]].to_dict()
+    new_state = State(
+        new_data["Open"][timestep],
+        new_data["High"][timestep],
+        new_data["Low"][timestep],
+        new_data["Close"][timestep],
+        new_data["Volume"][timestep],
+    )
 
-# Prepare the data for training
-X = data[["Open", "High", "Low", "Volume"]]
-y = data["Adj Close"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    if state:
+        new_state.balance = state.balance
+        new_state.entry_price = state.entry_price
+        new_state.contracts = state.contracts
 
-# Define the model architecture
-model = tf.keras.Sequential()
-model.add(tf.keras.layers.Dense(32, input_shape=(X_train.shape[1],), activation="relu"))
-model.add(tf.keras.layers.Dense(16, activation="relu"))
-model.add(tf.keras.layers.Dense(1))
+    return new_state
 
-# Compile the model
-model.compile(optimizer="adam", loss="mean_squared_error", metrics=["mae"])
 
-# Train the model
-model.fit(X_train, y_train, epochs=1000, batch_size=32)
+data = load_data("data/ES_futures_sample/ES_continuous_1min_sample.csv")
+episodes = 100
+batch_size = 32
+data_samples = len(data) - 1
+tick_size = 0.25
+tick_value = 12.50
+initial_balance = 10000  # TODO: Rework to be the actual initial balance
 
-# Evaluate the model on the test data
-test_loss, test_mae = model.evaluate(X_test, y_test)
-print("Test loss:", test_loss)
-print("Test MAE:", test_mae)
+trader = FreeLaborTrader(state_size=8)
+trader.model.summary()
 
-model.save(f"models/model_AAPL_{datetime.now()}.h5")
+for episode in range(1, episodes + 1):
+    print(f"Episode: {episode}/{episodes}")
+    state = state_creator(data, 0)
 
-# Use the model to make predictions on new data
-# future_prices = model.predict(new_data)
+    # tqdm is used for visualization
+    for t in tqdm(range(data_samples)):
+        action = trader.trade(state.to_numpy())
+        next_state = state_creator(data, t + 1, state)
+        reward = 0
+
+        if action == 1 and not state.has_position():  # Buying; enter long position
+            # TODO: Make possible to buy multiple contracts based on current balance
+            next_state.enter_long(state.close, 1, tick_value)
+            # print("FreeLaborTrader entered position:", state.rep_position())
+
+        elif action == 2 and not state.has_position():  # Selling; enter short position
+            # TODO: Make possible to sell short multiple contracts based on current balance
+            next_state.enter_short(state.close, 1, tick_value)
+            # print("FreeLaborTrader entered position:", state.rep_position())
+
+        elif action == 3 and state.has_position():  # Exit; close position
+            # TODO: Calculate actual profit
+            # TODO: Calculate reward based on position exit
+            profit = next_state.exit_position(state.close, tick_value)
+            # print("FreeLaborTrader exited position with profit: ", profit)
+            reward = profit
+
+        done = t == data_samples - 1
+        if done:
+            # Consequences for braking restrictions
+            reward = (
+                -1000000000000000
+                if state.has_position() or state.balance < 0
+                else reward
+            )
+            print("########################")
+            print(f"TOTAL PROFIT: {state.balance - initial_balance}")
+            print("########################")
+
+        trader.memory.append(
+            (
+                state.to_numpy(),
+                action,
+                reward,
+                next_state.to_numpy(),
+                done,
+            )
+        )
+
+        state = next_state
+
+        if len(trader.memory) > batch_size:
+            trader.batch_train(batch_size)
+
+    # Save the model every 10 episodes
+    if episode % 10 == 0:
+        trader.model.save(f"models/v0.1_ep{episode}.h5")
