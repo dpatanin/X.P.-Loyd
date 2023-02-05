@@ -30,7 +30,7 @@ batch_size = 32
 data_samples = len(data) - 1
 tick_size = 0.25
 tick_value = 12.50
-initial_balance = 10000
+initial_balance = 10000  # TODO: Rework to be the actual initial balance
 
 trader = FreeLaborTrader(state_size=8)
 trader.model.summary()
@@ -41,7 +41,7 @@ for episode in range(1, episodes + 1):
 
     # tqdm is used for visualization
     for t in tqdm(range(data_samples)):
-        action = trader.trade(state.to_df().to_numpy())
+        action = trader.trade(state.to_numpy())
         next_state = state_creator(data, t + 1, state)
         reward = 0
 
@@ -76,10 +76,10 @@ for episode in range(1, episodes + 1):
 
         trader.memory.append(
             (
-                state.to_df().to_numpy(),
+                state.to_numpy(),
                 action,
                 reward,
-                next_state.to_df().to_numpy(),
+                next_state.to_numpy(),
                 done,
             )
         )

@@ -76,3 +76,6 @@ class State:
                 "contracts": [self.contracts],
             }
         )
+
+    def to_numpy(self):
+        return self.to_df().to_numpy()
