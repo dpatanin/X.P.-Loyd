@@ -1,9 +1,6 @@
 # X.P. Loyd
 
-Currently this hosts an example project to get familiar with programming an RL AI in general.
-It utilizes a RL Deep-Q Learning Algorithm for predicting Stock Market trades.
-Here's the [guide].
-Be aware that the guide is not technically correct nor uses best practices, thus the differences in code.
+This project investigates the patterns behind profitable futures daytrading with implications to further trading applications.
 
 ## Installation
 
@@ -57,5 +54,3 @@ Tensorflow uses by default the GPU. The script will check for available GPUs but
 ## Run
 
 Run `master.py`
-
-[guide]: https://www.mlq.ai/deep-reinforcement-learning-for-trading-with-tensorflow-2-0/
