@@ -1,3 +1,4 @@
+from src.experience_replay import HindsightExperienceReplay
 import numpy as np
 import tensorflow as tf
 import random
@@ -10,13 +11,14 @@ class FreeLaborTrader:
         self.state_size = state_size
         self.action_space = action_space
         self.window_size = window_size
-        self.memory = deque(maxlen=2000)
+        self.memory = HindsightExperienceReplay(2000)
 
         self.gamma = 0.95
         self.epsilon = 1.0
         self.epsilon_final = 0.01
         self.epsilon_decay = 0.995
 
+        self.optimizer = tf.keras.optimizers.Adamax()
         self.model = self.build_model()
 
     def build_model(self):
@@ -28,7 +30,7 @@ class FreeLaborTrader:
         )
         model.add(tf.keras.layers.Dense(units=128, activation="relu"))
         model.add(tf.keras.layers.Dense(units=self.action_space, activation="linear"))
-        model.compile(loss="mean_squared_error", optimizer=tf.keras.optimizers.Adamax())
+        model.compile(loss="mean_squared_error", optimizer=self.optimizer)
 
         return model
 
@@ -40,25 +42,53 @@ class FreeLaborTrader:
         return np.argmax(actions[0])
 
     def batch_train(self, batch_size):
-        batch = [
-            self.memory[i]
-            for i in range(len(self.memory) - batch_size + 1, len(self.memory))
-        ]
+        batch = self.memory.sample(batch_size)
 
-        for state, action, reward, next_state, done in batch:
-            # Reward if agent is in terminal state
-            reward = reward
+        # TODO: Fix shape size whatever
+        # TODO: Make use of goals
+        states, actions, rewards, next_states, dones = [], [], [], [], []
 
-            # TODO: Do we need diminished returns?
-            if not done:
-                reward = reward + self.gamma * np.amax(
-                    self.model.predict(next_state)[0]
-                )
+        for b in batch:
+            states.append(b[0])
+            actions.append(b[1])
+            rewards.append(b[2])
+            next_states.append(b[3])
+            dones.append(b[4])
 
-            target = self.model.predict(state)
-            target[0][action] = reward
+        states = np.array(states)
+        actions = np.array(actions)
+        rewards = np.array(rewards)
+        next_states = np.array(next_states)
+        dones = np.array(dones)
 
-            self.model.fit(state, target, epochs=1, verbose=0)
+        # Convert the dones list to a binary mask
+        masks = 1 - dones
+        masks = masks.astype(np.float32)
+
+        # Update the model parameters
+        with tf.GradientTape() as tape:
+            # Compute the predicted Q-values
+            q_values = self.model(states)
+            q_values = tf.reduce_sum(
+                q_values * tf.one_hot(actions, self.action_space), axis=1
+            )
+
+            # Compute the actual Q-values
+            target_q_values = (
+                rewards
+                + self.gamma * tf.reduce_max(self.model(next_states), axis=1) * masks
+            )
+
+            # Compute the loss
+            loss = tf.reduce_mean(tf.square(q_values - target_q_values))
+
+            # Compute the gradients
+            gradients = tape.gradient(loss, self.model.trainable_variables)
+
+            # Apply the gradients to update the model parameters
+            self.optimizer.apply_gradients(
+                zip(gradients, self.model.trainable_variables)
+            )
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay

@@ -74,7 +74,7 @@ for episode in range(1, episodes + 1):
             print(f"TOTAL PROFIT: {state.balance - initial_balance}")
             print("########################")
 
-        trader.memory.append(
+        trader.memory.add(
             (
                 state.to_numpy(),
                 action,
