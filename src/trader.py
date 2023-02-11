@@ -3,9 +3,6 @@ import numpy as np
 import tensorflow as tf
 import random
 
-from collections import deque
-
-
 class FreeLaborTrader:
     def __init__(self, state_size, action_space=4, window_size=60):
         self.state_size = state_size
@@ -42,24 +39,16 @@ class FreeLaborTrader:
         return np.argmax(actions[0])
 
     def batch_train(self, batch_size):
-        batch = self.memory.sample(batch_size)
-
-        # TODO: Fix shape size whatever
         # TODO: Make use of goals
-        states, actions, rewards, next_states, dones = [], [], [], [], []
-
-        for b in batch:
-            states.append(b[0])
-            actions.append(b[1])
-            rewards.append(b[2])
-            next_states.append(b[3])
-            dones.append(b[4])
-
-        states = np.array(states)
-        actions = np.array(actions)
-        rewards = np.array(rewards)
-        next_states = np.array(next_states)
-        dones = np.array(dones)
+        (
+            states,
+            actions,
+            rewards,
+            next_states,
+            dones,
+            achieved_goals,
+            desired_goal,
+        ) = self.memory.sample(batch_size)
 
         # Convert the dones list to a binary mask
         masks = 1 - dones
