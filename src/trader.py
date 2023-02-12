@@ -5,7 +5,7 @@ import random
 
 
 class FreeLaborTrader:
-    def __init__(self, state_size, action_space=4, window_size=60):
+    def __init__(self, state_size: int, action_space=4, window_size=60):
         self.state_size = state_size
         self.action_space = action_space
         self.window_size = window_size
@@ -39,7 +39,7 @@ class FreeLaborTrader:
         actions = self.model.predict(state)
         return np.argmax(actions[0])
 
-    def batch_train(self, batch_size):
+    def batch_train(self, batch_size: int):
         (states, actions, rewards, next_states, dones) = self.memory.sample(batch_size)
 
         # Combine states and goals
