@@ -16,29 +16,7 @@ class ExperienceReplayBuffer:
         Returns: [states, actions, rewards, next_states, dones]
         """
         experiences = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones = (
-            [],
-            [],
-            [],
-            [],
-            [],
-        )
-
-        for experience in experiences:
-            (state, action, reward, next_state, done) = experience
-            states.append(state)
-            actions.append(action)
-            rewards.append(reward)
-            next_states.append(next_state)
-            dones.append(done)
-
-        return (
-            np.array(states),
-            np.array(actions),
-            np.array(rewards),
-            np.array(next_states),
-            np.array(dones),
-        )
+        return tuple(np.array(e) for e in zip(*experiences))
 
     def __len__(self):
         return len(self.buffer)
