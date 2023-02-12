@@ -6,10 +6,9 @@ from collections import deque
 
 
 class FreeLaborTrader:
-    def __init__(self, state_size: int, action_space: int = 4, window_size: int = 60):
+    def __init__(self, state_size: int, action_space: int = 4):
         self.state_size = state_size
         self.action_space = action_space
-        self.window_size = window_size
         self.memory = deque(maxlen=2000)
 
         self.gamma = 0.95
@@ -23,8 +22,8 @@ class FreeLaborTrader:
     def build_model(self):
         model = tf.keras.Sequential()
         model.add(
-            tf.keras.layers.LSTM(
-                units=32, input_shape=(self.window_size, self.state_size)
+            tf.keras.layers.Dense(
+                units=32, activation="relu", input_dim=self.state_size
             )
         )
         model.add(tf.keras.layers.Dense(units=128, activation="relu"))
