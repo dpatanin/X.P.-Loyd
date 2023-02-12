@@ -41,8 +41,13 @@ for episode in range(1, episodes + 1):
 
     # tqdm is used for visualization
     for t in tqdm(range(data_samples)):
-        action = trader.trade(state.to_numpy())
         next_state = state_creator(data, t + 1, state)
+
+        # TODO: Revise the goal (e.g. absolute vs relative value)
+        # Define the desired goal as the closing price of the next time step
+        # desired_goal = next_state.close
+
+        action = trader.trade(state.to_numpy())
         reward = 0
 
         if action == 1 and not state.has_position():  # Buying; enter long position

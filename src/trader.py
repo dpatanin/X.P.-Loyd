@@ -1,14 +1,15 @@
-from src.experience_replay import HindsightExperienceReplay
+from src.experience_replay import ExperienceReplayBuffer
 import numpy as np
 import tensorflow as tf
 import random
+
 
 class FreeLaborTrader:
     def __init__(self, state_size, action_space=4, window_size=60):
         self.state_size = state_size
         self.action_space = action_space
         self.window_size = window_size
-        self.memory = HindsightExperienceReplay(2000)
+        self.memory = ExperienceReplayBuffer(2000)
 
         self.gamma = 0.95
         self.epsilon = 1.0
@@ -31,8 +32,7 @@ class FreeLaborTrader:
 
         return model
 
-    def trade(self, state, goal):
-        state = np.concatenate((state, goal), axis=1)
+    def trade(self, state: np.ndarray):
         if random.random() <= self.epsilon:
             return random.randrange(self.action_space)
 
@@ -40,21 +40,12 @@ class FreeLaborTrader:
         return np.argmax(actions[0])
 
     def batch_train(self, batch_size):
-        # TODO: Make use of goals
-        (
-            states,
-            actions,
-            rewards,
-            next_states,
-            dones,
-            achieved_goals,
-            desired_goals,
-        ) = self.memory.sample(batch_size)
+        (states, actions, rewards, next_states, dones) = self.memory.sample(batch_size)
 
         # Combine states and goals
-        states = np.concatenate((states, achieved_goals), axis=-1)
-        next_states = np.concatenate((next_states, desired_goals), axis=-1)
-        
+        # states = np.concatenate((states, achieved_goals), axis=-1)
+        # next_states = np.concatenate((next_states, desired_goals), axis=-1)
+
         # Convert the dones list to a binary mask
         masks = 1 - dones
         masks = masks.astype(np.float32)
