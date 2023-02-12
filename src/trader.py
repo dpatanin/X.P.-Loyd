@@ -6,7 +6,7 @@ from collections import deque
 
 
 class FreeLaborTrader:
-    def __init__(self, state_size, action_space=4):
+    def __init__(self, state_size: int, action_space: int = 4):
         self.state_size = state_size
         self.action_space = action_space
         self.memory = deque(maxlen=2000)
@@ -17,6 +17,7 @@ class FreeLaborTrader:
         self.epsilon_decay = 0.995
 
         self.model = self.build_model()
+        self.target_model = self.build_model()
 
     def build_model(self):
         model = tf.keras.Sequential()
@@ -31,14 +32,14 @@ class FreeLaborTrader:
 
         return model
 
-    def trade(self, state):
+    def trade(self, state: np.ndarray):
         if random.random() <= self.epsilon:
             return random.randrange(self.action_space)
 
         actions = self.model.predict(state)
         return np.argmax(actions[0])
 
-    def batch_train(self, batch_size):
+    def batch_train(self, batch_size: int):
         batch = [
             self.memory[i]
             for i in range(len(self.memory) - batch_size + 1, len(self.memory))
@@ -48,10 +49,9 @@ class FreeLaborTrader:
             # Reward if agent is in terminal state
             reward = reward
 
-            # TODO: Do we need diminished returns?
             if not done:
                 reward = reward + self.gamma * np.amax(
-                    self.model.predict(next_state)[0]
+                    self.target_model.predict(next_state)[0]
                 )
 
             target = self.model.predict(state)
@@ -61,3 +61,8 @@ class FreeLaborTrader:
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
+        
+        self.update_target_model()
+
+    def update_target_model(self):
+        self.target_model.set_weights(self.model.get_weights())
