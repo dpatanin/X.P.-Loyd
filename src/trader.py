@@ -31,7 +31,8 @@ class FreeLaborTrader:
 
         return model
 
-    def trade(self, state):
+    def trade(self, state, goal):
+        state = np.concatenate((state, goal), axis=1)
         if random.random() <= self.epsilon:
             return random.randrange(self.action_space)
 
@@ -47,9 +48,13 @@ class FreeLaborTrader:
             next_states,
             dones,
             achieved_goals,
-            desired_goal,
+            desired_goals,
         ) = self.memory.sample(batch_size)
 
+        # Combine states and goals
+        states = np.concatenate((states, achieved_goals), axis=-1)
+        next_states = np.concatenate((next_states, desired_goals), axis=-1)
+        
         # Convert the dones list to a binary mask
         masks = 1 - dones
         masks = masks.astype(np.float32)
