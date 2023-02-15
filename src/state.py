@@ -64,6 +64,9 @@ class State:
         return f"{'Long' if position == 1 else 'Short'} position: {self.contracts} contracts entered at {self.entry_price}."
 
     def to_df(self) -> pd.DataFrame:
+        """
+        Human readable representation.
+        """
         return pd.DataFrame(
             {
                 "open": [self.open],
@@ -78,4 +81,7 @@ class State:
         )
 
     def to_numpy(self):
-        return self.to_df().to_numpy()
+        """
+        Machine readable representation.
+        """
+        return self.to_df().to_numpy().ravel()

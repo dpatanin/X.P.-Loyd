@@ -23,7 +23,7 @@ class FreeLaborTrader:
         model = tf.keras.Sequential()
         model.add(
             tf.keras.layers.Dense(
-                units=32, activation="relu", input_dim=self.state_size
+                units=32, activation="relu", input_shape=(self.state_size,)
             )
         )
         model.add(tf.keras.layers.Dense(units=128, activation="relu"))
