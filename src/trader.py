@@ -5,7 +5,7 @@ import random
 
 
 class FreeLaborTrader:
-    def __init__(self, state_size: int, action_space=4):
+    def __init__(self, state_size: int, action_space: int = 4):
         self.state_size = state_size
         self.action_space = action_space
         self.memory = ExperienceReplayBuffer(2000)
@@ -17,6 +17,7 @@ class FreeLaborTrader:
 
         self.optimizer = tf.keras.optimizers.Adamax()
         self.model = self.build_model()
+        self.target_model = self.build_model()
 
     def build_model(self):
         model = tf.keras.Sequential()
@@ -76,3 +77,8 @@ class FreeLaborTrader:
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
+        
+        self.update_target_model()
+
+    def update_target_model(self):
+        self.target_model.set_weights(self.model.get_weights())
