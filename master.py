@@ -1,47 +1,28 @@
-from src.data_preprocess import load_data
+from src.data_processor import DataProcessor
 from src.trader import FreeLaborTrader
 from src.state import State
-import pandas as pd
 
 from tqdm import tqdm
 
 
-def state_creator(data: pd.DataFrame, timestep: int, state: State = None):
-    new_data = data.iloc[[timestep]].to_dict()
-    new_state = State(
-        new_data["Open"][timestep],
-        new_data["High"][timestep],
-        new_data["Low"][timestep],
-        new_data["Close"][timestep],
-        new_data["Volume"][timestep],
-    )
-
-    if state:
-        new_state.balance = state.balance
-        new_state.entry_price = state.entry_price
-        new_state.contracts = state.contracts
-
-    return new_state
-
-
-data = load_data("data/ES_futures_sample/ES_continuous_1min_sample.csv")
 episodes = 100
 batch_size = 32
-data_samples = len(data) - 1
 tick_size = 0.25
 tick_value = 12.50
-initial_balance = 10000  # TODO: Rework to be the actual initial balance
+initial_balance = 10000
 
-trader = FreeLaborTrader(state_size=8)
+dp = DataProcessor("data/ES_futures_sample/ES_continuous_1min_sample.csv", batch_size)
+trader = FreeLaborTrader(state_size=8, batch_size=batch_size)
+
 trader.model.summary()
 
 for episode in range(1, episodes + 1):
     print(f"Episode: {episode}/{episodes}")
-    state = state_creator(data, 0)
+    state = State(dp.windowed_data[0], balance=initial_balance)  # initial state
 
     # tqdm is used for visualization
-    for t in tqdm(range(data_samples)):
-        next_state = state_creator(data, t + 1, state)
+    for data in tqdm(dp.windowed_data[1:]):
+        next_state = State(data, state.balance, state.entry_price, state.contracts)
 
         # TODO: Revise the goal (e.g. absolute vs relative value)
         # Define the desired goal as the closing price of the next time step
@@ -67,7 +48,7 @@ for episode in range(1, episodes + 1):
             # print("FreeLaborTrader exited position with profit: ", profit)
             reward = profit
 
-        done = t == data_samples - 1
+        done = dp.windowed_data.index(data) == len(dp.windowed_data) - 1
         if done:
             # Consequences for braking restrictions
             reward = (

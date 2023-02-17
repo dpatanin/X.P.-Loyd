@@ -17,6 +17,6 @@ class ExperienceReplayBuffer:
         """
         experiences = random.sample(self.buffer, batch_size)
         return tuple(np.array(e) for e in zip(*experiences))
-
+    
     def __len__(self):
         return len(self.buffer)

@@ -77,7 +77,7 @@ class FreeLaborTrader:
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
-        
+
         self.update_target_model()
 
     def update_target_model(self):

@@ -31,7 +31,7 @@ class DataProcessor:
     ) -> list[pd.DataFrame]:
         assert_columns(data, self.column_header)
 
-        windowed_data = []
+        windowed_data: list[pd.DataFrame] = []
 
         i = 0
         while i < len(data):
