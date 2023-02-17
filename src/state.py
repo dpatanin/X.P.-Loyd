@@ -1,5 +1,5 @@
 import pandas as pd
-from helper import assert_columns, default_header
+from src.helper import assert_columns, default_header
 
 
 class State:
@@ -11,7 +11,7 @@ class State:
         contracts=0,
     ):
         assert_columns(data, default_header)
-        
+
         self.data = data
         self.balance = balance
         self.entry_price = entry_price
@@ -64,7 +64,7 @@ class State:
         """
         return pd.DataFrame(
             {
-                "data": [self.data],
+                "data": [self.data.to_numpy()],
                 "balance": [self.balance],
                 "entry_price": [self.entry_price],
                 "contracts": [self.contracts],

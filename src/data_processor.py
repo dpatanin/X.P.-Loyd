@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
 import os
-from helper import assert_columns, default_header
+from src.helper import assert_columns, default_header
 
 
 class DataProcessor:
@@ -39,7 +38,7 @@ class DataProcessor:
                 i + window_size if i + window_size < len(data) else len(data) - 1
             )
 
-            windowed_data.append(data.iloc[i : i + upper_boundary, :])
+            windowed_data.append(data.iloc[i : upper_boundary, :])
             i += slide_length
 
         self.windowed_data = windowed_data
