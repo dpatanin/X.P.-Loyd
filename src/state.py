@@ -1,23 +1,18 @@
 import pandas as pd
+from helper import assert_columns
 
 
 class State:
     def __init__(
         self,
-        open: float,
-        high: float,
-        low: float,
-        close: float,
-        volume: int,
+        data: pd.DataFrame,
         balance=10000.00,
         entry_price=0.00,
         contracts=0,
     ):
-        self.open = open
-        self.high = high
-        self.low = low
-        self.close = close
-        self.volume = volume
+        assert_columns(data)
+        
+        self.data = data
         self.balance = balance
         self.entry_price = entry_price
         self.contracts = contracts
@@ -69,11 +64,7 @@ class State:
         """
         return pd.DataFrame(
             {
-                "open": [self.open],
-                "high": [self.high],
-                "low": [self.low],
-                "close": [self.close],
-                "volume": [self.volume],
+                "data": [self.data],
                 "balance": [self.balance],
                 "entry_price": [self.entry_price],
                 "contracts": [self.contracts],
@@ -85,3 +76,6 @@ class State:
         Machine readable representation.
         """
         return self.to_df().to_numpy().ravel()
+
+    def __str__(self):
+        return self.to_df().__str__
