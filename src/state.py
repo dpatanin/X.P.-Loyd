@@ -62,14 +62,11 @@ class State:
         """
         Human readable representation.
         """
-        return pd.DataFrame(
-            {
-                "data": [self.data.to_numpy()],
-                "balance": [self.balance],
-                "entry_price": [self.entry_price],
-                "contracts": [self.contracts],
-            }
-        )
+        df = pd.DataFrame(self.data)
+        df["Balance"] = self.balance
+        df["EntryPrice"] = self.entry_price
+        df["Contracts"] = self.contracts
+        return df
 
     def to_numpy(self):
         """

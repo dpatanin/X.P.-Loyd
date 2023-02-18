@@ -21,6 +21,8 @@ class DataProcessor:
         assert os.path.exists(file_path), f"{file_path} does not exist."
         data = pd.read_csv(file_path)
         assert_columns(data, self.column_header)
+        
+        data.drop(labels="DateTime", axis=1)
 
         self.data = data
         return data

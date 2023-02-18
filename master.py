@@ -22,8 +22,8 @@ for episode in range(1, episodes + 1):
     current_price = dp.windowed_data[0]["Close"].iloc[-1]
 
     # tqdm is used for visualization
-    for data in tqdm(dp.windowed_data[1:]):
-        next_state = State(data, state.balance, state.entry_price, state.contracts)
+    for batch in tqdm(dp.windowed_data[1:]):
+        next_state = State(batch, state.balance, state.entry_price, state.contracts)
 
         # TODO: Revise the goal (e.g. absolute vs relative value)
         # Define the desired goal as the closing price of the next time step
@@ -50,7 +50,7 @@ for episode in range(1, episodes + 1):
             reward = profit
 
 
-        done = data.index[-1] == len(dp.windowed_data) - 1
+        done = batch.index[-1] == len(dp.windowed_data) - 1
         if done:
             # Consequences for braking restrictions
             reward = (
@@ -73,7 +73,7 @@ for episode in range(1, episodes + 1):
         )
 
         state = next_state
-        current_price = data["Close"].iloc[-1]
+        current_price = batch["Close"].iloc[-1]
 
         if len(trader.memory) > batch_size:
             trader.batch_train(batch_size)
