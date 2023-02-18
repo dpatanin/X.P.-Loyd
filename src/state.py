@@ -72,7 +72,7 @@ class State:
         """
         Machine readable representation.
         """
-        return self.to_df().to_numpy().ravel()
+        return self.to_df().to_numpy()
 
     def __str__(self):
         return self.to_df().__str__

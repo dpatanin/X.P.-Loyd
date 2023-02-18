@@ -22,7 +22,7 @@ class DataProcessor:
         data = pd.read_csv(file_path)
         assert_columns(data, self.column_header)
         
-        data.drop(labels="DateTime", axis=1)
+        data.drop("DateTime", axis=1, inplace=True)
 
         self.data = data
         return data

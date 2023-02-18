@@ -12,7 +12,7 @@ tick_value = 12.50
 initial_balance = 10000
 
 dp = DataProcessor("data/ES_futures_sample/ES_continuous_1min_sample.csv", batch_size)
-trader = FreeLaborTrader(state_size=8)
+trader = FreeLaborTrader(batch_size=batch_size, state_size=8)
 
 trader.model.summary()
 
@@ -76,7 +76,7 @@ for episode in range(1, episodes + 1):
         current_price = batch["Close"].iloc[-1]
 
         if len(trader.memory) > batch_size:
-            trader.batch_train(batch_size)
+            trader.batch_train()
 
     # Save the model every 10 episodes
     if episode % 10 == 0:
