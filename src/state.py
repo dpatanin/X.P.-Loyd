@@ -57,7 +57,7 @@ class State:
 
     def to_df(self) -> pd.DataFrame:
         """
-        Human readable representation.
+        Human readable Dataframe representation of the State object.
         """
         df = pd.DataFrame(self.data)
         df["Balance"] = self.balance
@@ -67,7 +67,7 @@ class State:
 
     def to_numpy(self):
         """
-        Machine readable representation.
+        Machine readable Numpy representation of the State object.
         """
         return self.to_df().to_numpy()
 

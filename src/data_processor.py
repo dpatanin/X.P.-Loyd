@@ -11,11 +11,23 @@ class Data:
     Sequenced: Raw data split into sequences.
     Windowed: Sequenced data grouped into lists. Those lists may overlap.
     """
+
     def __init__(self, file_path: str, processor: "DataProcessor"):
         self.processor = processor
         self.raw = self.processor.load(file_path)
         self.sequenced = self.processor.sequence(self.raw)
         self.windowed = self.processor.window(self.sequenced)
+
+    def get_next_sequence(self, sequence: pd.DataFrame):
+        """
+        Returns the sequence after the provided one or None if there is none or the sequence is not part of `self.sequenced`.
+        """
+        try:
+            for i, seq in enumerate(self.sequenced):
+                if seq.equals(sequence):
+                    return self.sequenced[i + 1]
+        except Exception:
+            return None
 
 
 class DataProcessor:

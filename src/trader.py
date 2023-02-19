@@ -3,12 +3,12 @@ import numpy as np
 import tensorflow as tf
 import random
 
+
 class FreeLaborTrader:
-    def __init__(self, recall_reach:int, batch_size:int, state_size: int, action_space: int = 4):
+    def __init__(self, batch_size: int, state_size: int, action_space: int = 4):
         self.state_size = state_size
         self.action_space = action_space
         self.batch_size = batch_size
-        self.recall_reach = recall_reach
         self.memory = ExperienceReplayBuffer(2000)
 
         self.gamma = 0.95
@@ -23,36 +23,43 @@ class FreeLaborTrader:
     def build_model(self):
         model = tf.keras.Sequential()
         # Add a Dense layer as input layer
-        model.add(tf.keras.layers.Dense(64, input_shape=(self.batch_size, self.state_size)))  
+        model.add(
+            tf.keras.layers.Dense(64, input_shape=(self.batch_size, self.state_size))
+        )
 
         # The output of GRU will be a 3D tensor of shape (batch_size, timesteps, 256)
         model.add(tf.keras.layers.GRU(256, return_sequences=True))
 
         # The output of SimpleRNN will be a 2D tensor of shape (batch_size, 128)
         model.add(tf.keras.layers.SimpleRNN(128))
-        
+
         # Add a Dense layer for the output
-        model.add(tf.keras.layers.Dense(self.action_space, activation='linear'))
-        
+        model.add(tf.keras.layers.Dense(self.action_space, activation="linear"))
+
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
 
         return model
 
-    def trade(self, state: np.ndarray):
-        states = []
+    def predict_action(self, states: np.ndarray):
+        """
+        Given a batch of states, returns an action based on the current policy.
 
-        if len(self.memory) > 0:
-            states.append(self.memory.recall(reach=self.recall_reach)[0])        
-        states.append(state)
-        
+        Args:
+            states: A numpy array of shape (batch_size, state_size).
+
+        Returns:
+            An integer representing the action to take.
+        """
         if random.random() <= self.epsilon:
             return random.randrange(self.action_space)
-        
+
         actions = self.model.predict(states)
         return np.argmax(actions[0])
 
     def batch_train(self):
-        (states, actions, rewards, next_states, dones) = self.memory.sample(self.batch_size)
+        (states, actions, rewards, next_states, dones) = self.memory.sample(
+            self.batch_size
+        )
 
         # Combine states and goals
         # states = np.concatenate((states, achieved_goals), axis=-1)
