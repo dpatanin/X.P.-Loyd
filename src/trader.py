@@ -4,10 +4,11 @@ import tensorflow as tf
 import random
 
 class FreeLaborTrader:
-    def __init__(self, batch_size:int, state_size: int, action_space: int = 4):
+    def __init__(self, recall_reach:int, batch_size:int, state_size: int, action_space: int = 4):
         self.state_size = state_size
         self.action_space = action_space
         self.batch_size = batch_size
+        self.recall_reach = recall_reach
         self.memory = ExperienceReplayBuffer(2000)
 
         self.gamma = 0.95
@@ -38,11 +39,16 @@ class FreeLaborTrader:
         return model
 
     def trade(self, state: np.ndarray):
-        state = state.reshape((1, self.batch_size, self.state_size))
+        states = []
+
+        if len(self.memory) > 0:
+            states.append(self.memory.recall(reach=self.recall_reach)[0])        
+        states.append(state)
+        
         if random.random() <= self.epsilon:
             return random.randrange(self.action_space)
-
-        actions = self.model.predict(state)
+        
+        actions = self.model.predict(states)
         return np.argmax(actions[0])
 
     def batch_train(self):

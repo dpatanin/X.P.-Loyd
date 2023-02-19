@@ -11,12 +11,23 @@ class ExperienceReplayBuffer:
     def add(self, experience: tuple[np.ndarray, int, float, np.ndarray, bool]):
         self.buffer.append(experience)
 
+    def recall(self, reach: int):
+        """
+        Recalls the latest experiences from memory.
+        Returns: [states, actions, rewards, next_states, dones]
+        """
+        if len(self.buffer) < reach:
+            reach = len(self.buffer)
+        experiences = list(self.buffer)[-reach:]
+        return tuple(np.array(e) for e in zip(*experiences))
+
     def sample(self, batch_size: int):
         """
+        Samples random experiences from memory.
         Returns: [states, actions, rewards, next_states, dones]
         """
         experiences = random.sample(self.buffer, batch_size)
         return tuple(np.array(e) for e in zip(*experiences))
-    
+
     def __len__(self):
         return len(self.buffer)

@@ -1,47 +1,58 @@
 import pandas as pd
 import os
-from src.helper import assert_columns, default_header
+import random
+
+
+class Data:
+    def __init__(self, file_path: str, processor: "DataProcessor"):
+        self.processor = processor
+        self.raw = self.processor.load(file_path)
+        self.sequenced = self.processor.sequence(self.raw)
+        self.windowed = self.processor.window(self.sequenced)
 
 
 class DataProcessor:
     def __init__(
         self,
-        file_path: str,
+        sequence_length: int,
         window_size: int,
         slide_length: int = None,
-        column_header: list[str] = default_header,
+        column_headers: list[str] = None,
+        dropped_headers: list[str] = None,
     ):
-        self.column_header = column_header
-        self.load_data(file_path)
-        self.window_data(
-            self.data, window_size, slide_length=slide_length or window_size
-        )
+        self.sequence_length = sequence_length
+        self.window_size = window_size
+        self.slide_length = slide_length or window_size
+        self.column_headers = column_headers or []
+        self.dropped_headers = dropped_headers or []
 
-    def load_data(self, file_path: str) -> pd.DataFrame:
+    def load(self, file_path: str) -> pd.DataFrame:
         assert os.path.exists(file_path), f"{file_path} does not exist."
         data = pd.read_csv(file_path)
-        assert_columns(data, self.column_header)
-        
-        data.drop("DateTime", axis=1, inplace=True)
+        self.assert_columns(data)
 
-        self.data = data
+        data.drop(self.dropped_headers, axis=1, inplace=True)
+
         return data
 
-    def window_data(
-        self, data: pd.DataFrame, window_size: int, slide_length: int
-    ) -> list[pd.DataFrame]:
-        assert_columns(data, self.column_header)
+    def sequence(self, data: pd.DataFrame) -> list[pd.DataFrame]:
+        self.assert_columns(data)
+        return [
+            data.iloc[i : i + self.sequence_length]
+            for i in range(0, len(data), self.sequence_length)
+            if len(data.iloc[i : i + self.sequence_length]) == self.sequence_length
+        ]
 
-        windowed_data: list[pd.DataFrame] = []
+    def window(self, data: list[pd.DataFrame]) -> list[list[pd.DataFrame]]:
+        self.assert_columns(data[random.randrange(len(data))])
+        return [
+            data[i : i + self.window_size]
+            for i in range(0, len(data) - self.window_size + 1, self.slide_length)
+            if len(data[i : i + self.window_size]) == self.window_size
+        ]
 
-        i = 0
-        while i < len(data):
-            upper_boundary = (
-                i + window_size if i + window_size < len(data) else len(data) - 1
+    def assert_columns(self, data: pd.DataFrame):
+        if missing_columns := set(self.column_headers) - set(data.columns):
+            raise ValueError(
+                f"DataFrame is missing required columns: {missing_columns}"
             )
-
-            windowed_data.append(data.iloc[i : upper_boundary, :])
-            i += slide_length
-
-        self.windowed_data = windowed_data
-        return windowed_data

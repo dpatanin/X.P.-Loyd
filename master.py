@@ -5,14 +5,18 @@ from src.state import State
 from tqdm import tqdm
 
 
+default_header = ["Open", "High", "Low", "Close", "Volume"]
+dropped_header = ["DateTime"]
+
 episodes = 100
 batch_size = 32
+recall_reach = 10
 tick_size = 0.25
 tick_value = 12.50
 initial_balance = 10000
 
 dp = DataProcessor("data/ES_futures_sample/ES_continuous_1min_sample.csv", batch_size)
-trader = FreeLaborTrader(batch_size=batch_size, state_size=8)
+trader = FreeLaborTrader(recall_reach=10, batch_size=batch_size, state_size=8)
 
 trader.model.summary()
 
