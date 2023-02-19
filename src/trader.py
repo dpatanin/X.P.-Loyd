@@ -35,15 +35,18 @@ class FreeLaborTrader:
                 filters=32,
                 kernel_size=3,
                 input_shape=(self.sequence_length, self.state_size),
-                activation='relu'
+                activation="relu",
             )
         )
 
+        # Add a LSTM layer
+        model.add(tf.keras.layers.LSTM(units=64, return_sequences=True))
+
         # The output of GRU will be a 3D tensor of shape (batch_size, timesteps, 256)
-        model.add(tf.keras.layers.GRU(256, return_sequences=True))
+        model.add(tf.keras.layers.GRU(units=256, return_sequences=True))
 
         # The output of SimpleRNN will be a 2D tensor of shape (batch_size, 128)
-        model.add(tf.keras.layers.SimpleRNN(128))
+        model.add(tf.keras.layers.SimpleRNN(units=128))
 
         # Add a Dense layer for the output
         model.add(tf.keras.layers.Dense(self.action_space, activation="linear"))
