@@ -4,6 +4,13 @@ import random
 
 
 class Data:
+    """
+    Processor: The processing unit for the data. It processes the data and splits and sorts it into the respective data bundles.
+    Data chunks shorter than the specified parameter will be omitted.
+    Raw: Entire data in one dataframe.
+    Sequenced: Raw data split into sequences.
+    Windowed: Sequenced data grouped into lists. Those lists may overlap.
+    """
     def __init__(self, file_path: str, processor: "DataProcessor"):
         self.processor = processor
         self.raw = self.processor.load(file_path)
