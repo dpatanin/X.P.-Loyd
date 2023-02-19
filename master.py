@@ -7,7 +7,7 @@ import types
 from tqdm import tqdm
 
 
-default_headers = ["Open", "High", "Low", "Close", "Volume"]
+required_headers = ["Open", "High", "Low", "Close", "Volume"]
 dropped_headers = ["DateTime"]
 
 episodes = 100
@@ -19,11 +19,13 @@ tick_value = 12.50
 dp = DataProcessor(
     sequence_length=sequence_length,
     window_size=batch_size,
-    column_headers=default_headers,
+    column_headers=required_headers,
     dropped_headers=dropped_headers,
 )
 data = Data("data/ES_futures_sample/ES_continuous_1min_sample.csv", dp)
-trader = FreeLaborTrader(batch_size=batch_size, state_size=8)
+trader = FreeLaborTrader(
+    sequence_length=sequence_length, batch_size=batch_size, state_size=8
+)
 
 trader.model.summary()
 
@@ -69,7 +71,7 @@ for episode in range(1, episodes + 1):
         # Define the desired goal as the closing price of the next time step
         # desired_goal = next_state.close
 
-        action = trader.predict_action(np.array(batch_states))
+        action = trader.predict_action(np.array([s.to_numpy() for s in batch_states]))
         reward = 0
 
         if action == 1 and not state.has_position():  # Buying; enter long position
@@ -94,20 +96,20 @@ for episode in range(1, episodes + 1):
             or type(data.get_next_sequence(data.windowed[i + 1][-1])) is types.NoneType
         )
         if done:
+            # Consequences for braking restrictions
+            reward = (
+                -1000000000000000
+                if next_state.has_position() or next_state.balance < 0
+                else reward
+            )
+            print("########################")
+            print(f"TOTAL PROFIT: {next_state.balance - initial_balance}")
+            print("########################")
+
             # Updating the initial values of each episode
             initial_balance = next_state.balance
             initial_entry_price = next_state.entry_price
             initial_contracts = next_state.contracts
-
-            # Consequences for braking restrictions
-            reward = (
-                -1000000000000000
-                if state.has_position() or state.balance < 0
-                else reward
-            )
-            print("########################")
-            print(f"TOTAL PROFIT: {state.balance - initial_balance}")
-            print("########################")
 
         trader.memory.add(
             (
