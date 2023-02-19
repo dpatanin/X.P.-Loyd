@@ -27,7 +27,7 @@ class ExperienceReplayBuffer:
         if len(self.buffer) < batch_size:
             raise ValueError("Not enough experiences in the buffer.")
 
-        experiences = np.random.choice(self.buffer, size=batch_size, replace=False)
+        experiences = random.sample(self.buffer, batch_size)
         return tuple(np.array(e) for e in zip(*experiences))
 
     def clear(self) -> None:
