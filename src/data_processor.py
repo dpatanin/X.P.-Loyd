@@ -20,14 +20,16 @@ class Data:
 
     def get_next_sequence(self, sequence: pd.DataFrame):
         """
-        Returns the sequence after the provided one or None if there is none or the sequence is not part of `self.sequenced`.
+        Returns the sequence after the provided one or None if there is none i.e. it is the last.
         """
         try:
             for i, seq in enumerate(self.sequenced):
                 if seq.equals(sequence):
                     return self.sequenced[i + 1]
-        except Exception:
+        except IndexError:
             return None
+        except ValueError as e:
+            raise ValueError("Provided sequence not part of sequenced data.") from e
 
 
 class DataProcessor:
