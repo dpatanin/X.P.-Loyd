@@ -9,10 +9,10 @@ class FreeLaborTrader:
         self,
         sequence_length: int,
         batch_size: int,
-        state_size: int,
+        num_features: int,
         action_space: int = 4,
     ):
-        self.state_size = state_size
+        self.num_features = num_features
         self.action_space = action_space
         self.batch_size = batch_size
         self.sequence_length = sequence_length
@@ -34,7 +34,7 @@ class FreeLaborTrader:
             tf.keras.layers.Conv1D(
                 filters=32,
                 kernel_size=3,
-                input_shape=(self.sequence_length, self.state_size),
+                input_shape=(self.sequence_length, self.num_features),
                 activation="relu",
             )
         )

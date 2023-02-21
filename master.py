@@ -24,7 +24,7 @@ dp = DataProcessor(
 )
 data = Data("data/ES_futures_sample/ES_continuous_1min_sample.csv", dp)
 trader = FreeLaborTrader(
-    sequence_length=sequence_length, batch_size=batch_size, state_size=8
+    sequence_length=sequence_length, batch_size=batch_size, num_features=8
 )
 
 trader.model.summary()
