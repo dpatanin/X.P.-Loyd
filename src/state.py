@@ -60,9 +60,9 @@ class State:
         Human readable Dataframe representation of the State object.
         """
         df = pd.DataFrame(self.data)
-        df["Balance"] = self.balance
-        df["EntryPrice"] = self.entry_price
         df["Contracts"] = self.contracts
+        df["EntryPrice"] = self.entry_price
+        df["Balance"] = self.balance
         return df
 
     def to_numpy(self):
