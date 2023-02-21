@@ -7,8 +7,7 @@ import types
 from tqdm import tqdm
 
 
-required_headers = ["Open", "High", "Low", "Close", "Volume"]
-dropped_headers = ["DateTime"]
+headers = ["Open", "High", "Low", "Close", "Volume"]
 
 episodes = 100
 batch_size = 6
@@ -20,8 +19,7 @@ tick_value = 12.50
 dp = DataProcessor(
     sequence_length=sequence_length,
     window_size=batch_size,
-    column_headers=required_headers,
-    dropped_headers=dropped_headers,
+    headers=headers,
 )
 data = Data("data/ES_futures_sample/ES_continuous_1min_sample.csv", dp)
 trader = FreeLaborTrader(

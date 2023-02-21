@@ -29,28 +29,26 @@ class Data:
         except Exception:
             return None
 
-# TODO: remove dropped headers (all unspecified headers should be dropped)
+
 class DataProcessor:
     def __init__(
         self,
+        headers: list[str],
         sequence_length: int,
         window_size: int,
         slide_length: int = None,
-        column_headers: list[str] = None,
-        dropped_headers: list[str] = None,
     ):
+        self.column_headers = headers
         self.sequence_length = sequence_length
         self.window_size = window_size
         self.slide_length = slide_length or window_size
-        self.column_headers = column_headers or []
-        self.dropped_headers = dropped_headers or []
 
     def load(self, file_path: str) -> pd.DataFrame:
         assert os.path.exists(file_path), f"{file_path} does not exist."
         data = pd.read_csv(file_path)
-        self.assert_columns(data)
 
-        data.drop(self.dropped_headers, axis=1, inplace=True)
+        self.assert_columns(data)
+        data.drop(set(data.columns) - set(self.column_headers), axis=1, inplace=True)
 
         return data
 
