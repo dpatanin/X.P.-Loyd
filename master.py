@@ -13,6 +13,7 @@ dropped_headers = ["DateTime"]
 episodes = 100
 batch_size = 6
 sequence_length = 5
+update_freq = 5
 tick_size = 0.25
 tick_value = 12.50
 

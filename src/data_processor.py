@@ -29,7 +29,7 @@ class Data:
         except Exception:
             return None
 
-
+# TODO: remove dropped headers (all unspecified headers should be dropped)
 class DataProcessor:
     def __init__(
         self,

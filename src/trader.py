@@ -11,6 +11,7 @@ class FreeLaborTrader:
         batch_size: int,
         num_features: int,
         action_space: int = 4,
+        update_freq: int = 1,
     ):
         self.num_features = num_features
         self.action_space = action_space
@@ -22,6 +23,8 @@ class FreeLaborTrader:
         self.epsilon = 1.0
         self.epsilon_final = 0.01
         self.epsilon_decay = 0.995
+        self.target_update_freq = update_freq
+        self.target_update_cd = update_freq
 
         self.optimizer = tf.keras.optimizers.Adamax()
         self.model = self.build_model()
@@ -72,6 +75,8 @@ class FreeLaborTrader:
         return np.argmax(actions[0])
 
     def batch_train(self):
+        self.target_update_cd -= 1
+
         (states, actions, rewards, next_states, dones) = self.memory.sample(
             self.batch_size
         )
@@ -93,9 +98,12 @@ class FreeLaborTrader:
             )
 
             # Compute the actual Q-values
-            target_q_values = (
-                rewards
-                + self.gamma * tf.reduce_max(self.model(next_states), axis=1) * masks
+            target_q_values = rewards + self.gamma * tf.reduce_max(
+                self.target_model(next_states), axis=1
+            ) * masks * tf.cast(
+                tf.reduce_max(self.model(next_states), axis=1)
+                == tf.reduce_max(self.target_model(next_states), axis=1),
+                tf.float32,
             )
 
             # Compute the loss
@@ -112,7 +120,9 @@ class FreeLaborTrader:
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
 
-        self.update_target_model()
+        if self.target_update_cd == 0:
+            self.update_target_model()
+            self.target_update_cd = self.target_update_freq
 
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
