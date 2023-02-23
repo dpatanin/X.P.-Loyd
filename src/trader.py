@@ -1,4 +1,4 @@
-from src.experience_replay import ExperienceReplayBuffer
+from src.experience_replay import HERBuffer
 from src.state import State
 import numpy as np
 import tensorflow as tf
@@ -18,7 +18,7 @@ class FreeLaborTrader:
         self.action_space = action_space
         self.batch_size = batch_size
         self.sequence_length = sequence_length
-        self.memory = ExperienceReplayBuffer(2000)
+        self.memory = HERBuffer(2000)
 
         self.gamma = 0.95
         self.epsilon = 1.0
@@ -88,10 +88,6 @@ class FreeLaborTrader:
         rewards = np.array(rewards)
         next_states = self.__transform_states(next_states)
         dones = np.array(dones)
-
-        # Combine states and goals
-        # states = np.concatenate((states, achieved_goals), axis=-1)
-        # next_states = np.concatenate((next_states, desired_goals), axis=-1)
 
         # Convert the dones list to a binary mask
         masks = 1 - dones

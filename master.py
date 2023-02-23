@@ -45,7 +45,7 @@ for episode in range(1, episodes + 1):
     )  # initial state
 
     # TODO: Determine prices
-    current_price = data.raw["Close"].iloc[-1]
+    current_price = data.raw["Close"].iloc[0]
 
     for i, batch in enumerate(tqdm(data.windowed)):
         # Initialize states for batch of data; last element represents current state
@@ -65,10 +65,6 @@ for episode in range(1, episodes + 1):
             state.entry_price,
             state.contracts,
         )
-
-        # TODO: Revise the goal (e.g. absolute vs relative value)
-        # Define the desired goal as the closing price of the next time step
-        # desired_goal = next_state.close
 
         action = trader.predict_action(batch_states)
         reward = 0
@@ -125,6 +121,9 @@ for episode in range(1, episodes + 1):
 
         if len(trader.memory) > batch_size:
             trader.batch_train()
+
+    # Create hindsight experiences
+    trader.memory.analyze_missed_opportunities(tick_value)
 
     # Save the model every 10 episodes
     if episode % 10 == 0:
