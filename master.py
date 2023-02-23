@@ -70,7 +70,7 @@ for episode in range(1, episodes + 1):
         # Define the desired goal as the closing price of the next time step
         # desired_goal = next_state.close
 
-        action = trader.predict_action(np.array([s.to_numpy() for s in batch_states]))
+        action = trader.predict_action(batch_states)
         reward = 0
 
         if action == 1 and not state.has_position():  # Buying; enter long position
@@ -112,10 +112,10 @@ for episode in range(1, episodes + 1):
 
         trader.memory.add(
             (
-                state.to_numpy(),
+                state,
                 action,
                 reward,
-                next_state.to_numpy(),
+                next_state,
                 done,
             )
         )

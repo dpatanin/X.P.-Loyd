@@ -1,34 +1,36 @@
 import random
 import numpy as np
+from src.state import State
 from collections import deque
 from typing import Deque, Tuple
 
 
 class ExperienceReplayBuffer:
     def __init__(self, max_size: int, goal_sampling_strategy: str = "final"):
-        self.buffer: Deque[Tuple[np.ndarray, int, float, np.ndarray, bool]] = deque(
+        self.buffer: Deque[Tuple["State", int, float, "State", bool]] = deque(
             maxlen=max_size
         )
         self.goal_sampling_strategy: str = goal_sampling_strategy
 
-    def add(self, experience: Tuple[np.ndarray, int, float, np.ndarray, bool]) -> None:
-        assert all(
-            e[0].shape == experience[0].shape for e in self.buffer
-        ), "State shape mismatch."
-        assert all(
-            e[3].shape == experience[3].shape for e in self.buffer
-        ), "Next state shape mismatch."
-
+    def add(self, experience: Tuple["State", int, float, "State", bool]) -> None:
         self.buffer.append(experience)
 
     def sample(
         self, batch_size: int
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> Tuple[list["State"], list[int], list[float], list["State"], list[bool]]:
         if len(self.buffer) < batch_size:
             raise ValueError("Not enough experiences in the buffer.")
 
         experiences = random.sample(self.buffer, batch_size)
-        return tuple(np.array(e) for e in zip(*experiences))
+        states, actions, rewards, next_states, dones = zip(*experiences)
+
+        return (
+            list(states),
+            list(actions),
+            list(rewards),
+            list(next_states),
+            list(dones),
+        )
 
     def clear(self) -> None:
         self.buffer.clear()
