@@ -1,4 +1,4 @@
-from src.data_processor import DataProcessor, Data
+from src.data_processor import DataProcessor
 from src.trader import FreeLaborTrader
 from src.state import State
 import numpy as np
@@ -10,23 +10,27 @@ from tqdm import tqdm
 headers = ["Open", "High", "Low", "Close", "Volume"]
 
 episodes = 100
-batch_size = 6
+batch_size = 4
 sequence_length = 5
 update_freq = 5
 tick_size = 0.25
 tick_value = 12.50
 
 dp = DataProcessor(
+    dir="data",
     sequence_length=sequence_length,
-    window_size=batch_size,
+    batch_size=batch_size,
     headers=headers,
 )
-data = Data("data/ES_futures_sample/ES_continuous_1min_sample.csv", dp)
 trader = FreeLaborTrader(
     sequence_length=sequence_length, batch_size=batch_size, num_features=8
 )
-
 trader.model.summary()
+
+
+for i in range(len(dp.batched_dir)):
+    batch = dp.load_batch(i)
+    batch_states = []
 
 for episode in range(1, episodes + 1):
     print(f"Episode: {episode}/{episodes}")
