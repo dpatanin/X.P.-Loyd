@@ -4,20 +4,12 @@ import pandas as pd
 class State:
     def __init__(
         self,
-        open: float,
-        high: float,
-        low: float,
-        close: float,
-        volume: int,
+        data: pd.DataFrame,
         balance=10000.00,
         entry_price=0.00,
         contracts=0,
     ):
-        self.open = open
-        self.high = high
-        self.low = low
-        self.close = close
-        self.volume = volume
+        self.data = data
         self.balance = balance
         self.entry_price = entry_price
         self.contracts = contracts
@@ -64,18 +56,20 @@ class State:
         return f"{'Long' if position == 1 else 'Short'} position: {self.contracts} contracts entered at {self.entry_price}."
 
     def to_df(self) -> pd.DataFrame:
-        return pd.DataFrame(
-            {
-                "open": [self.open],
-                "high": [self.high],
-                "low": [self.low],
-                "close": [self.close],
-                "volume": [self.volume],
-                "balance": [self.balance],
-                "entry_price": [self.entry_price],
-                "contracts": [self.contracts],
-            }
-        )
+        """
+        Human readable Dataframe representation of the State object.
+        """
+        df = pd.DataFrame(self.data)
+        df["Contracts"] = self.contracts
+        df["EntryPrice"] = self.entry_price
+        df["Balance"] = self.balance
+        return df
 
     def to_numpy(self):
+        """
+        Machine readable Numpy representation of the State object.
+        """
         return self.to_df().to_numpy()
+
+    def __str__(self):
+        return self.to_df().__str__

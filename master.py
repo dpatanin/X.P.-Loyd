@@ -1,93 +1,129 @@
-from src.data_preprocess import load_data
+from src.data_processor import DataProcessor, Data
 from src.trader import FreeLaborTrader
 from src.state import State
-import pandas as pd
+import numpy as np
+import types
 
 from tqdm import tqdm
 
 
-def state_creator(data: pd.DataFrame, timestep: int, state: State = None):
-    new_data = data.iloc[[timestep]].to_dict()
-    new_state = State(
-        new_data["Open"][timestep],
-        new_data["High"][timestep],
-        new_data["Low"][timestep],
-        new_data["Close"][timestep],
-        new_data["Volume"][timestep],
-    )
+headers = ["Open", "High", "Low", "Close", "Volume"]
 
-    if state:
-        new_state.balance = state.balance
-        new_state.entry_price = state.entry_price
-        new_state.contracts = state.contracts
-
-    return new_state
-
-
-data = load_data("data/ES_futures_sample/ES_continuous_1min_sample.csv")
 episodes = 100
-batch_size = 32
-data_samples = len(data) - 1
+batch_size = 6
+sequence_length = 5
+update_freq = 5
 tick_size = 0.25
 tick_value = 12.50
-initial_balance = 10000  # TODO: Rework to be the actual initial balance
 
-trader = FreeLaborTrader(state_size=8)
+dp = DataProcessor(
+    sequence_length=sequence_length,
+    window_size=batch_size,
+    headers=headers,
+)
+data = Data("data/ES_futures_sample/ES_continuous_1min_sample.csv", dp)
+trader = FreeLaborTrader(
+    sequence_length=sequence_length, batch_size=batch_size, num_features=8
+)
+
 trader.model.summary()
 
 for episode in range(1, episodes + 1):
     print(f"Episode: {episode}/{episodes}")
-    state = state_creator(data, 0)
+    done = False
 
-    # tqdm is used for visualization
-    for t in tqdm(range(data_samples)):
-        action = trader.trade(state.to_numpy())
-        next_state = state_creator(data, t + 1, state)
+    # Initial parameters for each episode
+    initial_balance = 10000  # Initial balance may change from episode to episode
+    initial_entry_price = 0  # This should only change when swing trading
+    initial_contracts = 0  # This should only change when swing trading
+
+    state = State(
+        data.sequenced[0],
+        balance=initial_balance,
+        entry_price=initial_entry_price,
+        contracts=initial_contracts,
+    )  # initial state
+
+    # TODO: Determine prices
+    current_price = data.raw["Close"].iloc[0]
+
+    for i, batch in enumerate(tqdm(data.windowed)):
+        # Initialize states for batch of data; last element represents current state
+        batch_states = [
+            State(sequence, state.balance, state.entry_price, state.contracts)
+            for sequence in batch
+        ]
+        state = batch_states[-1]
+
+        next_sequence = data.get_next_sequence(batch[-1])
+        if type(next_sequence) is types.NoneType:
+            continue
+
+        next_state = State(
+            next_sequence,
+            state.balance,
+            state.entry_price,
+            state.contracts,
+        )
+
+        action = trader.predict_action(batch_states)
         reward = 0
 
         if action == 1 and not state.has_position():  # Buying; enter long position
             # TODO: Make possible to buy multiple contracts based on current balance
-            next_state.enter_long(state.close, 1, tick_value)
+            next_state.enter_long(current_price, 1, tick_value)
             # print("FreeLaborTrader entered position:", state.rep_position())
 
         elif action == 2 and not state.has_position():  # Selling; enter short position
             # TODO: Make possible to sell short multiple contracts based on current balance
-            next_state.enter_short(state.close, 1, tick_value)
+            next_state.enter_short(current_price, 1, tick_value)
             # print("FreeLaborTrader entered position:", state.rep_position())
 
         elif action == 3 and state.has_position():  # Exit; close position
             # TODO: Calculate actual profit
             # TODO: Calculate reward based on position exit
-            profit = next_state.exit_position(state.close, tick_value)
+            profit = next_state.exit_position(current_price, tick_value)
             # print("FreeLaborTrader exited position with profit: ", profit)
             reward = profit
 
-        done = t == data_samples - 1
+        done = (
+            i == len(data.windowed) - 1
+            or type(data.get_next_sequence(data.windowed[i + 1][-1])) is types.NoneType
+        )
         if done:
             # Consequences for braking restrictions
             reward = (
                 -1000000000000000
-                if state.has_position() or state.balance < 0
+                if next_state.has_position() or next_state.balance < 0
                 else reward
             )
             print("########################")
-            print(f"TOTAL PROFIT: {state.balance - initial_balance}")
+            print(f"TOTAL PROFIT: {next_state.balance - initial_balance}")
             print("########################")
 
-        trader.memory.append(
+            # Updating the initial values of each episode
+            initial_balance = next_state.balance
+            initial_entry_price = next_state.entry_price
+            initial_contracts = next_state.contracts
+
+        trader.memory.add(
             (
-                state.to_numpy(),
+                state,
                 action,
                 reward,
-                next_state.to_numpy(),
+                next_state,
                 done,
             )
         )
 
         state = next_state
+        current_price = batch[-1]["Close"].iloc[-1]
 
         if len(trader.memory) > batch_size:
-            trader.batch_train(batch_size)
+            trader.batch_train()
+
+    # Create hindsight experiences
+    trader.memory.analyze_missed_opportunities(tick_value)
 
     # Save the model every 10 episodes
     if episode % 10 == 0:
