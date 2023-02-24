@@ -1,4 +1,5 @@
-from src.experience_replay import ExperienceReplayBuffer
+from src.experience_replay import HERBuffer
+from src.state import State
 import numpy as np
 import tensorflow as tf
 import random
@@ -17,7 +18,7 @@ class FreeLaborTrader:
         self.action_space = action_space
         self.batch_size = batch_size
         self.sequence_length = sequence_length
-        self.memory = ExperienceReplayBuffer(2000)
+        self.memory = HERBuffer(2000)
 
         self.gamma = 0.95
         self.epsilon = 1.0
@@ -58,12 +59,12 @@ class FreeLaborTrader:
 
         return model
 
-    def predict_action(self, states: np.ndarray):
+    def predict_action(self, states: list["State"]):
         """
         Given a batch of states, returns an action based on the current policy.
 
         Args:
-            states: A numpy array of shape (batch_size, sequence_length, state_size).
+            states: A list of states of size `batch_size`.
 
         Returns:
             An integer representing the action to take.
@@ -71,7 +72,8 @@ class FreeLaborTrader:
         if random.random() <= self.epsilon:
             return random.randrange(self.action_space)
 
-        actions = self.model.predict(states)
+        # TODO: which action to choose?
+        actions = self.model.predict(self.__transform_states(states))
         return np.argmax(actions[0])
 
     def batch_train(self):
@@ -81,9 +83,11 @@ class FreeLaborTrader:
             self.batch_size
         )
 
-        # Combine states and goals
-        # states = np.concatenate((states, achieved_goals), axis=-1)
-        # next_states = np.concatenate((next_states, desired_goals), axis=-1)
+        states = self.__transform_states(states)
+        actions = np.array(actions)
+        rewards = np.array(rewards)
+        next_states = self.__transform_states(next_states)
+        dones = np.array(dones)
 
         # Convert the dones list to a binary mask
         masks = 1 - dones
@@ -126,3 +130,6 @@ class FreeLaborTrader:
 
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
+
+    def __transform_states(self, states: list["State"]):
+        return np.array([s.to_numpy() for s in states])
