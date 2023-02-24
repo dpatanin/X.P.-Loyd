@@ -1,58 +1,39 @@
 import pandas as pd
 import os
-import random
-
-
-class Data:
-    """
-    Processor: The processing unit for the data. It processes the data and splits and sorts it into the respective data bundles.
-    Data chunks shorter than the specified parameter will be omitted.
-    Raw: Entire data in one dataframe.
-    Sequenced: Raw data split into sequences.
-    Windowed: Sequenced data grouped into lists. Those lists may overlap.
-    """
-
-    def __init__(self, file_path: str, processor: "DataProcessor"):
-        self.processor = processor
-        self.raw = self.processor.load(file_path)
-        self.sequenced = self.processor.sequence(self.raw)
-        self.windowed = self.processor.window(self.sequenced)
-
-    def get_next_sequence(self, sequence: pd.DataFrame):
-        """
-        Returns the sequence after the provided one or None if there is none i.e. it is the last.
-        """
-        try:
-            for i, seq in enumerate(self.sequenced):
-                if seq.equals(sequence):
-                    return self.sequenced[i + 1]
-        except IndexError:
-            return None
-        except ValueError as e:
-            raise ValueError("Provided sequence not part of sequenced data.") from e
+import numpy as np
 
 
 class DataProcessor:
     def __init__(
         self,
+        dir: str,
         headers: list[str],
         sequence_length: int,
-        window_size: int,
-        slide_length: int = None,
+        batch_size: int,
     ):
+        assert os.path.exists(dir), f"{dir} does not exist."
+
+        self.dir = dir
         self.column_headers = headers
         self.sequence_length = sequence_length
-        self.window_size = window_size
-        self.slide_length = slide_length or window_size
+        self.batch_size = batch_size
+        self.batched_dir = self.__batch_dir()
 
-    def load(self, file_path: str) -> pd.DataFrame:
-        assert os.path.exists(file_path), f"{file_path} does not exist."
+    def load_file(self, file_path: str) -> pd.DataFrame:
         data = pd.read_csv(file_path)
 
         self.assert_columns(data)
         data.drop(set(data.columns) - set(self.column_headers), axis=1, inplace=True)
 
         return data
+
+    def load_batch(self, batch_index: int):
+        seq_files = [
+            self.sequence(self.load_file(f"{self.dir}/{path}"))
+            for path in self.batched_dir[batch_index]
+        ]
+
+        return [list(s) for s in zip(*seq_files)]
 
     def sequence(self, data: pd.DataFrame) -> list[pd.DataFrame]:
         self.assert_columns(data)
@@ -62,16 +43,14 @@ class DataProcessor:
             if len(data.iloc[i : i + self.sequence_length]) == self.sequence_length
         ]
 
-    def window(self, data: list[pd.DataFrame]) -> list[list[pd.DataFrame]]:
-        self.assert_columns(data[random.randrange(len(data))])
-        return [
-            data[i : i + self.window_size]
-            for i in range(0, len(data) - self.window_size + 1, self.slide_length)
-            if len(data[i : i + self.window_size]) == self.window_size
-        ]
-
     def assert_columns(self, data: pd.DataFrame):
         if missing_columns := set(self.column_headers) - set(data.columns):
             raise ValueError(
                 f"DataFrame is missing required columns: {missing_columns}"
             )
+
+    def __batch_dir(self):
+        ls = os.listdir(self.dir)
+        del ls[: (len(ls) % self.batch_size)]
+
+        return [ls[i : i + self.batch_size] for i in range(0, len(ls), self.batch_size)]
