@@ -5,7 +5,7 @@ class State:
     def __init__(
         self,
         data: pd.DataFrame,
-        balance=10000.00,
+        balance=0.00,
         entry_price=0.00,
         contracts=0,
     ):
@@ -72,4 +72,4 @@ class State:
         return self.to_df().to_numpy()
 
     def __str__(self):
-        return self.to_df().__str__
+        return self.to_df().__str__()

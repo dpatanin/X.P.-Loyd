@@ -59,22 +59,26 @@ class FreeLaborTrader:
 
         return model
 
-    def predict_action(self, states: list["State"]):
+    def predict_actions(self, states: list["State"]) -> list[int]:
         """
-        Given a batch of states, returns an action based on the current policy.
+        Given a batch of states, returns an action based on the current policy for each state.
 
         Args:
             states: A list of states of size `batch_size`.
 
         Returns:
-            An integer representing the action to take.
+            An integer list representing the actions to take.
         """
-        if random.random() <= self.epsilon:
-            return random.randrange(self.action_space)
-
-        # TODO: which action to choose?
-        actions = self.model.predict(self.__transform_states(states))
-        return np.argmax(actions[0])
+        actions = []
+        predictions = self.model.predict(self.__transform_states(states))
+        
+        for s, p in zip(states, predictions):
+            if random.random() <= self.epsilon:
+                actions.append(random.randrange(self.action_space))
+            else:
+                actions.append(np.argmax(p))
+            
+        return actions
 
     def batch_train(self):
         self.target_update_cd -= 1
