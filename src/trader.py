@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 import random
 
-
 class FreeLaborTrader:
     def __init__(
         self,
@@ -72,7 +71,7 @@ class FreeLaborTrader:
         actions = []
         predictions = self.model.predict(self.__transform_states(states))
         
-        for s, p in zip(states, predictions):
+        for p in predictions:
             if random.random() <= self.epsilon:
                 actions.append(random.randrange(self.action_space))
             else:

@@ -1,11 +1,7 @@
 from src.data_processor import DataProcessor
 from src.trader import FreeLaborTrader
 from src.state import State
-import numpy as np
 import pandas as pd
-import types
-
-from tqdm import tqdm
 
 
 headers = ["Open", "High", "Low", "Close", "Volume"]
@@ -65,7 +61,6 @@ for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
 
     for e in range(1, episodes + 1):
-        print(f"Batch {i+1}/{len(dp.batched_dir)}. Episode: {e}/{episodes}")
         done = False
 
         # States to maintain continuity of actions
