@@ -1,5 +1,4 @@
 import random
-import numpy as np
 from src.state import State
 from collections import deque
 from typing import Deque, Tuple
