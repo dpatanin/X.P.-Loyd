@@ -13,6 +13,8 @@ update_freq = 5
 tick_size = 0.25
 tick_value = 12.50
 init_balance = 10000.00
+threshold = 0.2
+volume_limit = 500  # TODO
 
 dp = DataProcessor(
     dir="data",
@@ -39,20 +41,41 @@ def create_state(sequence: pd.DataFrame, state: "State" = None):
     )
 
 
-def take_action(action: int, state: "State", current_price: float):
+def take_action(q: int, state: "State", current_price: float):
     reward = 0
+    amount = abs(((abs(q) - threshold) / (1 - threshold)) * volume_limit)
+    if q > 0 and (overhead := state.balance - (amount * tick_value)) < 0:
+        amount -= overhead / tick_value
 
-    if action == 1 and not state.has_position():  # Buying; enter long position
-        # TODO: Make possible to buy multiple contracts based on current balance
-        state.enter_long(current_price, contracts=1, price_per_contract=tick_value)
-
-    elif action == 2 and not state.has_position():  # Selling; enter short position
-        # TODO: Make possible to sell short multiple contracts based on current balance
-        state.enter_short(current_price, contracts=1, price_per_contract=tick_value)
-
-    elif action == 3 and state.has_position():  # Exit; close position
-        profit = state.exit_position(current_price, price_per_contract=tick_value)
-        reward = profit
+    if q < 0:
+        if abs(q) < threshold:
+            if state.has_position() > 0:
+                reward = state.exit_position()
+        elif state.has_position() > 0:
+            reward = state.exit_position()
+            state.enter_short(current_price, amount, tick_value)
+        elif state.has_position() < 0:
+            contracts = state.contracts
+            state.exit_position()
+            state.enter_short(current_price, amount + contracts, tick_value)
+        else:
+            state.enter_short(current_price, amount, tick_value)
+    elif q > 0:
+        if abs(q) < threshold:
+            if state.has_position() < 0:
+                reward = state.exit_position()
+        elif state.has_position() < 0:
+            reward = state.exit_position()
+            state.enter_long(current_price, amount, tick_value)
+        elif state.has_position() > 0:
+            contracts = state.contracts
+            state.exit_position()
+            state.enter_long(current_price, amount + contracts, tick_value)
+        else:
+            state.enter_long(current_price, amount, tick_value)
+    else:
+        # TODO: intrinsic motivation?
+        reward += 0
 
     return reward
 
@@ -78,10 +101,10 @@ for i in range(len(dp.batched_dir) - 1):
                 for seq, state in zip(batch[idx + 1], con_states)
             ]
 
-            actions = trader.predict_actions(curr_states)
+            q_values = trader.predict(curr_states)
             rewards = [
-                take_action(a, ns, ns.data["Close"].iloc[-1])
-                for a, ns in zip(actions, next_states)
+                take_action(q, ns, ns.data["Close"].iloc[-1])
+                for q, ns in zip(q_values, next_states)
             ]
 
             # Check for next state to be available
@@ -96,8 +119,8 @@ for i in range(len(dp.batched_dir) - 1):
                 ]
 
             con_states = next_states
-            for s, a, r, ns in zip(curr_states, actions, rewards, next_states):
-                trader.memory.add((s, a, r, ns, done))
+            for s, q, r, ns in zip(curr_states, q_values, rewards, next_states):
+                trader.memory.add((s, q, r, ns, done))
 
             if len(trader.memory) > batch_size:
                 trader.batch_train()
