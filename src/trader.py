@@ -51,7 +51,7 @@ class FreeLaborTrader:
         model.add(tf.keras.layers.SimpleRNN(units=128))
 
         # Add a single output neuron with tanh activation
-        tf.keras.layers.Dense(units=1, activation="tanh")
+        model.add(tf.keras.layers.Dense(units=1, activation="tanh"))
 
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
 
