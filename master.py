@@ -1,6 +1,7 @@
 from src.data_processor import DataProcessor
 from src.trader import FreeLaborTrader
 from src.state import State
+from src.action_space import ActionSpace
 import pandas as pd
 
 
@@ -14,8 +15,11 @@ tick_size = 0.25
 tick_value = 12.50
 init_balance = 10000.00
 threshold = 0.2
-volume_limit = 500  # TODO
+trade_limit = 500  # Limit to trade at once
 
+action_space = ActionSpace(
+    threshold=threshold, price_per_contract=tick_value, limit=trade_limit
+)
 dp = DataProcessor(
     dir="data",
     sequence_length=sequence_length,
@@ -41,45 +45,6 @@ def create_state(sequence: pd.DataFrame, state: "State" = None):
     )
 
 
-def take_action(q: int, state: "State", current_price: float):
-    reward = 0
-    amount = abs(((abs(q) - threshold) / (1 - threshold)) * volume_limit)
-    if q > 0 and (overhead := state.balance - (amount * tick_value)) < 0:
-        amount -= overhead / tick_value
-
-    if q < 0:
-        if abs(q) < threshold:
-            if state.has_position() > 0:
-                reward = state.exit_position()
-        elif state.has_position() > 0:
-            reward = state.exit_position()
-            state.enter_short(current_price, amount, tick_value)
-        elif state.has_position() < 0:
-            contracts = state.contracts
-            state.exit_position()
-            state.enter_short(current_price, amount + contracts, tick_value)
-        else:
-            state.enter_short(current_price, amount, tick_value)
-    elif q > 0:
-        if abs(q) < threshold:
-            if state.has_position() < 0:
-                reward = state.exit_position()
-        elif state.has_position() < 0:
-            reward = state.exit_position()
-            state.enter_long(current_price, amount, tick_value)
-        elif state.has_position() > 0:
-            contracts = state.contracts
-            state.exit_position()
-            state.enter_long(current_price, amount + contracts, tick_value)
-        else:
-            state.enter_long(current_price, amount, tick_value)
-    else:
-        # TODO: intrinsic motivation?
-        reward += 0
-
-    return reward
-
-
 for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
 
@@ -103,8 +68,7 @@ for i in range(len(dp.batched_dir) - 1):
 
             q_values = trader.predict(curr_states)
             rewards = [
-                take_action(q, ns, ns.data["Close"].iloc[-1])
-                for q, ns in zip(q_values, next_states)
+                action_space.take_action(q, ns) for q, ns in zip(q_values, next_states)
             ]
 
             # Check for next state to be available

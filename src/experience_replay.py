@@ -6,25 +6,25 @@ from typing import Deque, Tuple
 
 class ExperienceReplayBuffer:
     def __init__(self, max_size: int):
-        self.buffer: Deque[Tuple["State", int, float, "State", bool]] = deque(
+        self.buffer: Deque[Tuple["State", float, float, "State", bool]] = deque(
             maxlen=max_size
         )
 
-    def add(self, experience: Tuple["State", int, float, "State", bool]) -> None:
+    def add(self, experience: Tuple["State", float, float, "State", bool]) -> None:
         self.buffer.append(experience)
 
     def sample(
         self, batch_size: int
-    ) -> Tuple[list["State"], list[int], list[float], list["State"], list[bool]]:
+    ) -> Tuple[list["State"], list[float], list[float], list["State"], list[bool]]:
         if len(self.buffer) < batch_size:
             raise ValueError("Not enough experiences in the buffer.")
 
         experiences = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones = zip(*experiences)
+        states, predictions, rewards, next_states, dones = zip(*experiences)
 
         return (
             list(states),
-            list(actions),
+            list(predictions),
             list(rewards),
             list(next_states),
             list(dones),
@@ -49,9 +49,8 @@ class HERBuffer(ExperienceReplayBuffer):
         alt_state: State = None
         price_shift_ref = 0.00
         for xp in experiences:
-            s, a, r, ns, d = xp
+            s, q, r, ns, d = xp
 
-            # TODO: actions rework
             # TODO: reward intrinsic motivation
             current_price: float = s.data["Close"].iloc[-1]
             price_diff: float = ns.data["Close"].iloc[-1] - current_price
@@ -84,7 +83,7 @@ class HERBuffer(ExperienceReplayBuffer):
                     ns.balance = alt_state.balance
                     ns.contracts = alt_state.contracts
                     ns.entry_price = alt_state.entry_price
-                    self.add((alt_state, a, r, ns, d))
+                    self.add((alt_state, q, r, ns, d))
                     alt_state = ns
 
     def remember_last_episode(self) -> list[Tuple[State, int, float, State, bool]]:
