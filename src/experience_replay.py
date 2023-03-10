@@ -73,7 +73,6 @@ class HERBuffer(ExperienceReplayBuffer):
                     or ns.contracts != 0
                 ):
                     rand_q = self.__calc_q_for_exit(action_space.threshold, alt_q)
-
                     reward = self.reward_fac * action_space.take_action(
                         rand_q, alt_state, ns
                     )
