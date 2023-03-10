@@ -74,7 +74,7 @@ class FreeLaborTrader:
             if random.random() <= self.epsilon:
                 predictions.append(random.uniform(-1, 1))
             else:
-                predictions.append(q)
+                predictions.append(q[0])
 
         return predictions
 

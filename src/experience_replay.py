@@ -77,7 +77,7 @@ class HERBuffer(ExperienceReplayBuffer):
                 self.add((s, alt_q, r, ns, d))
                 alt_state = ns
 
-            else:
+            elif alt_state:
                 rand_q = random.uniform(0.0000000001, action_space.threshold)
 
                 if (

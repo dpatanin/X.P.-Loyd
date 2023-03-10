@@ -1,4 +1,5 @@
 from src.state import State
+import numpy as np
 
 # TODO: better doc
 class ActionSpace:
@@ -34,7 +35,7 @@ class ActionSpace:
 
         abs_q = abs(q)
         position = state.has_position()
-        price = state.data["Close"].iloc(-1)
+        price = state.data["Close"].iloc[-1]
         amount = self.calc_trade_amount(q, state)
         reward = 0
 
@@ -45,7 +46,7 @@ class ActionSpace:
             if self.is_opposite_direction(q, position):
                 reward = state.exit_position(price, self.ppc)
             elif position:
-                amount += state.contracts
+                amount += abs(state.contracts)
                 state.exit_position(price, self.ppc)
 
             state.enter_long(

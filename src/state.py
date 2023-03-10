@@ -26,7 +26,7 @@ class State:
         assert not self.has_position(), "Exit current position first."
         self.entry_price = entry_price
         self.balance += contracts * price_per_contract
-        self.contracts = contracts
+        self.contracts = -contracts
 
     def exit_position(self, exit_price: float, price_per_contract: float) -> float:
         assert self.has_position(), "No position to exit."
