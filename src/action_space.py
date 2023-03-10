@@ -29,29 +29,28 @@ class ActionSpace:
             else 0
         )
 
-    def take_action(self, q: float, state: "State") -> float:
+    def take_action(self, q: float, curr_state: "State", next_state: "State") -> float:
         if q == 0:
             return 0
 
         abs_q = abs(q)
-        position = state.has_position()
-        price = state.data["Close"].iloc[-1]
-        amount = self.calc_trade_amount(q, state)
+        position = curr_state.has_position()
+        price = curr_state.data["Close"].iloc[-1]
+        amount = self.calc_trade_amount(q, curr_state)
         reward = 0
 
         if abs_q < self.threshold:
             if self.is_opposite_direction(q, position):
-                reward = state.exit_position(price, self.ppc)
+                reward = next_state.exit_position(price, self.ppc)
         else:
-            if self.is_opposite_direction(q, position):
-                reward = state.exit_position(price, self.ppc)
-            elif position:
-                amount += abs(state.contracts)
-                state.exit_position(price, self.ppc)
+            if position:
+                if not self.is_opposite_direction(q, position):
+                    amount += abs(curr_state.contracts)
+                reward = next_state.exit_position(price, self.ppc)
 
-            state.enter_long(
-                price, amount - self.calc_overhead(amount, state.balance), self.ppc
-            ) if q > 0 else state.enter_short(price, amount, self.ppc)
+            next_state.enter_long(
+                price, amount - self.calc_overhead(amount, curr_state.balance), self.ppc
+            ) if q > 0 else next_state.enter_short(price, amount, self.ppc)
 
         return reward
 

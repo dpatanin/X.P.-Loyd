@@ -68,7 +68,8 @@ for i in range(len(dp.batched_dir) - 1):
 
             q_values = trader.predict(curr_states)
             rewards = [
-                action_space.take_action(q, ns) for q, ns in zip(q_values, next_states)
+                action_space.take_action(q, s, ns)
+                for q, s, ns in zip(q_values, curr_states, next_states)
             ]
 
             # Check for next state to be available
