@@ -107,3 +107,5 @@ for i in range(len(dp.batched_dir) - 1):
         # Save the model every 10 episodes
         if e % 10 == 0:
             trader.model.save(f"models/v0.1_ep{e}.h5")
+
+    trader.model.save("models/terminal_model.h5")
