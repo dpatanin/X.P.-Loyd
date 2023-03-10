@@ -74,6 +74,8 @@ class HERBuffer(ExperienceReplayBuffer):
                     alt_q = -alt_q
                     ns.enter_short(current_price, amount, price_per_contract)
 
+                reward = action_space.take_action(alt_q, s)
+
                 self.add((s, alt_q, r, ns, d))
                 alt_state = ns
 
