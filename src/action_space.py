@@ -15,12 +15,14 @@ class ActionSpace:
         self.ppc = price_per_contract
         self.limit = limit
 
-    def calc_trade_amount(self, q: float, state: "State") -> float:
+    def calc_trade_amount(self, q: float, state: "State") -> int:
         max_amount = min(state.data["Volume"].median(), self.limit)
-        return abs(((abs(q) - self.threshold) / (1 - self.threshold)) * max_amount)
+        return round(
+            abs(((abs(q) - self.threshold) / (1 - self.threshold)) * max_amount)
+        )
 
     def calc_overhead(self, contracts: int, balance: float) -> int:
-        return (
+        return round(
             overhead / self.ppc
             if (overhead := balance - (contracts * self.ppc)) < 0
             else 0

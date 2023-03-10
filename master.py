@@ -90,7 +90,7 @@ for i in range(len(dp.batched_dir) - 1):
                 trader.batch_train()
 
         # Create hindsight experiences
-        trader.memory.analyze_missed_opportunities(tick_value)
+        trader.memory.analyze_missed_opportunities(tick_value, action_space)
 
         # Save the model every 10 episodes
         if e % 10 == 0:
