@@ -39,13 +39,11 @@ class ExperienceReplayBuffer:
 
 
 class HERBuffer(ExperienceReplayBuffer):
-    def __init__(self, max_size: int, reward_factor=1):
+    def __init__(self, max_size: int, reward_fac=1):
         super().__init__(max_size)
-        self.reward_factor = reward_factor
+        self.reward_fac = reward_fac
 
-    def analyze_missed_opportunities(
-        self, price_per_contract: float, action_space: "ActionSpace"
-    ):
+    def analyze_missed_opportunities(self, action_space: "ActionSpace"):
         experiences = self.remember_last_episode()
 
         # alt state represents current state per iteration during alt timeline
@@ -55,7 +53,6 @@ class HERBuffer(ExperienceReplayBuffer):
         for xp in experiences:
             s, q, r, ns, d = xp
 
-            # TODO: reward intrinsic motivation
             current_price: float = s.data["Close"].iloc[-1]
             price_diff: float = ns.data["Close"].iloc[-1] - current_price
 
@@ -64,39 +61,38 @@ class HERBuffer(ExperienceReplayBuffer):
                 and not alt_state
             ):
                 price_shift_ref = price_diff
-                alt_q = random.uniform(action_space.threshold, 1)
-                amount = action_space.calc_trade_amount(alt_q, s)
+                alt_q = self.__calc_q_for_action(action_space.threshold, price_diff)
+                reward = action_space.take_action(alt_q, s, ns)
 
-                if price_diff > 0:
-                    amount -= action_space.calc_overhead(amount, s.balance)
-                    ns.enter_long(current_price, amount, price_per_contract)
-                if price_diff < 0:
-                    alt_q = -alt_q
-                    ns.enter_short(current_price, amount, price_per_contract)
-
-                reward = action_space.take_action(alt_q, s)
-
-                self.add((s, alt_q, r, ns, d))
+                self.add((s, alt_q, reward, ns, d))
                 alt_state = ns
 
             elif alt_state:
-                rand_q = random.uniform(0.0000000001, action_space.threshold)
-
                 if (
                     self.__check_price_shift(price_shift_ref, price_diff)
                     or ns.contracts != 0
                 ):
-                    r = self.reward_factor * alt_state.exit_position(
-                        current_price, price_per_contract
+                    rand_q = self.__calc_q_for_exit(action_space.threshold, alt_q)
+
+                    reward = self.reward_fac * action_space.take_action(
+                        rand_q, alt_state, ns
                     )
-                    self.add((alt_state, rand_q if alt_q < 0 else -rand_q, r, ns, d))
+
+                    self.add((alt_state, rand_q, reward, ns, d))
                     alt_state = None
                     alt_q = 0.00
                 else:
+                    rand_q = self.__calc_q_for_no_action(action_space.threshold, alt_q)
+                    reward = self.reward_fac * action_space.take_action(
+                        rand_q, alt_state, ns
+                    )
+
+                    # Ensure continuity of actions
                     ns.balance = alt_state.balance
                     ns.contracts = alt_state.contracts
                     ns.entry_price = alt_state.entry_price
-                    self.add((alt_state, rand_q if alt_q > 0 else -rand_q, r, ns, d))
+
+                    self.add((alt_state, rand_q, reward, ns, d))
                     alt_state = ns
 
     def remember_last_episode(self) -> list[Tuple[State, int, float, State, bool]]:
@@ -121,3 +117,15 @@ class HERBuffer(ExperienceReplayBuffer):
 
     def __check_missed_opportunity(self, c1: int, c2: int, diff: float):
         return c1 == 0 and c2 == 0 and diff != 0
+
+    def __calc_q_for_action(self, threshold: float, price_diff: float):
+        q = random.uniform(threshold, 1)
+        return q if price_diff > 0 else -q
+
+    def __calc_q_for_exit(self, threshold: float, alt_q: float):
+        q = random.uniform(0.0000000001, threshold)
+        return q if alt_q < 0 else -q
+
+    def __calc_q_for_no_action(self, threshold: float, alt_q: float):
+        q = random.uniform(0.0000000001, threshold)
+        return -q if alt_q < 0 else q
