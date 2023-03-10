@@ -58,15 +58,6 @@ class FreeLaborTrader:
         return model
 
     def predict(self, states: list["State"]) -> list[float]:
-        """
-        Given a batch of states, returns an action based on the current policy for each state.
-
-        Args:
-            states: A list of states of size `batch_size`.
-
-        Returns:
-            An integer list representing the actions to take.
-        """
         predictions = []
         q_values = self.model.predict(self.__transform_states(states))
 
