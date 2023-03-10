@@ -28,7 +28,7 @@ class ActionSpace:
     def calc_overhead(self, contracts: int, balance: float) -> int:
         return round(
             overhead / self.ppc
-            if (overhead := balance - (contracts * self.ppc)) < 0
+            if (overhead := abs(balance) - (contracts * self.ppc)) < 0
             else 0
         )
 
