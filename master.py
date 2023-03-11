@@ -3,11 +3,19 @@ from src.trader import FreeLaborTrader
 from src.state import State
 from src.action_space import ActionSpace
 import pandas as pd
+import numpy as np
 import yaml
 from yaml.loader import FullLoader
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
+
+
+def calc_num_features(headers: list, sequence_length: int) -> int:
+    empty = np.zeros((sequence_length, len(headers)))
+    data = pd.DataFrame(empty, columns=headers)
+    return len(State(data=data).to_df().columns)
+
 
 action_space = ActionSpace(
     threshold=config["action_space"]["threshold"],
@@ -24,7 +32,7 @@ dp = DataProcessor(
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
-    num_features=len(config["data_headers"]) + 3,
+    num_features=calc_num_features(config["data_headers"], config["sequence_length"]),
     memory_size=config["agent"]["memory_size"],
     update_freq=config["agent"]["update_frequency"],
     hindsight_reward_fac=config["reward_factors"]["hindsight"],

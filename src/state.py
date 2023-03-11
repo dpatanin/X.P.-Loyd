@@ -10,7 +10,6 @@ class State:
         contracts=0,
     ):
         self.data = data
-        # If you change the number of state features (outside the `data`) adjust the agent config
         self.balance = balance
         self.entry_price = entry_price
         self.contracts = contracts
