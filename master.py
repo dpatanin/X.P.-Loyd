@@ -5,21 +5,37 @@ from src.action_space import ActionSpace
 import pandas as pd
 
 
-headers = ["Open", "High", "Low", "Close", "Volume"]
-
-episodes = 100
-batch_size = 4
-sequence_length = 5
-update_freq = 5
+# General
 tick_size = 0.25
 tick_value = 12.50
 init_balance = 10000.00
+data_dir = "data"
+model_dir = "models"
+model_name = "v1-prototype"
+
+# Action Space
+episodes = 100
 threshold = 0.2
 trade_limit = 500  # Limit to trade at once
 
+# Data structure
+headers = ["Open", "High", "Low", "Close", "Volume"]
+batch_size = 4
+sequence_length = 5
+
+# Agent params
+update_freq = 5
+memory_size = 2000
+gamma = 0.95
+epsilon = 1.0
+epsilon_final = 0.01
+epsilon_decay = 0.995
+
+# Learning & rewards
 terminal_reward_fac = 1.5
 intrinsic_reward_fac = 0.75
 hindsight_reward_fac = 0.5
+
 
 action_space = ActionSpace(
     threshold=threshold,
@@ -28,7 +44,7 @@ action_space = ActionSpace(
     intrinsic_fac=intrinsic_reward_fac,
 )
 dp = DataProcessor(
-    dir="data",
+    dir=data_dir,
     sequence_length=sequence_length,
     batch_size=batch_size,
     headers=headers,
@@ -36,9 +52,14 @@ dp = DataProcessor(
 trader = FreeLaborTrader(
     sequence_length=sequence_length,
     batch_size=batch_size,
-    num_features=8,
-    update_freq=1,
+    num_features=len(headers) + 3,
+    memory_size=memory_size,
+    update_freq=update_freq,
     hindsight_reward_fac=hindsight_reward_fac,
+    gamma=gamma,
+    epsilon=epsilon,
+    epsilon_final=epsilon_final,
+    epsilon_decay=epsilon_decay,
 )
 trader.model.summary()
 
@@ -106,6 +127,6 @@ for i in range(len(dp.batched_dir) - 1):
 
         # Save the model every 10 episodes
         if e % 10 == 0:
-            trader.model.save(f"models/v0.1_ep{e}.h5")
+            trader.model.save(f"{model_dir}/{model_name}_ep{e}.h5")
 
-    trader.model.save("models/terminal_model.h5")
+    trader.model.save(f"{model_dir}/{model_name}_terminal.h5")

@@ -11,18 +11,23 @@ class FreeLaborTrader:
         sequence_length: int,
         batch_size: int,
         num_features: int,
-        update_freq=1,
+        memory_size=2000,
+        update_freq=5,
         hindsight_reward_fac=1.00,
+        gamma=0.95,
+        epsilon=1.0,
+        epsilon_final=0.01,
+        epsilon_decay=0.995,
     ):
         self.num_features = num_features
         self.batch_size = batch_size
         self.sequence_length = sequence_length
-        self.memory = HERBuffer(2000, hindsight_reward_fac)
+        self.memory = HERBuffer(memory_size, hindsight_reward_fac)
 
-        self.gamma = 0.95
-        self.epsilon = 1.0
-        self.epsilon_final = 0.01
-        self.epsilon_decay = 0.995
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.epsilon_final = epsilon_final
+        self.epsilon_decay = epsilon_decay
         self.target_update_freq = update_freq
         self.target_update_cd = update_freq
 
