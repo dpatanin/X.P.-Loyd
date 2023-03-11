@@ -25,7 +25,7 @@ action_space = ActionSpace(
     threshold=threshold,
     price_per_contract=tick_value,
     limit=trade_limit,
-    intrinsic_fac=1,
+    intrinsic_fac=intrinsic_reward_fac,
 )
 dp = DataProcessor(
     dir="data",
