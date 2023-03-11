@@ -68,8 +68,6 @@ class HERBuffer(ExperienceReplayBuffer):
                 alt_state = ns
 
             elif alt_state:
-                rand_q = random.uniform(0.0000000001, action_space.threshold)
-
                 if (
                     self.__check_price_shift(price_shift_ref, price_diff)
                     or ns.contracts != 0

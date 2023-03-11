@@ -3,42 +3,43 @@ from src.trader import FreeLaborTrader
 from src.state import State
 from src.action_space import ActionSpace
 import pandas as pd
+import numpy as np
+import yaml
+from yaml.loader import FullLoader
+
+with open("config.yaml") as f:
+    config = yaml.load(f, Loader=FullLoader)
 
 
-headers = ["Open", "High", "Low", "Close", "Volume"]
+def calc_num_features(headers: list, sequence_length: int) -> int:
+    empty = np.zeros((sequence_length, len(headers)))
+    data = pd.DataFrame(empty, columns=headers)
+    return len(State(data=data).to_df().columns)
 
-episodes = 100
-batch_size = 4
-sequence_length = 5
-update_freq = 5
-tick_size = 0.25
-tick_value = 12.50
-init_balance = 10000.00
-threshold = 0.2
-trade_limit = 500  # Limit to trade at once
-
-terminal_reward_fac = 1.5
-intrinsic_reward_fac = 0.75
-hindsight_reward_fac = 0.5
 
 action_space = ActionSpace(
-    threshold=threshold,
-    price_per_contract=tick_value,
-    limit=trade_limit,
-    intrinsic_fac=intrinsic_reward_fac,
+    threshold=config["action_space"]["threshold"],
+    price_per_contract=config["tick_value"],
+    limit=config["action_space"]["trade_limit"],
+    intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
 dp = DataProcessor(
-    dir="data",
-    sequence_length=sequence_length,
-    batch_size=batch_size,
-    headers=headers,
+    dir=config["data_directory"],
+    sequence_length=config["sequence_length"],
+    batch_size=config["batch_size"],
+    headers=config["data_headers"],
 )
 trader = FreeLaborTrader(
-    sequence_length=sequence_length,
-    batch_size=batch_size,
-    num_features=8,
-    update_freq=1,
-    hindsight_reward_fac=hindsight_reward_fac,
+    sequence_length=config["sequence_length"],
+    batch_size=config["batch_size"],
+    num_features=calc_num_features(config["data_headers"], config["sequence_length"]),
+    memory_size=config["agent"]["memory_size"],
+    update_freq=config["agent"]["update_frequency"],
+    hindsight_reward_fac=config["reward_factors"]["hindsight"],
+    gamma=config["agent"]["gamma"],
+    epsilon=config["agent"]["epsilon"],
+    epsilon_final=config["agent"]["epsilon_final"],
+    epsilon_decay=config["agent"]["epsilon_decay"],
 )
 trader.model.summary()
 
@@ -52,18 +53,18 @@ def create_state(sequence: pd.DataFrame, state: "State" = None):
             contracts=state.contracts,
         )
         if state
-        else State(sequence, balance=init_balance)
+        else State(sequence, balance=config["initial_balance"])
     )
 
 
 for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
 
-    for e in range(1, episodes + 1):
+    for e in range(1, config["episodes"] + 1):
         done = False
 
         # States to maintain continuity of actions
-        con_states: list["State"] = [None] * batch_size
+        con_states: list["State"] = [None] * config["batch_size"]
 
         for idx, sequences in enumerate(batch):
             if done:
@@ -90,7 +91,8 @@ for i in range(len(dp.batched_dir) - 1):
                 terminal_rewards: list[float] = [
                     -1000000000000000000
                     if ns.has_position() or ns.balance < 0
-                    else (r + ns.balance - init_balance) * terminal_reward_fac
+                    else (r + ns.balance - config["initial_balance"])
+                    * config["reward_factors"]["session_total"]
                     for r, ns in zip(rewards, next_states)
                 ]
 
@@ -98,7 +100,7 @@ for i in range(len(dp.batched_dir) - 1):
             for s, q, r, ns in zip(curr_states, q_values, rewards, next_states):
                 trader.memory.add((s, q, r, ns, done))
 
-            if len(trader.memory) > batch_size:
+            if len(trader.memory) > config["batch_size"]:
                 trader.batch_train()
 
         # Create hindsight experiences
@@ -106,6 +108,8 @@ for i in range(len(dp.batched_dir) - 1):
 
         # Save the model every 10 episodes
         if e % 10 == 0:
-            trader.model.save(f"models/v0.1_ep{e}.h5")
+            trader.model.save(
+                f"{config['model_directory']}/{config['model_name']}_ep{e}.h5"
+            )
 
-    trader.model.save("models/terminal_model.h5")
+    trader.model.save(f"{config['model_directory']}/{config['model_name']}_terminal.h5")

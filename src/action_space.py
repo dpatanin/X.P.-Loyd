@@ -1,5 +1,4 @@
 from src.state import State
-import numpy as np
 
 # TODO: better doc
 class ActionSpace:
