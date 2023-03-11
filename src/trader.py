@@ -11,11 +11,9 @@ class FreeLaborTrader:
         sequence_length: int,
         batch_size: int,
         num_features: int,
-        action_space: int = 4,
         update_freq: int = 1,
     ):
         self.num_features = num_features
-        self.action_space = action_space
         self.batch_size = batch_size
         self.sequence_length = sequence_length
         self.memory = HERBuffer(2000)
@@ -52,43 +50,34 @@ class FreeLaborTrader:
         # The output of SimpleRNN will be a 2D tensor of shape (batch_size, 128)
         model.add(tf.keras.layers.SimpleRNN(units=128))
 
-        # Add a Dense layer for the output
-        model.add(tf.keras.layers.Dense(self.action_space, activation="linear"))
+        # Add a single output neuron with tanh activation
+        model.add(tf.keras.layers.Dense(units=1, activation="tanh"))
 
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
 
         return model
 
-    def predict_actions(self, states: list["State"]) -> list[int]:
-        """
-        Given a batch of states, returns an action based on the current policy for each state.
+    def predict(self, states: list["State"]) -> list[float]:
+        predictions = []
+        q_values = self.model.predict(self.__transform_states(states))
 
-        Args:
-            states: A list of states of size `batch_size`.
-
-        Returns:
-            An integer list representing the actions to take.
-        """
-        actions = []
-        predictions = self.model.predict(self.__transform_states(states))
-
-        for p in predictions:
+        for q in q_values:
             if random.random() <= self.epsilon:
-                actions.append(random.randrange(self.action_space))
+                predictions.append(random.uniform(-1, 1))
             else:
-                actions.append(np.argmax(p))
+                predictions.append(q[0])
 
-        return actions
+        return predictions
 
     def batch_train(self):
         self.target_update_cd -= 1
 
-        (states, actions, rewards, next_states, dones) = self.memory.sample(
+        (states, predictions, rewards, next_states, dones) = self.memory.sample(
             self.batch_size
         )
 
         states = self.__transform_states(states)
-        actions = np.array(actions)
+        predictions = np.array(predictions)
         rewards = np.array(rewards)
         next_states = self.__transform_states(next_states)
         dones = np.array(dones)
@@ -101,9 +90,7 @@ class FreeLaborTrader:
         with tf.GradientTape() as tape:
             # Compute Q-values for each state using the model
             q_values = self.model(states)
-            q_values = tf.reduce_sum(
-                q_values * tf.one_hot(actions, self.action_space), axis=1
-            )
+            q_values = tf.reduce_sum(q_values * tf.one_hot(predictions, 1), axis=1)
 
             # Compute the actual Q-values
             target_q_values = rewards + self.gamma * tf.reduce_max(

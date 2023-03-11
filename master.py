@@ -1,6 +1,7 @@
 from src.data_processor import DataProcessor
 from src.trader import FreeLaborTrader
 from src.state import State
+from src.action_space import ActionSpace
 import pandas as pd
 
 
@@ -13,7 +14,12 @@ update_freq = 5
 tick_size = 0.25
 tick_value = 12.50
 init_balance = 10000.00
+threshold = 0.2
+trade_limit = 500  # Limit to trade at once
 
+action_space = ActionSpace(
+    threshold=threshold, price_per_contract=tick_value, limit=trade_limit
+)
 dp = DataProcessor(
     dir="data",
     sequence_length=sequence_length,
@@ -39,24 +45,6 @@ def create_state(sequence: pd.DataFrame, state: "State" = None):
     )
 
 
-def take_action(action: int, state: "State", current_price: float):
-    reward = 0
-
-    if action == 1 and not state.has_position():  # Buying; enter long position
-        # TODO: Make possible to buy multiple contracts based on current balance
-        state.enter_long(current_price, contracts=1, price_per_contract=tick_value)
-
-    elif action == 2 and not state.has_position():  # Selling; enter short position
-        # TODO: Make possible to sell short multiple contracts based on current balance
-        state.enter_short(current_price, contracts=1, price_per_contract=tick_value)
-
-    elif action == 3 and state.has_position():  # Exit; close position
-        profit = state.exit_position(current_price, price_per_contract=tick_value)
-        reward = profit
-
-    return reward
-
-
 for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
 
@@ -78,10 +66,10 @@ for i in range(len(dp.batched_dir) - 1):
                 for seq, state in zip(batch[idx + 1], con_states)
             ]
 
-            actions = trader.predict_actions(curr_states)
+            q_values = trader.predict(curr_states)
             rewards = [
-                take_action(a, ns, ns.data["Close"].iloc[-1])
-                for a, ns in zip(actions, next_states)
+                action_space.take_action(q, s, ns)
+                for q, s, ns in zip(q_values, curr_states, next_states)
             ]
 
             # Check for next state to be available
@@ -96,14 +84,14 @@ for i in range(len(dp.batched_dir) - 1):
                 ]
 
             con_states = next_states
-            for s, a, r, ns in zip(curr_states, actions, rewards, next_states):
-                trader.memory.add((s, a, r, ns, done))
+            for s, q, r, ns in zip(curr_states, q_values, rewards, next_states):
+                trader.memory.add((s, q, r, ns, done))
 
             if len(trader.memory) > batch_size:
                 trader.batch_train()
 
         # Create hindsight experiences
-        trader.memory.analyze_missed_opportunities(tick_value)
+        trader.memory.analyze_missed_opportunities(tick_value, action_space)
 
         # Save the model every 10 episodes
         if e % 10 == 0:
