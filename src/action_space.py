@@ -11,10 +11,13 @@ class ActionSpace:
     If above threshold, enter the desired direction. If already in that direction, keep your contracts (reenter).
     """
 
-    def __init__(self, threshold: float, price_per_contract: float, limit: int):
+    def __init__(
+        self, threshold: float, price_per_contract: float, limit: int, intrinsic_fac=1
+    ):
         self.threshold = threshold
         self.ppc = price_per_contract
         self.limit = limit
+        self.intrinsic_fac = intrinsic_fac
 
     def calc_trade_amount(self, q: float, state: "State") -> int:
         max_amount = min(state.data["Volume"].median(), self.limit)
@@ -25,7 +28,7 @@ class ActionSpace:
     def calc_overhead(self, contracts: int, balance: float) -> int:
         return round(
             overhead / self.ppc
-            if (overhead := balance - (contracts * self.ppc)) < 0
+            if (overhead := abs(balance) - (contracts * self.ppc)) < 0
             else 0
         )
 
@@ -48,9 +51,13 @@ class ActionSpace:
                     amount += abs(curr_state.contracts)
                 reward = next_state.exit_position(price, self.ppc)
 
-            next_state.enter_long(
-                price, amount - self.calc_overhead(amount, curr_state.balance), self.ppc
-            ) if q > 0 else next_state.enter_short(price, amount, self.ppc)
+            if q > 0:
+                amount -= self.calc_overhead(amount, curr_state.balance)
+                next_state.enter_long(price, amount, self.ppc)
+            else:
+                next_state.enter_short(price, amount, self.ppc)
+
+            reward += amount * self.ppc * self.intrinsic_fac
 
         return reward
 
