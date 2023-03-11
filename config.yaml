@@ -19,7 +19,7 @@
   batch_size: 4
   sequence_length: 5
   action_space:
-    threshold: 0.2
+    threshold: 0.2 # 0.00 - 1; 1 -> no action
     trade_limit: 500 # Limit to trade at once
   agent:
     update_frequency: 5 # Target network
