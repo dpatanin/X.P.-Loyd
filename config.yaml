@@ -1,0 +1,34 @@
+---
+  # General configuration
+  model_name: v1-prototype
+  model_directory: models
+  data_directory: data
+  #! Close & Volume headers are required; not listed headers will be aborted
+  data_headers:
+            - Open
+            - High
+            - Low
+            - Close
+            - Volume
+  tick_size: 0.25 # Currently not in use
+  tick_value: 12.50 # Represents price per contract
+  initial_balance: 10000.00
+  
+  # Hyperparameter
+  episodes: 100
+  batch_size: 4
+  sequence_length: 5
+  action_space:
+    threshold: 0.2
+    trade_limit: 500 # Limit to trade at once
+  agent:
+    update_frequency: 5 # Target network
+    memory_size: 2000
+    gamma: 0.95
+    epsilon: 1.0
+    epsilon_final: 0.01
+    epsilon_decay: 0.995
+  reward_factors:
+    session_total: 1.5
+    intrinsic: 0.75
+    hindsight: 0.5
