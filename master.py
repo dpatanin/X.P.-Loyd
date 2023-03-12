@@ -47,19 +47,6 @@ trader = FreeLaborTrader(
 trader.model.summary()
 
 
-def create_state(sequence: pd.DataFrame, state: "State" = None) -> "State":
-    return (
-        State(
-            data=sequence,
-            balance=state.balance,
-            entry_price=state.entry_price,
-            contracts=state.contracts,
-        )
-        if state
-        else State(sequence, balance=config["initial_balance"])
-    )
-
-
 def calc_terminal_reward(reward: float, state: "State") -> float:
     if state.has_position or state.balance < 0:
         return -100000000000000000000
@@ -81,9 +68,6 @@ for i in range(len(dp.batched_dir) - 1):
         ] * config["batch_size"]
 
         for idx, sequences in enumerate(batch):
-            if done:
-                continue
-
             for seq, state in zip(sequences, states):
                 state.data = seq
             snapshot = states.copy()  # States before action; For experiences
@@ -91,8 +75,7 @@ for i in range(len(dp.batched_dir) - 1):
             q_values = trader.predict(states)
             rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
 
-            # Check for next state to be available
-            done = idx + 1 == len(batch) - 1
+            done = idx == len(batch) - 1
             if done:
                 rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
 
