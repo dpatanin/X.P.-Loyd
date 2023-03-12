@@ -28,14 +28,14 @@ class State:
         self.contracts = contracts
 
     def enter_long(self, contracts: int, price_per_contract: float):
-        assert not self.has_position(), "Exit current position first."
-        self.entry_price = self.data["Close"].iloc[-1]
+        self.assert_valid_operation(contracts, price_per_contract)
+        self.entry_price = self.data["Close"].iloc[-1] if contracts > 0 else 0.00
         self.balance -= contracts * price_per_contract
         self.contracts = contracts
 
     def enter_short(self, contracts: int, price_per_contract: float):
-        assert not self.has_position(), "Exit current position first."
-        self.entry_price = self.data["Close"].iloc[-1]
+        self.assert_valid_operation(contracts, price_per_contract)
+        self.entry_price = self.data["Close"].iloc[-1] if contracts > 0 else 0.00
         self.balance += contracts * price_per_contract
         self.contracts = -contracts
 
@@ -43,7 +43,7 @@ class State:
         assert self.has_position(), "No position to exit."
         profit = (
             (self.data["Close"].iloc[-1] - self.entry_price)
-            * self.contracts
+            * abs(self.contracts)
             * price_per_contract
         )
         self.balance += profit
@@ -83,6 +83,17 @@ class State:
         req_columns = ["Close", "Volume"]
         if missing_columns := set(req_columns) - set(self.data.columns):
             raise ValueError(f"Sequence is missing required columns: {missing_columns}")
+
+    def assert_valid_operation(self, contracts: int, price_per_contract: float):
+        assert (
+            not self.has_position()
+        ), f"Exit current position first. Current position: {self.has_position()}."
+        assert (
+            contracts >= 0
+        ), f"Invalid amount of contracts provided. Received: {contracts}."
+        assert (
+            price_per_contract > 0
+        ), f"Invalid amount of contracts provided. Received: {price_per_contract}."
 
     def __str__(self):
         return self.to_df().__str__()
