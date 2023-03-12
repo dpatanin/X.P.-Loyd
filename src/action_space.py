@@ -24,17 +24,24 @@ class ActionSpace:
         self.intrinsic_fac = intrinsic_fac
 
     def calc_trade_amount(self, q: float, state: "State") -> int:
+        """
+        Scales the q value prediction to the amount of contracts to trade.
+        """
         max_amount = min(state.data["Volume"].median(), self.limit)
         return round(
             abs(((abs(q) - self.threshold) / (1 - self.threshold)) * max_amount)
         )
 
-    def calc_overhead(self, contracts: int, balance: float) -> int:
-        return round(
-            overhead / self.ppc
-            if (overhead := abs(balance) - (contracts * self.ppc)) < 0
-            else 0
-        )
+    def remove_overhead(self, contracts: int, balance: float) -> int:
+        """
+        Calculates the overhead of contracts in regard to the balance.
+        Returns the new calculated trade amount without the overhead.
+        """
+        if balance <= 0:
+            return 0
+
+        overhead = balance - (contracts * self.ppc)
+        return contracts - round(abs(overhead / self.ppc)) if overhead <= 0 else 0
 
     def take_action(self, q: float, state: "State") -> float:
         if q == 0:
@@ -55,7 +62,7 @@ class ActionSpace:
                 reward = state.exit_position(self.ppc)
 
             if q > 0:
-                amount -= self.calc_overhead(amount, state.balance)
+                amount = self.remove_overhead(amount, state.balance)
                 state.enter_long(amount, self.ppc)
             else:
                 state.enter_short(amount, self.ppc)
