@@ -44,7 +44,7 @@ trader = FreeLaborTrader(
 trader.model.summary()
 
 
-def create_state(sequence: pd.DataFrame, state: "State" = None):
+def create_state(sequence: pd.DataFrame, state: "State" = None) -> "State":
     return (
         State(
             data=sequence,
