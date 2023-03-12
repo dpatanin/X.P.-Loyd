@@ -48,13 +48,6 @@ class State:
         else:
             return 0
 
-    def rep_position(self):
-        if not self.has_position():
-            return "No position."
-
-        position = self.has_position()
-        return f"{'Long' if position == 1 else 'Short'} position: {self.contracts} contracts entered at {self.entry_price}."
-
     def to_df(self) -> pd.DataFrame:
         """
         Human readable Dataframe representation of the State object.
