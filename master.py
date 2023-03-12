@@ -57,6 +57,15 @@ def create_state(sequence: pd.DataFrame, state: "State" = None):
     )
 
 
+def calc_terminal_reward(reward: float, next_state: "State") -> float:
+    if next_state.has_position or next_state.balance < 0:
+        return -100000000000000000000
+    else:
+        return (reward + ns.balance - config["initial_balance"]) * config[
+            "reward_factors"
+        ]["session_total"]
+
+
 for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
 
@@ -87,13 +96,8 @@ for i in range(len(dp.batched_dir) - 1):
             # Check for next state to be available
             done = idx + 1 == len(batch) - 1
             if done:
-                # Punish if breaking restrictions or reward total profit
-                terminal_rewards: list[float] = [
-                    -1000000000000000000
-                    if ns.has_position() or ns.balance < 0
-                    else (r + ns.balance - config["initial_balance"])
-                    * config["reward_factors"]["session_total"]
-                    for r, ns in zip(rewards, next_states)
+                rewards = [
+                    calc_terminal_reward(r, ns) for r, ns in zip(rewards, next_states)
                 ]
 
             con_states = next_states
