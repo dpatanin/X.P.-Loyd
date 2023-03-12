@@ -2,6 +2,16 @@ import pandas as pd
 
 
 class State:
+    """
+    This object represents one state.\n
+    Entering positions modifies this state. To feed it to a model use the `to_numpy()` method.
+
+    |`data`: Sequence of this state's price data as a pandas DataFrame.
+    |`balance`: Current balance.
+    |`entry_price`: Price with which position was entered.
+    |`contracts`: Amount of contracts if in position. Negative represents short position, positive long.
+    """
+
     def __init__(
         self,
         data: pd.DataFrame,

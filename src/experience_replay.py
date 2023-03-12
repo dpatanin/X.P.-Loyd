@@ -6,7 +6,16 @@ from typing import Deque, Tuple
 
 
 class ExperienceReplayBuffer:
-    def __init__(self, max_size: int):
+    """
+    A basic experience replay buffer representing a collection of transitions.\n
+    Unlike in a standard experience replay, this does not store predictions
+    as we use one continuous value and derive the actions therefrom.
+
+    One experience contains: `[State before action, Reward after action, State after action, Flag for session end]`
+    |`max_size`: Maximum amount of experiences being stored. (New delete oldest when full.)
+    """
+
+    def __init__(self, max_size=2000):
         self.buffer: Deque[Tuple["State", float, "State", bool]] = deque(
             maxlen=max_size
         )
@@ -17,6 +26,10 @@ class ExperienceReplayBuffer:
     def sample(
         self, batch_size: int
     ) -> Tuple[list["State"], list[float], list["State"], list[bool]]:
+        """
+        Randomly samples `batch_size` transitions/experiences.
+        """
+
         if len(self.buffer) < batch_size:
             raise ValueError("Not enough experiences in the buffer.")
 
@@ -38,7 +51,14 @@ class ExperienceReplayBuffer:
 
 
 class HERBuffer(ExperienceReplayBuffer):
-    def __init__(self, max_size: int, reward_fac=1):
+    """
+    A extended experience replay using the principle of a hindsight replay.\n
+    It creates additional experiences/transition from existing ones.
+
+    |`reward_fac`: Weight of rewards for ind hindsight generated experiences.
+    """
+
+    def __init__(self, max_size=2000, reward_fac=1):
         super().__init__(max_size)
         self.reward_fac = reward_fac
 

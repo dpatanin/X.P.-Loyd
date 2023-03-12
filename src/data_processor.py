@@ -3,6 +3,14 @@ import os
 
 
 class DataProcessor:
+    """
+    Loads, processes and serves the data.\n
+    It divides the sessions inside `dir` into batches of `batch_size` for parallel processing. (Leftover files are disregarded)
+    When loading a batch, the time sequenced data is split into `sequence_length` long sequences. (Leftover sequences are disregarded)
+
+    |`headers`: Specifies column header of csv files. Unspecified columns are dropped.
+    """
+
     def __init__(
         self,
         dir: str,

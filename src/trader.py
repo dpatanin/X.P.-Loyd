@@ -6,6 +6,20 @@ import random
 
 
 class FreeLaborTrader:
+    """
+    The trader defines the network and maintains a record of the transitions of size `memory_size`.
+    It's purpose is to represent the actor/agent in the environment, providing predictions, memorizing the outcomes
+    and lastly training on those observations to improve the predictions.\n
+    The trader uses two networks, one primary network is used to make the predictions,
+    a secondary target network is used to ensure a more stable learning process, being updated every `update_freq` trainings.
+    During training the trader uses an experience replay strategy, calculates the loss and updates the gradients.
+
+    |`sequence_length`, `batch_size`, `num_features`: Mandatory configuration parameters.
+    |`hindsight_reward_fac`: Weight for hindsight rewards.
+    |`gamma`: Weight inside the loss functions.
+    |`epsilon`, `epsilon_final`, `epsilon_decay`: Exploration parameters.
+    """
+
     def __init__(
         self,
         sequence_length: int,

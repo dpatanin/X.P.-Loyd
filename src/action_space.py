@@ -1,13 +1,18 @@
 from src.state import State
 
-# TODO: better doc
+
 class ActionSpace:
     """
-    Responsible for taking the action, this class defines the trading strategy and part of the rewards.
+    Responsible for taking the action, this class defines the trading strategy and returns the respective rewards.
+
+    |`threshold`: The threshold of the prediction/value to act. (0 - 1); 0: Always act; 1: Never act.
+    |`price_per_contract`: The price of a single contract (or item in general).
+    |`limit`: Absolute trading limit per single trade.
+    |`intrinsic_fac`: Weight for intrinsic rewards.
 
     Strategy:\n
-    If under threshold, do nothing unless direction changes, in that case be careful and exit position.
-    If above threshold, enter the desired direction. If already in that direction, keep your contracts (reenter).
+    If under threshold, do nothing unless prediction opposes current position, in that case be careful and exit position.
+    If above threshold, enter the predicted position. If already in that position, keep your contracts and reenter.
     """
 
     def __init__(
