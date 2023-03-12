@@ -7,25 +7,24 @@ from typing import Deque, Tuple
 
 class ExperienceReplayBuffer:
     def __init__(self, max_size: int):
-        self.buffer: Deque[Tuple["State", float, float, "State", bool]] = deque(
+        self.buffer: Deque[Tuple["State", float, "State", bool]] = deque(
             maxlen=max_size
         )
 
-    def add(self, experience: Tuple["State", float, float, "State", bool]) -> None:
+    def add(self, experience: Tuple["State", float, "State", bool]) -> None:
         self.buffer.append(experience)
 
     def sample(
         self, batch_size: int
-    ) -> Tuple[list["State"], list[float], list[float], list["State"], list[bool]]:
+    ) -> Tuple[list["State"], list[float], list["State"], list[bool]]:
         if len(self.buffer) < batch_size:
             raise ValueError("Not enough experiences in the buffer.")
 
         experiences = random.sample(self.buffer, batch_size)
-        states, predictions, rewards, next_states, dones = zip(*experiences)
+        states, rewards, next_states, dones = zip(*experiences)
 
         return (
             list(states),
-            list(predictions),
             list(rewards),
             list(next_states),
             list(dones),
@@ -51,7 +50,7 @@ class HERBuffer(ExperienceReplayBuffer):
         alt_q = 0.00
         price_shift_ref = 0.00
         for xp in experiences:
-            s, q, r, ns, d = xp
+            s, r, ns, d = xp
 
             current_price: float = s.data["Close"].iloc[-1]
             price_diff: float = ns.data["Close"].iloc[-1] - current_price
@@ -64,7 +63,7 @@ class HERBuffer(ExperienceReplayBuffer):
                 alt_q = self.__calc_q_for_action(action_space.threshold, price_diff)
                 reward = action_space.take_action(alt_q, s, ns)
 
-                self.add((s, alt_q, reward, ns, d))
+                self.add((s, reward, ns, d))
                 alt_state = ns
 
             elif alt_state:
@@ -72,18 +71,18 @@ class HERBuffer(ExperienceReplayBuffer):
                     self.__check_price_shift(price_shift_ref, price_diff)
                     or ns.contracts != 0
                 ):
-                    rand_q = self.__calc_q_for_exit(action_space.threshold, alt_q)
+                    q = self.__calc_q_for_exit(action_space.threshold, alt_q)
                     reward = self.reward_fac * action_space.take_action(
-                        rand_q, alt_state, ns
+                        q, alt_state, ns
                     )
 
-                    self.add((alt_state, rand_q, reward, ns, d))
+                    self.add((alt_state, reward, ns, d))
                     alt_state = None
                     alt_q = 0.00
                 else:
-                    rand_q = self.__calc_q_for_no_action(action_space.threshold, alt_q)
+                    q = self.__calc_q_for_no_action(action_space.threshold, alt_q)
                     reward = self.reward_fac * action_space.take_action(
-                        rand_q, alt_state, ns
+                        q, alt_state, ns
                     )
 
                     # Ensure continuity of actions
@@ -91,7 +90,7 @@ class HERBuffer(ExperienceReplayBuffer):
                     ns.contracts = alt_state.contracts
                     ns.entry_price = alt_state.entry_price
 
-                    self.add((alt_state, rand_q, reward, ns, d))
+                    self.add((alt_state, reward, ns, d))
                     alt_state = ns
 
     def remember_last_episode(self) -> list[Tuple[State, int, float, State, bool]]:

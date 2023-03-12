@@ -101,8 +101,8 @@ for i in range(len(dp.batched_dir) - 1):
                 ]
 
             con_states = next_states
-            for s, q, r, ns in zip(curr_states, q_values, rewards, next_states):
-                trader.memory.add((s, q, r, ns, done))
+            for s, r, ns in zip(curr_states, rewards, next_states):
+                trader.memory.add((s, r, ns, done))
 
             if len(trader.memory) > config["batch_size"]:
                 trader.batch_train()

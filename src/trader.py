@@ -68,12 +68,7 @@ class FreeLaborTrader:
     def batch_train(self):
         self.target_update_cd -= 1
 
-        (states, predictions, rewards, next_states, dones) = self.memory.sample(
-            self.batch_size
-        )
-
-        predictions = np.array(predictions)
-
+        (states, rewards, next_states, dones) = self.memory.sample(self.batch_size)
         # Convert the dones list to a binary mask; (1 for not done, 0 for done)
         masks = tf.cast(tf.logical_not(dones), dtype=tf.float32)
 
