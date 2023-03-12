@@ -11,10 +11,13 @@ with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
 
 
-def calc_num_features(headers: list, sequence_length: int) -> int:
-    empty = np.zeros((sequence_length, len(headers)))
-    data = pd.DataFrame(empty, columns=headers)
-    return len(State(data=data).to_df().columns)
+def num_features() -> int:
+    return len(State(data=empty_sequence()).to_df().columns)
+
+
+def empty_sequence() -> pd.DataFrame:
+    empty = np.zeros((config["sequence_length"], len(config["data_headers"])))
+    return pd.DataFrame(empty, columns=config["data_headers"])
 
 
 action_space = ActionSpace(
@@ -32,7 +35,7 @@ dp = DataProcessor(
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
-    num_features=calc_num_features(config["data_headers"], config["sequence_length"]),
+    num_features=num_features(),
     memory_size=config["agent"]["memory_size"],
     update_freq=config["agent"]["update_frequency"],
     hindsight_reward_fac=config["reward_factors"]["hindsight"],
@@ -57,11 +60,11 @@ def create_state(sequence: pd.DataFrame, state: "State" = None) -> "State":
     )
 
 
-def calc_terminal_reward(reward: float, next_state: "State") -> float:
-    if next_state.has_position or next_state.balance < 0:
+def calc_terminal_reward(reward: float, state: "State") -> float:
+    if state.has_position or state.balance < 0:
         return -100000000000000000000
     else:
-        return (reward + ns.balance - config["initial_balance"]) * config[
+        return (reward + states.balance - config["initial_balance"]) * config[
             "reward_factors"
         ]["session_total"]
 
@@ -72,37 +75,36 @@ for i in range(len(dp.batched_dir) - 1):
     for e in range(1, config["episodes"] + 1):
         done = False
 
-        # States to maintain continuity of actions
-        con_states: list["State"] = [None] * config["batch_size"]
+        # Initial states
+        states = [
+            State(data=empty_sequence(), balance=config["initial_balance"])
+        ] * config["batch_size"]
 
         for idx, sequences in enumerate(batch):
             if done:
                 continue
 
-            curr_states = [
-                create_state(seq, state) for seq, state in zip(sequences, con_states)
+            states = [
+                State(
+                    data=seq,
+                    balance=state.balance,
+                    entry_price=state.entry_price,
+                    contracts=state.contracts,
+                )
+                for seq, state in zip(sequences, states)
             ]
-            next_states = [
-                create_state(seq, state)
-                for seq, state in zip(batch[idx + 1], con_states)
-            ]
+            snapshot = states.copy()  # States before action; For experiences
 
-            q_values = trader.predict(curr_states)
-            rewards = [
-                action_space.take_action(q, s, ns)
-                for q, s, ns in zip(q_values, curr_states, next_states)
-            ]
+            q_values = trader.predict(states)
+            rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
 
             # Check for next state to be available
             done = idx + 1 == len(batch) - 1
             if done:
-                rewards = [
-                    calc_terminal_reward(r, ns) for r, ns in zip(rewards, next_states)
-                ]
+                rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
 
-            con_states = next_states
-            for s, r, ns in zip(curr_states, rewards, next_states):
-                trader.memory.add((s, r, ns, done))
+            for snap, reward, state in zip(snapshot, rewards, states):
+                trader.memory.add((snap, reward, state, done))
 
             if len(trader.memory) > config["batch_size"]:
                 trader.batch_train()

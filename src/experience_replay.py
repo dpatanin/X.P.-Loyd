@@ -63,6 +63,11 @@ class HERBuffer(ExperienceReplayBuffer):
         self.reward_fac = reward_fac
 
     def analyze_missed_opportunities(self, action_space: "ActionSpace"):
+        """
+        Analyzes experiences from latest episode to identify when the agent did not act.
+        Once found, a new timeline of transitions will be created, wherein the agent would've taken a favorable course of actions
+        until the the agent did act in the original timeline.
+        """
         experiences = self.remember_last_episode()
 
         # alt state represents current state per iteration during alt timeline
