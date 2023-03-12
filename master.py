@@ -84,15 +84,8 @@ for i in range(len(dp.batched_dir) - 1):
             if done:
                 continue
 
-            states = [
-                State(
-                    data=seq,
-                    balance=state.balance,
-                    entry_price=state.entry_price,
-                    contracts=state.contracts,
-                )
-                for seq, state in zip(sequences, states)
-            ]
+            for seq, state in zip(sequences, states):
+                state.data = seq
             snapshot = states.copy()  # States before action; For experiences
 
             q_values = trader.predict(states)
@@ -103,7 +96,7 @@ for i in range(len(dp.batched_dir) - 1):
             if done:
                 rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
 
-            for snap, reward, state in zip(snapshot, rewards, states):
+            for snap, reward, state in zip(snapshot, rewards, states.copy()):
                 trader.memory.add((snap, reward, state, done))
 
             if len(trader.memory) > config["batch_size"]:
