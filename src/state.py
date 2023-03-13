@@ -93,7 +93,7 @@ class State:
         ), f"Invalid amount of contracts provided. Received: {contracts}."
         assert (
             price_per_contract > 0
-        ), f"Invalid amount of contracts provided. Received: {price_per_contract}."
+        ), f"Invalid price per contract provided. Received: {price_per_contract}."
 
     def __str__(self):
         return self.to_df().__str__()
