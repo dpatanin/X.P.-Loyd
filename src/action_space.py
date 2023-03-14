@@ -41,7 +41,9 @@ class ActionSpace:
             return 0
 
         overhead = balance - (contracts * self.ppc)
-        return contracts - round(abs(overhead / self.ppc)) if overhead <= 0 else 0
+        return (
+            contracts - round(abs(overhead / self.ppc)) if overhead <= 0 else contracts
+        )
 
     def take_action(self, q: float, state: "State") -> float:
         if q == 0:
