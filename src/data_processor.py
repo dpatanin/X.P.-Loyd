@@ -58,6 +58,7 @@ class DataProcessor:
 
     def __batch_dir(self):
         ls = os.listdir(self.dir)
+        ls.sort()
         del ls[: (len(ls) % self.batch_size)]
 
         return [ls[i : i + self.batch_size] for i in range(0, len(ls), self.batch_size)]
