@@ -2,7 +2,9 @@
   # General configuration
   model_name: v1-prototype
   model_directory: models
-  data_directory: data
+  training_data: data/training
+  validation_data: data/validation
+  test_data: data/test
   #! Close & Volume headers are required; not listed headers will be aborted
   data_headers:
     - Progress

@@ -27,7 +27,6 @@ action_space = ActionSpace(
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
 dp = DataProcessor(
-    dir=config["data_directory"],
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
     headers=config["data_headers"],
@@ -55,6 +54,12 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
             "reward_factors"
         ]["session_total"]
 
+
+########################### Training ###########################
+
+dp.dir = config["training_data"]
+dp.batched_dir = dp.batch_dir()
+terminal_model = f"{config['model_directory']}/{config['model_name']}_terminal.h5"
 
 for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
@@ -94,4 +99,30 @@ for i in range(len(dp.batched_dir) - 1):
                 f"{config['model_directory']}/{config['model_name']}_ep{e}.h5"
             )
 
-    trader.model.save(f"{config['model_directory']}/{config['model_name']}_terminal.h5")
+    trader.model.save(terminal_model)
+
+
+###################### Validation | Test #######################
+
+dp.dir = config["validation_data"]
+# dp.dir = config["test_data"]
+dp.batched_dir = dp.batch_dir()
+trader.memory.clear()
+trader.load(terminal_model)
+
+for i in range(len(dp.batched_dir) - 1):
+    batch = dp.load_batch(i)
+
+    for _ in range(1, config["episodes"] + 1):
+        # Initial states
+        states = [
+            State(data=empty_sequence(), balance=config["initial_balance"])
+        ] * config["batch_size"]
+
+        for sequences in batch:
+            for seq, state in zip(sequences, states):
+                state.data = seq
+
+            q_values = trader.predict(states)
+            for q, s in zip(q_values, states):
+                action_space.take_action(q, s)
