@@ -6,6 +6,20 @@ import random
 
 
 class FreeLaborTrader:
+    """
+    The trader defines the network and maintains a record of the transitions of size `memory_size`.
+    It's purpose is to represent the actor/agent in the environment, providing predictions, memorizing the outcomes
+    and lastly training on those observations to improve the predictions.\n
+    The trader uses two networks, one primary network is used to make the predictions,
+    a secondary target network is used to ensure a more stable learning process, being updated every `update_freq` trainings.
+    During training the trader uses an experience replay strategy, calculates the loss and updates the gradients.
+
+    |`sequence_length`, `batch_size`, `num_features`: Mandatory configuration parameters.
+    |`hindsight_reward_fac`: Weight for hindsight rewards.
+    |`gamma`: Weight inside the loss functions.
+    |`epsilon`, `epsilon_final`, `epsilon_decay`: Exploration parameters.
+    """
+
     def __init__(
         self,
         sequence_length: int,
@@ -37,7 +51,6 @@ class FreeLaborTrader:
 
     def build_model(self):
         model = tf.keras.Sequential()
-        # Add a Dense layer as input layer
         model.add(
             tf.keras.layers.Conv1D(
                 filters=32,
@@ -46,71 +59,47 @@ class FreeLaborTrader:
                 activation="relu",
             )
         )
-
-        # Add a LSTM layer
         model.add(tf.keras.layers.LSTM(units=64, return_sequences=True))
-
-        # The output of GRU will be a 3D tensor of shape (batch_size, timesteps, 256)
+        # Output of GRU: 3D tensor (batch_size, timesteps, 256)
         model.add(tf.keras.layers.GRU(units=256, return_sequences=True))
-
-        # The output of SimpleRNN will be a 2D tensor of shape (batch_size, 128)
+        # Output of SimpleRNN: 2D tensor (batch_size, 128)
         model.add(tf.keras.layers.SimpleRNN(units=128))
-
-        # Add a single output neuron with tanh activation
+        # Single continuous output in range (-1, 1)
         model.add(tf.keras.layers.Dense(units=1, activation="tanh"))
-
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
 
         return model
 
     def predict(self, states: list["State"]) -> list[float]:
-        predictions = []
-        q_values = self.model.predict(self.__transform_states(states))
-
-        for q in q_values:
-            if random.random() <= self.epsilon:
-                predictions.append(random.uniform(-1, 1))
-            else:
-                predictions.append(q[0])
-
-        return predictions
+        """
+        Returns a list of q values of range (-1, 1).
+        """
+        q_values = self.model.predict_on_batch(self.__transform_states(states))[:, 0]
+        random_values = tf.random.uniform(shape=q_values.shape, minval=-1, maxval=1)
+        predictions = tf.where(random.random() <= self.epsilon, random_values, q_values)
+        return predictions.numpy().tolist()
 
     def batch_train(self):
         self.target_update_cd -= 1
 
-        (states, predictions, rewards, next_states, dones) = self.memory.sample(
-            self.batch_size
-        )
-
-        states = self.__transform_states(states)
-        predictions = np.array(predictions)
-        rewards = np.array(rewards)
-        next_states = self.__transform_states(next_states)
-        dones = np.array(dones)
-
-        # Convert the dones list to a binary mask
-        masks = 1 - dones
-        masks = masks.astype(np.float32)
+        (states, rewards, next_states, dones) = self.memory.sample(self.batch_size)
+        # Convert the dones list to a binary mask; (1 for not done, 0 for done)
+        masks = tf.cast(tf.logical_not(dones), dtype=tf.float32)
 
         # Update the model parameters
         with tf.GradientTape() as tape:
-            # Compute Q-values for each state using the model
-            q_values = self.model(states)
-            q_values = tf.reduce_sum(q_values * tf.one_hot(predictions, 1), axis=1)
+            # Access q values manually for GradientTape to record for backpropagation
+            q_values = self.model(self.__transform_states(states))[:, 0]
+            target_q_values = self.target_model(self.__transform_states(next_states))[
+                :, 0
+            ]
 
-            # Compute the actual Q-values
-            target_q_values = rewards + self.gamma * tf.reduce_max(
-                self.target_model(next_states), axis=1
-            ) * masks * tf.cast(
-                tf.reduce_max(self.model(next_states), axis=1)
-                == tf.reduce_max(self.target_model(next_states), axis=1),
-                tf.float32,
+            # Compute the target Q-values following the bellmann equation
+            target_q_values = (
+                rewards + self.gamma * tf.reduce_max(target_q_values) * masks
             )
 
-            # Compute the loss
             loss = tf.reduce_mean(tf.square(q_values - target_q_values))
-
-            # Compute the gradients
             gradients = tape.gradient(loss, self.model.trainable_variables)
 
             # Apply the gradients to update the model parameters

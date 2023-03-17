@@ -6,26 +6,38 @@ from typing import Deque, Tuple
 
 
 class ExperienceReplayBuffer:
-    def __init__(self, max_size: int):
-        self.buffer: Deque[Tuple["State", float, float, "State", bool]] = deque(
+    """
+    A basic experience replay buffer representing a collection of transitions.\n
+    Unlike in a standard experience replay, this does not store predictions
+    as we use one continuous value and derive the actions therefrom.
+
+    One experience contains: `[State before action, Reward after action, State after action, Flag for session end]`
+    |`max_size`: Maximum amount of experiences being stored. (New delete oldest when full.)
+    """
+
+    def __init__(self, max_size=2000):
+        self.buffer: Deque[Tuple["State", float, "State", bool]] = deque(
             maxlen=max_size
         )
 
-    def add(self, experience: Tuple["State", float, float, "State", bool]) -> None:
+    def add(self, experience: Tuple["State", float, "State", bool]) -> None:
         self.buffer.append(experience)
 
     def sample(
         self, batch_size: int
-    ) -> Tuple[list["State"], list[float], list[float], list["State"], list[bool]]:
+    ) -> Tuple[list["State"], list[float], list["State"], list[bool]]:
+        """
+        Randomly samples `batch_size` transitions/experiences.
+        """
+
         if len(self.buffer) < batch_size:
             raise ValueError("Not enough experiences in the buffer.")
 
         experiences = random.sample(self.buffer, batch_size)
-        states, predictions, rewards, next_states, dones = zip(*experiences)
+        states, rewards, next_states, dones = zip(*experiences)
 
         return (
             list(states),
-            list(predictions),
             list(rewards),
             list(next_states),
             list(dones),
@@ -39,11 +51,23 @@ class ExperienceReplayBuffer:
 
 
 class HERBuffer(ExperienceReplayBuffer):
-    def __init__(self, max_size: int, reward_fac=1):
+    """
+    A extended experience replay using the principle of a hindsight replay.\n
+    It creates additional experiences/transition from existing ones.
+
+    |`reward_fac`: Weight of rewards for ind hindsight generated experiences.
+    """
+
+    def __init__(self, max_size=2000, reward_fac=1):
         super().__init__(max_size)
         self.reward_fac = reward_fac
 
     def analyze_missed_opportunities(self, action_space: "ActionSpace"):
+        """
+        Analyzes experiences from latest episode to identify when the agent did not act.
+        Once found, a new timeline of transitions will be created, wherein the agent would've taken a favorable course of actions
+        until the the agent did act in the original timeline.
+        """
         experiences = self.remember_last_episode()
 
         # alt state represents current state per iteration during alt timeline
@@ -51,7 +75,7 @@ class HERBuffer(ExperienceReplayBuffer):
         alt_q = 0.00
         price_shift_ref = 0.00
         for xp in experiences:
-            s, q, r, ns, d = xp
+            s, r, ns, d = xp
 
             current_price: float = s.data["Close"].iloc[-1]
             price_diff: float = ns.data["Close"].iloc[-1] - current_price
@@ -64,7 +88,7 @@ class HERBuffer(ExperienceReplayBuffer):
                 alt_q = self.__calc_q_for_action(action_space.threshold, price_diff)
                 reward = action_space.take_action(alt_q, s, ns)
 
-                self.add((s, alt_q, reward, ns, d))
+                self.add((s, reward, ns, d))
                 alt_state = ns
 
             elif alt_state:
@@ -72,18 +96,18 @@ class HERBuffer(ExperienceReplayBuffer):
                     self.__check_price_shift(price_shift_ref, price_diff)
                     or ns.contracts != 0
                 ):
-                    rand_q = self.__calc_q_for_exit(action_space.threshold, alt_q)
+                    q = self.__calc_q_for_exit(action_space.threshold, alt_q)
                     reward = self.reward_fac * action_space.take_action(
-                        rand_q, alt_state, ns
+                        q, alt_state, ns
                     )
 
-                    self.add((alt_state, rand_q, reward, ns, d))
+                    self.add((alt_state, reward, ns, d))
                     alt_state = None
                     alt_q = 0.00
                 else:
-                    rand_q = self.__calc_q_for_no_action(action_space.threshold, alt_q)
+                    q = self.__calc_q_for_no_action(action_space.threshold, alt_q)
                     reward = self.reward_fac * action_space.take_action(
-                        rand_q, alt_state, ns
+                        q, alt_state, ns
                     )
 
                     # Ensure continuity of actions
@@ -91,7 +115,7 @@ class HERBuffer(ExperienceReplayBuffer):
                     ns.contracts = alt_state.contracts
                     ns.entry_price = alt_state.entry_price
 
-                    self.add((alt_state, rand_q, reward, ns, d))
+                    self.add((alt_state, reward, ns, d))
                     alt_state = ns
 
     def remember_last_episode(self) -> list[Tuple[State, int, float, State, bool]]:
