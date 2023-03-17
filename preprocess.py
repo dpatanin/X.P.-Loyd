@@ -13,7 +13,7 @@ if config["training_set"] + config["validation_set"] + config["test_set"] != 0:
         + "If you want to reduce the total size used, set `total_set` accordingly."
     )
 
-# Suppress warning; We want to use copies
+# Suppress warning. We want to use copies.
 pd.set_option("mode.chained_assignment", None)
 
 print("Reading data source...")
