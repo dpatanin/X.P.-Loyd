@@ -1,11 +1,24 @@
 ---
-  # General configuration
   model_name: v1-prototype
   model_directory: models
+
+  # Trading sessions are expected as individual files
   training_data: data/training
   validation_data: data/validation
   test_data: data/test
-  #! Close & Volume headers are required; not listed headers will be aborted
+
+  # Preprocessing
+  source_data: data/source.scv
+  session_begin_marker: '18:00:00'
+  session_end_marker: '16:59:00'
+  marker_column: DateTime
+  total_set: 1 # How much of the total data to use
+  training_set: 0.7 # Cross training-validation
+  validation_set: 0.15
+  test_set: 0.15 # Always latest data
+
+  # General config
+  #! Close & Volume headers are required; not listed headers will be dropped _after_ preprocessing
   data_headers:
     - Progress
     - Open
