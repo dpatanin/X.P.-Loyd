@@ -68,10 +68,10 @@ terminal_model = (
     + "_terminal.h5"
 )
 
-for i in range(len(dp.batched_dir) - 1):
-    batch = dp.load_batch(i)
+for e in range(1, config["episodes"] + 1):
 
-    for e in range(1, config["episodes"] + 1):
+    for i in range(len(dp.batched_dir) - 1):
+        batch = dp.load_batch(i)
         done = False
 
         # Initial states
@@ -121,16 +121,15 @@ trader.load(terminal_model)
 for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
 
-    for _ in range(1, config["episodes"] + 1):
-        # Initial states
-        states = [
-            State(data=empty_sequence(), balance=config["initial_balance"])
-        ] * config["batch_size"]
+    # Initial states
+    states = [
+        State(data=empty_sequence(), balance=config["initial_balance"])
+    ] * config["batch_size"]
 
-        for sequences in batch:
-            for seq, state in zip(sequences, states):
-                state.data = seq
+    for sequences in batch:
+        for seq, state in zip(sequences, states):
+            state.data = seq
 
-            q_values = trader.predict(states)
-            for q, s in zip(q_values, states):
-                action_space.take_action(q, s)
+        q_values = trader.predict(states)
+        for q, s in zip(q_values, states):
+            action_space.take_action(q, s)
