@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import yaml
 from yaml.loader import FullLoader
+from datetime import datetime
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -59,7 +60,12 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
 
 dp.dir = config["training_data"]
 dp.batched_dir = dp.batch_dir()
-terminal_model = f"{config['model_directory']}/{config['model_name']}_terminal.h5"
+terminal_model = (
+    f"{config['model_directory']}/"
+    + f"{config['model_name']}_"
+    + f"{datetime.now().strftime('%d_%m_%Y %H_%M_%S')}"
+    + "_terminal.h5"
+)
 
 for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
