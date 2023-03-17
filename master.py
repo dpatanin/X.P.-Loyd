@@ -44,6 +44,7 @@ trader = FreeLaborTrader(
     epsilon_final=config["agent"]["epsilon_final"],
     epsilon_decay=config["agent"]["epsilon_decay"],
 )
+now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 trader.model.summary()
 
 
@@ -63,7 +64,7 @@ dp.batched_dir = dp.batch_dir()
 terminal_model = (
     f"{config['model_directory']}/"
     + f"{config['model_name']}_"
-    + f"{datetime.now().strftime('%d_%m_%Y %H_%M_%S')}"
+    + f"{now}"
     + "_terminal.h5"
 )
 
@@ -102,7 +103,7 @@ for i in range(len(dp.batched_dir) - 1):
         # Save the model every 10 episodes
         if e % 10 == 0:
             trader.model.save(
-                f"{config['model_directory']}/{config['model_name']}_ep{e}.h5"
+                f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
             )
 
     trader.model.save(terminal_model)
