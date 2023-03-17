@@ -114,6 +114,7 @@ for i in range(len(dp.batched_dir) - 1):
 dp.dir = config["validation_data"]
 # dp.dir = config["test_data"]
 dp.batched_dir = dp.batch_dir()
+dp.step_size = 1
 trader.memory.clear()
 trader.load(terminal_model)
 

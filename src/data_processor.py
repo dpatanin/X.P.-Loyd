@@ -16,6 +16,7 @@ class DataProcessor:
         headers: list[str],
         sequence_length: int,
         batch_size: int,
+        step_size: int = None,
         dir: str = None,
     ):
         assert os.path.exists(dir), f"{dir} does not exist."
@@ -23,6 +24,7 @@ class DataProcessor:
         self.dir = dir
         self.column_headers = headers
         self.sequence_length = sequence_length
+        self.step_size = step_size or sequence_length
         self.batch_size = batch_size
         self.batched_dir: list[list[str]] = self.batch_dir() if dir else [[]]
 
@@ -46,7 +48,7 @@ class DataProcessor:
         self.assert_columns(data)
         return [
             data.iloc[i : i + self.sequence_length]
-            for i in range(0, len(data), self.sequence_length)
+            for i in range(0, len(data), self.step_size)
             if len(data.iloc[i : i + self.sequence_length]) == self.sequence_length
         ]
 
