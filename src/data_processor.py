@@ -13,18 +13,20 @@ class DataProcessor:
 
     def __init__(
         self,
-        dir: str,
         headers: list[str],
         sequence_length: int,
         batch_size: int,
+        step_size: int = None,
+        dir: str = None,
     ):
         assert os.path.exists(dir), f"{dir} does not exist."
 
         self.dir = dir
         self.column_headers = headers
         self.sequence_length = sequence_length
+        self.step_size = step_size or sequence_length
         self.batch_size = batch_size
-        self.batched_dir = self.__batch_dir()
+        self.batched_dir: list[list[str]] = self.batch_dir() if dir else [[]]
 
     def load_file(self, file_path: str) -> pd.DataFrame:
         data = pd.read_csv(file_path)
@@ -46,7 +48,7 @@ class DataProcessor:
         self.assert_columns(data)
         return [
             data.iloc[i : i + self.sequence_length]
-            for i in range(0, len(data), self.sequence_length)
+            for i in range(0, len(data), self.step_size)
             if len(data.iloc[i : i + self.sequence_length]) == self.sequence_length
         ]
 
@@ -56,7 +58,7 @@ class DataProcessor:
                 f"DataFrame is missing required columns: {missing_columns}"
             )
 
-    def __batch_dir(self):
+    def batch_dir(self):
         ls = os.listdir(self.dir)
         ls.sort()
         del ls[: (len(ls) % self.batch_size)]

@@ -70,6 +70,17 @@ class FreeLaborTrader:
 
         return model
 
+    def load(self, path: str) -> None:
+        new_model = tf.keras.models.load_model(path)
+        if self.model.get_config() == new_model.get_config():
+            self.model = new_model
+        else:
+            raise AssertionError(
+                "Loaded model differs from training setup.\n"
+                + f"Expected: {self.model.get_config()}\n"
+                + f"Loaded: {new_model.get_config()}"
+            )
+
     def predict(self, states: list["State"]) -> list[float]:
         """
         Returns a list of q values of range (-1, 1).

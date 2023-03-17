@@ -44,7 +44,7 @@ Once the above steps are done, from the root directory run:
     pip install -r requirements.txt
 ```
 
-Tensorflow uses by default the GPU. The script will check for available GPUs but if you want to manually check you can run:
+Tensorflow uses by default the GPU. If you want to manually check whether GPU is detected/utilized you can run:
 
 ```console
     print(tf.config.list_physical_devices('GPU')) // To see number of GPUs detected
@@ -53,4 +53,8 @@ Tensorflow uses by default the GPU. The script will check for available GPUs but
 
 ## Run
 
-Run `master.py`
+Preprocess: `python preprocess.py`
+Run: `python master.py`
+
+The preprocessing script is designed for our data. The important part is. You can skip this part if you preprocess your data elsewhere.
+If using the provided script, you should adjust the preprocess script to fit your specific needs.

@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import yaml
 from yaml.loader import FullLoader
+from datetime import datetime
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -27,7 +28,6 @@ action_space = ActionSpace(
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
 dp = DataProcessor(
-    dir=config["data_directory"],
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
     headers=config["data_headers"],
@@ -44,6 +44,7 @@ trader = FreeLaborTrader(
     epsilon_final=config["agent"]["epsilon_final"],
     epsilon_decay=config["agent"]["epsilon_decay"],
 )
+now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 trader.model.summary()
 
 
@@ -56,10 +57,21 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
         ]["session_total"]
 
 
-for i in range(len(dp.batched_dir) - 1):
-    batch = dp.load_batch(i)
+########################### Training ###########################
 
-    for e in range(1, config["episodes"] + 1):
+dp.dir = config["training_data"]
+dp.batched_dir = dp.batch_dir()
+terminal_model = (
+    f"{config['model_directory']}/"
+    + f"{config['model_name']}_"
+    + f"{now}"
+    + "_terminal.h5"
+)
+
+for e in range(1, config["episodes"] + 1):
+
+    for i in range(len(dp.batched_dir) - 1):
+        batch = dp.load_batch(i)
         done = False
 
         # Initial states
@@ -91,7 +103,33 @@ for i in range(len(dp.batched_dir) - 1):
         # Save the model every 10 episodes
         if e % 10 == 0:
             trader.model.save(
-                f"{config['model_directory']}/{config['model_name']}_ep{e}.h5"
+                f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
             )
 
-    trader.model.save(f"{config['model_directory']}/{config['model_name']}_terminal.h5")
+    trader.model.save(terminal_model)
+
+
+###################### Validation | Test #######################
+
+dp.dir = config["validation_data"]
+# dp.dir = config["test_data"]
+dp.batched_dir = dp.batch_dir()
+dp.step_size = 1
+trader.memory.clear()
+trader.load(terminal_model)
+
+for i in range(len(dp.batched_dir) - 1):
+    batch = dp.load_batch(i)
+
+    # Initial states
+    states = [
+        State(data=empty_sequence(), balance=config["initial_balance"])
+    ] * config["batch_size"]
+
+    for sequences in batch:
+        for seq, state in zip(sequences, states):
+            state.data = seq
+
+        q_values = trader.predict(states)
+        for q, s in zip(q_values, states):
+            action_space.take_action(q, s)
