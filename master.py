@@ -7,6 +7,7 @@ import numpy as np
 import yaml
 from yaml.loader import FullLoader
 from datetime import datetime
+import time
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -57,27 +58,35 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
         ]["session_total"]
 
 
+def print_time(t: float, num_ep: int):
+    rem_time_sec = num_ep * (time.time() - t)
+    print(
+        f"remaining time: {round(rem_time_sec / 60)} min {round(rem_time_sec) % 60} sec")
+
+
 ########################### Training ###########################
 
 dp.dir = config["training_data"]
 dp.batched_dir = dp.batch_dir()
 terminal_model = (
-    f"{config['model_directory']}/"
-    + f"{config['model_name']}_"
-    + f"{now}"
-    + "_terminal.h5"
+        f"{config['model_directory']}/"
+        + f"{config['model_name']}_"
+        + f"{now}"
+        + "_terminal.h5"
 )
 
-for e in range(1, config["episodes"] + 1):
 
+for e in range(1, config["episodes"] + 1):
+    t1 = time.time()
     for i in range(len(dp.batched_dir) - 1):
         batch = dp.load_batch(i)
         done = False
 
         # Initial states
         states = [
-            State(data=empty_sequence(), balance=config["initial_balance"])
-        ] * config["batch_size"]
+                     State(data=empty_sequence(),
+                           balance=config["initial_balance"])
+                 ] * config["batch_size"]
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
@@ -85,11 +94,13 @@ for e in range(1, config["episodes"] + 1):
             snapshot = states.copy()  # States before action; For experiences
 
             q_values = trader.predict(states)
-            rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
+            rewards = [action_space.take_action(q, s) for q, s in
+                       zip(q_values, states)]
 
             done = idx == len(batch) - 1
             if done:
-                rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
+                rewards = [calc_terminal_reward(r, s) for r, s in
+                           zip(rewards, states)]
 
             for snap, reward, state in zip(snapshot, rewards, states.copy()):
                 trader.memory.add((snap, reward, state, done))
@@ -107,7 +118,7 @@ for e in range(1, config["episodes"] + 1):
             )
 
     trader.model.save(terminal_model)
-
+    print_time(t1, config["episodes"] + 1 - e)
 
 ###################### Validation | Test #######################
 
@@ -123,8 +134,8 @@ for i in range(len(dp.batched_dir) - 1):
 
     # Initial states
     states = [
-        State(data=empty_sequence(), balance=config["initial_balance"])
-    ] * config["batch_size"]
+                 State(data=empty_sequence(), balance=config["initial_balance"])
+             ] * config["batch_size"]
 
     for sequences in batch:
         for seq, state in zip(sequences, states):
