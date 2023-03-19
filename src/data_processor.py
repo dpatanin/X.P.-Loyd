@@ -19,7 +19,6 @@ class DataProcessor:
         step_size: int = None,
         dir: str = None,
     ):
-        assert os.path.exists(dir), f"{dir} does not exist."
 
         self.dir = dir
         self.column_headers = headers
@@ -59,6 +58,7 @@ class DataProcessor:
             )
 
     def batch_dir(self):
+        assert os.path.exists(self.dir), f"{self.dir} does not exist."
         ls = os.listdir(self.dir)
         ls.sort()
         del ls[: (len(ls) % self.batch_size)]

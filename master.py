@@ -62,11 +62,13 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
 dp.dir = config["training_data"]
 dp.batched_dir = dp.batch_dir()
 terminal_model = (
-    f"{config['model_directory']}/"
-    + f"{config['model_name']}_"
-    + f"{now}"
-    + "_terminal.h5"
+        f"{config['model_directory']}/"
+        + f"{config['model_name']}_"
+        + f"{now}"
+        + "_terminal.h5"
 )
+
+balance_list = []
 
 for e in range(1, config["episodes"] + 1):
 
@@ -76,20 +78,25 @@ for e in range(1, config["episodes"] + 1):
 
         # Initial states
         states = [
-            State(data=empty_sequence(), balance=config["initial_balance"])
-        ] * config["batch_size"]
+                     State(data=empty_sequence(),
+                           balance=config["initial_balance"])
+                 ] * config["batch_size"]
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
                 state.data = seq
             snapshot = states.copy()  # States before action; For experiences
 
+            balance_list.append(states[0].balance)
+
             q_values = trader.predict(states)
-            rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
+            rewards = [action_space.take_action(q, s) for q, s in
+                       zip(q_values, states)]
 
             done = idx == len(batch) - 1
             if done:
-                rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
+                rewards = [calc_terminal_reward(r, s) for r, s in
+                           zip(rewards, states)]
 
             for snap, reward, state in zip(snapshot, rewards, states.copy()):
                 trader.memory.add((snap, reward, state, done))
@@ -106,6 +113,8 @@ for e in range(1, config["episodes"] + 1):
                 f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
             )
 
+    df = pd.DataFrame(balance_list)
+    df.to_excel(f"data/monitoring_ep{e}.xlsx")
     trader.model.save(terminal_model)
 
 
