@@ -1,6 +1,4 @@
-import time
 from tqdm import tqdm
-
 
 class ProgressBar(tqdm):
     def __init__(
