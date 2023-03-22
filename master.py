@@ -57,6 +57,14 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
         ]["session_total"]
 
 
+def append_avg_balance(states: [State]):
+    sum_balance = 0
+    for state in states:
+        sum_balance += state.balance
+    avg_balance = sum_balance / config["batch_size"]
+    balance_list.append(avg_balance)
+
+
 ########################### Training ###########################
 
 dp.dir = config["training_data"]
@@ -87,7 +95,8 @@ for e in range(1, config["episodes"] + 1):
                 state.data = seq
             snapshot = states.copy()  # States before action; For experiences
 
-            balance_list.append(states[0].balance)
+            append_avg_balance(states)
+            print(balance_list)
 
             q_values = trader.predict(states)
             rewards = [action_space.take_action(q, s) for q, s in
