@@ -8,7 +8,7 @@
   test_data: data/test
 
   # Preprocessing
-  source_data: data/source.scv
+  source_data: data/source.csv
   session_begin_marker: '18:00:00'
   session_end_marker: '16:59:00'
   marker_column: DateTime
@@ -25,6 +25,7 @@
     - High
     - Low
     - Close
+    - CloseNorm
     - Volume
   tick_size: 0.25 # Currently not in use
   tick_value: 12.50 # Represents price per contract
