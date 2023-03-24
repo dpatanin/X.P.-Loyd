@@ -9,8 +9,7 @@
 
   # Preprocessing
   source_data: data/source.csv
-  session_begin_marker: '18:00:00'
-  session_end_marker: '16:59:00'
+  session_marker: '18:00:00' # Start of session
   marker_column: DateTime
   total_set: 1 # How much of the total data to use
   training_set: 0.7 # Cross training-validation

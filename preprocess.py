@@ -19,19 +19,14 @@ pd.set_option("mode.chained_assignment", None)
 print("Reading data source...")
 data = pd.read_csv(config["source_data"])
 names = ["%05d" % x for x in range(100000)]
-start_indices = []
-end_indices = []
 
-for idx, row in tqdm(data.iterrows(), desc="Indexing", leave=True):
-    if row[config["marker_column"]].endswith(config["session_begin_marker"]):
-        start_indices.append(idx)
-    if row[config["marker_column"]].endswith(config["session_end_marker"]):
-        end_indices.append(idx)
-
-if end_indices[0] < start_indices[0]:
-    end_indices.pop(0)
-if start_indices[-1] > end_indices[-1]:
-    start_indices.pop(-1)
+print("Indexing...")
+start_indices = data[
+    data[config["marker_column"]].str.contains(config["session_marker"])
+].index
+end_indices = (start_indices - 1).to_list()
+end_indices.pop(0)
+end_indices.append(len(data.index) - 1)
 indices = [*zip(start_indices, end_indices)]
 
 print("Splitting & shuffling...")
