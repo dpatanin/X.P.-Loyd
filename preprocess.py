@@ -22,7 +22,7 @@ names = ["%05d" % x for x in range(100000)]
 start_indices = []
 end_indices = []
 
-for idx, row in tqdm(data.iterrows(), desc="Indexing...", leave=True):
+for idx, row in tqdm(data.iterrows(), desc="Indexing", leave=True):
     if row[config["marker_column"]].endswith(config["session_begin_marker"]):
         start_indices.append(idx)
     if row[config["marker_column"]].endswith(config["session_end_marker"]):
@@ -74,17 +74,17 @@ generate(
     train_indices,
     names[: train_size - 1],
     config["training_data"],
-    "Generating training set...",
+    "Generating training set",
 )
 generate(
     valid_indices,
     names[train_size : valid_size - 1],
     config["validation_data"],
-    "Generating validation set...",
+    "Generating validation set",
 )
 generate(
     test_indices,
     names[valid_size : test_size - 1],
     config["test_data"],
-    "Generating test set...",
+    "Generating test set",
 )
