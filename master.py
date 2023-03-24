@@ -57,12 +57,9 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
         ]["session_total"]
 
 
-def append_avg_balance(states: [State], list: []):
-    sum_balance = 0
-    for state in states:
-        sum_balance += state.balance
-    avg_balance = sum_balance / config["batch_size"]
-    list.append(avg_balance)
+def avg_balance(states: list["State"]):
+    sum_balance = sum(state.balance for state in states)
+    return sum_balance / config["batch_size"]
 
 
 ########################### Training ###########################
@@ -70,10 +67,10 @@ def append_avg_balance(states: [State], list: []):
 dp.dir = config["training_data"]
 dp.batched_dir = dp.batch_dir()
 terminal_model = (
-        f"{config['model_directory']}/"
-        + f"{config['model_name']}_"
-        + f"{now}"
-        + "_terminal.h5"
+    f"{config['model_directory']}/"
+    + f"{config['model_name']}_"
+    + f"{now}"
+    + "_terminal.h5"
 )
 
 balance_list_train = []
@@ -86,25 +83,22 @@ for e in range(1, config["episodes"] + 1):
 
         # Initial states
         states = [
-                     State(data=empty_sequence(),
-                           balance=config["initial_balance"])
-                 ] * config["batch_size"]
+            State(data=empty_sequence(), balance=config["initial_balance"])
+        ] * config["batch_size"]
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
                 state.data = seq
             snapshot = states.copy()  # States before action; For experiences
 
-            append_avg_balance(states, balance_list_train)
+            balance_list_train.append(avg_balance(states))
 
             q_values = trader.predict(states)
-            rewards = [action_space.take_action(q, s) for q, s in
-                       zip(q_values, states)]
+            rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
 
             done = idx == len(batch) - 1
             if done:
-                rewards = [calc_terminal_reward(r, s) for r, s in
-                           zip(rewards, states)]
+                rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
 
             for snap, reward, state in zip(snapshot, rewards, states.copy()):
                 trader.memory.add((snap, reward, state, done))
@@ -115,15 +109,15 @@ for e in range(1, config["episodes"] + 1):
         # Create hindsight experiences
         trader.memory.analyze_missed_opportunities(action_space)
 
-        # Save the model every 10 episodes
-        if e % 10 == 0:
-            trader.model.save(
-                f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
-            )
+    # Save the model every 10 episodes
+    if e % 10 == 0:
+        trader.model.save(
+            f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
+        )
 
-    df = pd.DataFrame(balance_list_train)
-    df.to_excel(f"data/monitoring_training_ep{e}.xlsx")
-    trader.model.save(terminal_model)
+df = pd.DataFrame(balance_list_train)
+df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
+trader.model.save(terminal_model)
 
 ###################### Validation | Test #######################
 
@@ -140,19 +134,19 @@ for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
 
     # Initial states
-    states = [
-                 State(data=empty_sequence(), balance=config["initial_balance"])
-             ] * config["batch_size"]
+    states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
+        "batch_size"
+    ]
 
     for sequences in batch:
         for seq, state in zip(sequences, states):
             state.data = seq
 
-        append_avg_balance(states, balance_list_val)
+        balance_list_val.extend(state.balance for state in states)
 
         q_values = trader.predict(states)
         for q, s in zip(q_values, states):
             action_space.take_action(q, s)
 
 df = pd.DataFrame(balance_list_val)
-df.to_excel(f"data/monitoring_validation.xlsx")
+df.to_excel(f"data/monitoring_validation_{now}.xlsx")
