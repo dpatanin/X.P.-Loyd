@@ -1,3 +1,5 @@
+import math
+
 from src.data_processor import DataProcessor
 from src.trader import FreeLaborTrader
 from src.state import State
@@ -59,10 +61,10 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
         ]["session_total"]
 
 
-def rem_time(t: float, num_ep: int):
-    rem_time_sec = num_ep * (time.time() - t)
+def rem_time(it_time: float, it_left: int):
+    rem_time_sec = it_left * (time.time() - it_time)
     return (
-        f"Remaining time: {round(rem_time_sec / 60)} min {round(rem_time_sec) % 60} sec"
+        f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
     )
 
 
@@ -84,10 +86,12 @@ pbar = ProgressBar(
     suffix="Remaining time: ???",
     leave=True,
 )
+it_left = 0
 
 for e in range(1, config["episodes"] + 1):
-    t1 = time.time()
+
     for i in range(len(dp.batched_dir)):
+        t = time.time()
         batch = dp.load_batch(i)
         done = False
 
@@ -119,12 +123,15 @@ for e in range(1, config["episodes"] + 1):
         # Create hindsight experiences
         trader.memory.analyze_missed_opportunities(action_space)
 
+        pbar.suffix = rem_time(t, config["episodes"]
+                               * len(dp.batched_dir) - it_left)
+        it_left += 1
+
     # Save the model every 10 episodes
     if e % 10 == 0:
         trader.model.save(
             f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
         )
-    pbar.suffix = rem_time(t1, config["episodes"] + 1 - e)
 
 trader.model.save(terminal_model)
 pbar.close()
