@@ -57,6 +57,11 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
         ]["session_total"]
 
 
+def avg_balance(states: list["State"]):
+    sum_balance = sum(state.balance for state in states)
+    return sum_balance / config["batch_size"]
+
+
 ########################### Training ###########################
 
 dp.dir = config["training_data"]
@@ -67,6 +72,8 @@ terminal_model = (
     + f"{now}"
     + "_terminal.h5"
 )
+
+balance_list_train = []
 
 for e in range(1, config["episodes"] + 1):
 
@@ -84,6 +91,8 @@ for e in range(1, config["episodes"] + 1):
                 state.data = seq
             snapshot = states.copy()  # States before action; For experiences
 
+            balance_list_train.append(avg_balance(states))
+
             q_values = trader.predict(states)
             rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
 
@@ -100,14 +109,15 @@ for e in range(1, config["episodes"] + 1):
         # Create hindsight experiences
         trader.memory.analyze_missed_opportunities(action_space)
 
-        # Save the model every 10 episodes
-        if e % 10 == 0:
-            trader.model.save(
-                f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
-            )
+    # Save the model every 10 episodes
+    if e % 10 == 0:
+        trader.model.save(
+            f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
+        )
 
-    trader.model.save(terminal_model)
-
+df = pd.DataFrame(balance_list_train)
+df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
+trader.model.save(terminal_model)
 
 ###################### Validation | Test #######################
 
@@ -118,18 +128,25 @@ dp.step_size = 1
 trader.memory.clear()
 trader.load(terminal_model)
 
+balance_list_val = []
+
 for i in range(len(dp.batched_dir) - 1):
     batch = dp.load_batch(i)
 
     # Initial states
-    states = [
-        State(data=empty_sequence(), balance=config["initial_balance"])
-    ] * config["batch_size"]
+    states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
+        "batch_size"
+    ]
 
     for sequences in batch:
         for seq, state in zip(sequences, states):
             state.data = seq
 
+        balance_list_val.extend(state.balance for state in states)
+
         q_values = trader.predict(states)
         for q, s in zip(q_values, states):
             action_space.take_action(q, s)
+
+df = pd.DataFrame(balance_list_val)
+df.to_excel(f"data/monitoring_validation_{now}.xlsx")
