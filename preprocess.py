@@ -67,19 +67,19 @@ def generate(indices: list[tuple], names: list[str], path: str, label: str):
 
 generate(
     train_indices,
-    names[: train_size - 1],
+    names[:train_size],
     config["training_data"],
     "Generating training set",
 )
 generate(
     valid_indices,
-    names[train_size : valid_size - 1],
+    names[train_size:valid_size],
     config["validation_data"],
     "Generating validation set",
 )
 generate(
     test_indices,
-    names[valid_size : test_size - 1],
+    names[valid_size:test_size],
     config["test_data"],
     "Generating test set",
 )
