@@ -63,9 +63,7 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
 
 def rem_time(it_time: float, it_left: int):
     rem_time_sec = it_left * (time.time() - it_time)
-    return (
-        f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
-    )
+    return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
 
 
 ########################### Training ###########################
@@ -86,7 +84,7 @@ pbar = ProgressBar(
     suffix="Remaining time: ???",
     leave=True,
 )
-it_left = 0
+rem_batches = config["episodes"] * len(dp.batched_dir)
 
 for e in range(1, config["episodes"] + 1):
 
@@ -123,9 +121,8 @@ for e in range(1, config["episodes"] + 1):
         # Create hindsight experiences
         trader.memory.analyze_missed_opportunities(action_space)
 
-        pbar.suffix = rem_time(t, config["episodes"]
-                               * len(dp.batched_dir) - it_left)
-        it_left += 1
+        rem_batches -= 1
+        pbar.suffix = rem_time(t, rem_batches)
 
     # Save the model every 10 episodes
     if e % 10 == 0:
