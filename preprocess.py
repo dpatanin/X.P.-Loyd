@@ -39,8 +39,8 @@ train_size = round(len(indices) * config["total_set"] * config["training_set"])
 valid_size = round(len(indices) * config["total_set"] * config["validation_set"])
 train_valid_indices = indices[:-test_size]
 random.shuffle(train_valid_indices)
-train_indices = train_valid_indices[: train_size - 1]
-valid_indices = train_valid_indices[train_size : valid_size - 1]
+train_indices = train_valid_indices[:train_size]
+valid_indices = train_valid_indices[train_size : valid_size + train_size]
 
 
 def generate(indices: list[tuple], names: list[str], path: str, label: str):
@@ -73,13 +73,13 @@ generate(
 )
 generate(
     valid_indices,
-    names[train_size:valid_size],
+    names[train_size : valid_size + train_size],
     config["validation_data"],
     "Generating validation set",
 )
 generate(
     test_indices,
-    names[valid_size:test_size],
+    names[valid_size + train_size : valid_size + train_size + test_size],
     config["test_data"],
     "Generating test set",
 )
