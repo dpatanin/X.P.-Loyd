@@ -66,6 +66,11 @@ def rem_time(it_time: float, it_left: int):
     return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
 
 
+def avg_balance(states: list["State"]):
+    sum_balance = sum(state.balance for state in states)
+    return sum_balance / config["batch_size"]
+
+
 ########################### Training ###########################
 
 dp.dir = config["training_data"]
@@ -86,6 +91,8 @@ pbar = ProgressBar(
 )
 rem_batches = config["episodes"] * len(dp.batched_dir)
 
+balance_list_train = []
+
 for e in range(1, config["episodes"] + 1):
 
     for i in range(len(dp.batched_dir)):
@@ -102,6 +109,8 @@ for e in range(1, config["episodes"] + 1):
             for seq, state in zip(sequences, states):
                 state.data = seq
             snapshot = states.copy()  # States before action; For experiences
+
+            balance_list_train.append(avg_balance(states))
 
             q_values = trader.predict(states)
             rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
@@ -130,8 +139,10 @@ for e in range(1, config["episodes"] + 1):
             f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
         )
 
-trader.model.save(terminal_model)
 pbar.close()
+df = pd.DataFrame(balance_list_train)
+df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
+trader.model.save(terminal_model)
 
 ###################### Validation | Test #######################
 
@@ -150,6 +161,7 @@ pbar = ProgressBar(
     suffix="Remaining time: ???",
     leave=True,
 )
+balance_list_val = []
 
 for i in range(len(dp.batched_dir) - 1):
     t1 = time.time()
@@ -164,6 +176,8 @@ for i in range(len(dp.batched_dir) - 1):
         for seq, state in zip(sequences, states):
             state.data = seq
 
+        balance_list_val.extend(state.balance for state in states)
+
         q_values = trader.predict(states)
         for q, s in zip(q_values, states):
             action_space.take_action(q, s)
@@ -171,3 +185,6 @@ for i in range(len(dp.batched_dir) - 1):
         pbar.update(batch=i + 1, seq=idx)
 
     pbar.suffix = rem_time(t1, len(dp.batched_dir) - i)
+
+df = pd.DataFrame(balance_list_val)
+df.to_excel(f"data/monitoring_validation_{now}.xlsx")
