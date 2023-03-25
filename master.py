@@ -89,8 +89,8 @@ pbar = ProgressBar(
     suffix="Remaining time: ???",
     leave=True,
 )
-rem_batches = config["episodes"] * len(dp.batched_dir)
 
+rem_batches = config["episodes"] * len(dp.batched_dir)
 balance_list_train = []
 
 for e in range(1, config["episodes"] + 1):
