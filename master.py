@@ -133,11 +133,9 @@ for e in range(1, config["episodes"] + 1):
         rem_batches -= 1
         pbar.suffix = rem_time(t, rem_batches)
 
-    # Save the model every 10 episodes
-    if e % 10 == 0:
-        trader.model.save(
-            f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
-        )
+    trader.model.save(
+        f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
+    )
 
 pbar.close()
 df = pd.DataFrame(balance_list_train)
