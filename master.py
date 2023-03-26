@@ -138,9 +138,9 @@ for e in range(1, config["episodes"] + 1):
     )
 
 pbar.close()
+trader.model.save(terminal_model)
 df = pd.DataFrame(balance_list_train)
 df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
-trader.model.save(terminal_model)
 
 ###################### Validation | Test #######################
 
