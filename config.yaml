@@ -8,9 +8,8 @@
   test_data: data/test
 
   # Preprocessing
-  source_data: data/source.scv
-  session_begin_marker: '18:00:00'
-  session_end_marker: '16:59:00'
+  source_data: data/source.csv
+  session_marker: '18:00:00' # Start of session
   marker_column: DateTime
   total_set: 1 # How much of the total data to use
   training_set: 0.7 # Cross training-validation
@@ -25,6 +24,7 @@
     - High
     - Low
     - Close
+    - CloseNorm
     - Volume
   tick_size: 0.25 # Currently not in use
   tick_value: 12.50 # Represents price per contract
