@@ -11,6 +11,7 @@ import yaml
 from yaml.loader import FullLoader
 from datetime import datetime
 import time
+import warnings
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -141,6 +142,9 @@ df = pd.DataFrame(profit_list)
 df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
 
 ###################### Validation | Test #######################
+
+# The performance issue is insignificant; Complexity rises significant otherwise
+warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 dp.dir = config["validation_data"]
 # dp.dir = config["test_data"]
