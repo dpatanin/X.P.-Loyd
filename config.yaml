@@ -7,15 +7,6 @@
   validation_data: data/validation
   test_data: data/test
 
-  # Preprocessing
-  source_data: data/source.csv
-  session_marker: '18:00:00' # Start of session
-  marker_column: DateTime
-  total_set: 0.2 # How much of the total data to use
-  training_set: 0.7 # Cross training-validation
-  validation_set: 0.15
-  test_set: 0.15 # Always latest data
-
   # General config
   #! Close & Volume headers are required; not listed headers will be dropped _after_ preprocessing
   data_headers:
