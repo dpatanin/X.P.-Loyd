@@ -66,9 +66,9 @@ def rem_time(it_time: float, it_left: int):
     return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
 
 
-def avg_balance(states: list["State"]):
+def avg_profit(states: list["State"]):
     sum_balance = sum(state.balance for state in states)
-    return sum_balance / config["batch_size"]
+    return (sum_balance / config["batch_size"]) - config["initial_balance"]
 
 
 ########################### Training ###########################
@@ -91,7 +91,7 @@ pbar = ProgressBar(
 )
 
 rem_batches = config["episodes"] * len(dp.batched_dir)
-balance_list_train = []
+profit_list = []
 
 for e in range(1, config["episodes"] + 1):
 
@@ -109,13 +109,12 @@ for e in range(1, config["episodes"] + 1):
                 state.data = seq
             snapshot = states.copy()  # States before action; For experiences
 
-            balance_list_train.append(avg_balance(states))
-
             q_values = trader.predict(states)
             rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
 
             done = idx == len(batch) - 1
             if done:
+                profit_list.append(avg_profit(states))
                 rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
 
             for snap, reward, state in zip(snapshot, rewards, states.copy()):
@@ -138,7 +137,7 @@ for e in range(1, config["episodes"] + 1):
 
 pbar.close()
 trader.model.save(terminal_model)
-df = pd.DataFrame(balance_list_train)
+df = pd.DataFrame(profit_list)
 df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
 
 ###################### Validation | Test #######################
@@ -146,7 +145,7 @@ df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
 dp.dir = config["validation_data"]
 # dp.dir = config["test_data"]
 dp.batched_dir = dp.batch_dir()
-dp.step_size = 1
+# dp.step_size = 1
 trader.memory.clear()
 trader.load(terminal_model)
 
@@ -158,9 +157,9 @@ pbar = ProgressBar(
     suffix="Remaining time: ???",
     leave=True,
 )
-balance_list_val = []
+balance_list = pd.DataFrame()
 
-for i in range(len(dp.batched_dir) - 1):
+for i in range(len(dp.batched_dir)):
     t1 = time.time()
     batch = dp.load_batch(i)
 
@@ -169,19 +168,20 @@ for i in range(len(dp.batched_dir) - 1):
         "batch_size"
     ]
 
+    for ids, s in enumerate(states):
+        balance_list[f"b{i}s{ids}"] = [s.balance] * len(batch)
+
     for idx, sequences in enumerate(batch):
         for seq, state in zip(sequences, states):
             state.data = seq
 
-        balance_list_val.extend(state.balance for state in states)
-
         q_values = trader.predict(states)
-        for q, s in zip(q_values, states):
-            action_space.take_action(q, s)
+        for ids, qs in enumerate(zip(q_values, states)):
+            action_space.take_action(qs[0], qs[1])
+            balance_list[f"b{i}s{ids}"].iloc[idx] = qs[1].balance
 
         pbar.update(batch=i + 1, seq=idx)
 
     pbar.suffix = rem_time(t1, len(dp.batched_dir) - i)
 
-df = pd.DataFrame(balance_list_val)
-df.to_excel(f"data/monitoring_validation_{now}.xlsx")
+balance_list.to_excel(f"data/monitoring_validation_{now}.xlsx")
