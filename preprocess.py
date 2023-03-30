@@ -3,12 +3,13 @@ from tqdm import tqdm
 import random
 import yaml
 from yaml.loader import FullLoader
+from datetime import datetime, timedelta
 
 total_set = 1  # How much of the total data to use
 training_set = 0.7  # Cross training-validation
 validation_set = 0.15
 test_set = 0.15  # Always latest data
-timesteps = 1320
+timesteps = 1321
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -46,7 +47,9 @@ for i in indices:
 
 indices = [i[0] for i in indices if i[0] not in anomalies]
 indices = [
-    (s, e) for s, e in zip(indices[::2], indices[1::2]) if e - s <= timesteps * 1.0625
+    (s, e)
+    for s, e in zip(indices[::2], indices[1::2])
+    if timesteps * 0.9375 <= e - s <= timesteps * 1.0625
 ]
 
 print("Splitting & shuffling...")
@@ -66,10 +69,15 @@ valid_indices = train_valid_indices[train_size : valid_size + train_size]
 def generate(indices: list[tuple], names: list[str], path: str, label: str):
     for index, name in tqdm(zip(indices, names), desc=label, leave=True):
         start, end = index
-        session = data.iloc[start : end + 1]
+        session = data.iloc[start : end + 1].copy()
 
         # ------ Manipulate data ------
+        # Interpolate missing data
+        if len(session.index) < timesteps:
+            interpolate(session)
         session.drop(["DateTime"], axis=1, inplace=True)
+
+        # Add progress indicator
         progress = [(100 / timesteps) * x for x in range(1, timesteps + 1)]
         session.insert(0, "Progress", progress)
 
@@ -77,11 +85,50 @@ def generate(indices: list[tuple], names: list[str], path: str, label: str):
         session["Open"] -= session["Open"].iloc[0]
         session["High"] -= session["High"].iloc[0]
         session["Low"] -= session["Low"].iloc[0]
+
         # Keeping original close prizes for calculations
         session["CloseNorm"] = session["Close"] - session["Close"].iloc[0]
         # -----------------------------
 
         session.to_csv(f"{path}/{name}.csv", sep=",", index=False)
+
+
+def interpolate(session: pd.DataFrame):  # sourcery skip: pandas-avoid-inplace
+    session_size = len(session.index)
+
+    while session_size < timesteps:
+        interpolations = []
+        removals = []
+        for i in range(session_size - 2):
+            first = session.iloc[i]
+            second = session.iloc[i + 1]
+            diff = (
+                datetime.fromisoformat(second["DateTime"])
+                - datetime.fromisoformat(first["DateTime"])
+            ).total_seconds() / 60
+
+            if diff > 1:
+                inter = first.copy()
+                inter["DateTime"] = str(
+                    datetime.fromisoformat(inter["DateTime"]) + timedelta(minutes=1)
+                )
+                inter["Volume"] = round((first["Volume"] + second["Volume"]) / 2)
+
+                for c in ["Open", "High", "Low", "Close"]:
+                    inter[c] = round(((first[c] + second[c]) * 4) / 2) / 4
+
+                interpolations.append((session.index[i] + 0.5, inter.tolist()))
+            elif diff == 0:
+                removals.append(session.index[i])
+            elif diff < 0:
+                raise RuntimeError("Something went horribly wrong... again...")
+
+        for inter in interpolations:
+            session.loc[inter[0]] = inter[1]
+        session.drop(removals, axis=0, inplace=True)
+        session.sort_index(inplace=True)
+        session.reset_index(inplace=True, drop=True)
+        session_size = len(session.index)
 
 
 generate(
