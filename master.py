@@ -54,10 +54,12 @@ trader.model.summary()
 
 
 def calc_terminal_reward(reward: float, state: "State") -> float:
-    if state.has_position or state.balance < 0:
-        return -100000000000000000000
+    if state.has_position():
+        reward += state.exit_position(config["tick_value"])
+    if state.balance < 0:
+        return reward - 10000000000000000000000
     else:
-        return (reward + states.balance - config["initial_balance"]) * config[
+        return (reward + state.balance - config["initial_balance"]) * config[
             "reward_factors"
         ]["session_total"]
 
