@@ -141,7 +141,7 @@ for e in range(1, config["episodes"] + 1):
 pbar.close()
 trader.model.save(terminal_model)
 df = pd.DataFrame(profit_list)
-df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
+df.to_excel(f"data/monitoring_training_{now}.xlsx")
 
 ###################### Validation | Test #######################
 
