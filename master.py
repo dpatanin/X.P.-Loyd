@@ -98,7 +98,6 @@ for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
         t = time.time()
         batch = dp.load_batch(i)
-        done = False
 
         # Initial states
         states = [
