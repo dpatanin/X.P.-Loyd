@@ -5,7 +5,7 @@ import yaml
 from yaml.loader import FullLoader
 from datetime import datetime, timedelta
 
-total_set = 0.2  # How much of the total data to use
+total_set = 1  # How much of the total data to use
 training_set = 0.7  # Cross training-validation
 validation_set = 0.15
 test_set = 0.15  # Always latest data
