@@ -82,6 +82,7 @@ def generate(indices: list[tuple], names: list[str], path: str, label: str):
         session["Open"] -= session["Open"].iloc[0]
         session["High"] -= session["High"].iloc[0]
         session["Low"] -= session["Low"].iloc[0]
+
         # Keeping original close prizes for calculations
         session["CloseNorm"] = session["Close"] - session["Close"].iloc[0]
         # -----------------------------
