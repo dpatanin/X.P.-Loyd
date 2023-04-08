@@ -175,7 +175,8 @@ for i in range(len(dp.batched_dir)):
     ]
 
     for ids, s in enumerate(states):
-        balance_list[f"b{i}s{ids}"] = [s.balance] * len(batch)
+        # +1 to keep initial balance
+        balance_list[f"b{i}s{ids}"] = [s.balance] * (len(batch) + 1)
 
     for idx, sequences in enumerate(batch):
         for seq, state in zip(sequences, states):
@@ -184,9 +185,9 @@ for i in range(len(dp.batched_dir)):
         q_values = trader.predict(states)
         for ids, qs in enumerate(zip(q_values, states)):
             action_space.take_action(qs[0], qs[1])
-            balance_list[f"b{i}s{ids}"].iloc[idx] = qs[1].balance
+            balance_list[f"b{i}s{ids}"].iloc[idx + 1] = qs[1].balance
 
-        pbar.update(batch=i + 1, seq=idx)
+        pbar.update(batch=i + 1, seq=idx + 1)
 
     pbar.suffix = rem_time(t1, len(dp.batched_dir) - i)
 
