@@ -48,6 +48,7 @@ trader = FreeLaborTrader(
     epsilon=config["agent"]["epsilon"],
     epsilon_final=config["agent"]["epsilon_final"],
     epsilon_decay=config["agent"]["epsilon_decay"],
+    learning_rate=config["agent"]["learning_rate"],
 )
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 trader.model.summary()

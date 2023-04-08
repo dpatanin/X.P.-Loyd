@@ -32,6 +32,7 @@ class FreeLaborTrader:
         epsilon=1.0,
         epsilon_final=0.01,
         epsilon_decay=0.995,
+        learning_rate=0.01,
     ):
         self.num_features = num_features
         self.batch_size = batch_size
@@ -45,7 +46,7 @@ class FreeLaborTrader:
         self.target_update_freq = update_freq
         self.target_update_cd = update_freq
 
-        self.optimizer = tf.keras.optimizers.Adamax()
+        self.optimizer = tf.keras.optimizers.Adamax(learning_rate=learning_rate)
         self.model = self.build_model()
         self.target_model = self.build_model()
 

@@ -23,7 +23,7 @@
   
   # Hyperparameter
   episodes: 10
-  batch_size: 64
+  batch_size: 512
   sequence_length: 5
   action_space:
     threshold: 0.2 # 0.00 - 1; 1 -> no action
@@ -35,6 +35,7 @@
     epsilon: 1.0
     epsilon_final: 0.01
     epsilon_decay: 0.995
+    learning_rate: 0.16
   reward_factors:
     session_total: 1.5
     intrinsic: 0.75
