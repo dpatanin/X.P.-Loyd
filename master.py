@@ -154,7 +154,7 @@ dp.dir = config["validation_data"]
 dp.batched_dir = dp.batch_dir()
 # dp.step_size = 1
 trader.memory.clear()
-trader.load(terminal_model)
+# trader.load("models/v1-prototype_09_04_2023 09_35_17_base.h5")
 
 pbar = ProgressBar(
     episodes=1,
@@ -179,17 +179,18 @@ for i in range(len(dp.batched_dir)):
         # +1 to keep initial balance
         balance_list[f"b{i}s{ids}"] = [s.balance] * (len(batch) + 1)
 
-    for idx, sequences in enumerate(batch):
+    for n, sequences in enumerate(batch):
         for seq, state in zip(sequences, states):
             state.data = seq
 
         q_values = trader.predict(states)
         for ids, qs in enumerate(zip(q_values, states)):
             action_space.take_action(qs[0], qs[1])
-            balance_list[f"b{i}s{ids}"].iloc[idx + 1] = qs[1].balance
+            balance_list[f"b{i}s{ids}"].iloc[n + 1] = qs[1].balance
 
-        pbar.update(batch=i + 1, seq=idx + 1)
+        pbar.update(batch=i + 1, seq=n + 1)
 
     pbar.suffix = rem_time(t1, len(dp.batched_dir) - i)
 
+pbar.close()
 balance_list.to_excel(f"data/monitoring_validation_{now}.xlsx")
