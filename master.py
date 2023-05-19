@@ -25,6 +25,7 @@ def empty_sequence() -> pd.DataFrame:
     empty = np.zeros((config["sequence_length"], len(config["data_headers"])))
     return pd.DataFrame(empty, columns=config["data_headers"])
 
+
 action_space = ActionSpace(
     threshold=config["action_space"]["threshold"],
     price_per_contract=config["tick_value"],
@@ -64,8 +65,8 @@ def calc_terminal_reward(reward: float, state: "State") -> float:
         ]["session_total"]
 
 
-def rem_time(it_time: float, it_left: int):
-    rem_time_sec = it_left * (time.time() - it_time)
+def rem_time(times: list[int], it_left: int):
+    rem_time_sec = it_left * (sum(times) / len(times))
     return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
 
 
@@ -95,6 +96,7 @@ pbar = ProgressBar(
 
 rem_batches = config["episodes"] * len(dp.batched_dir)
 profit_list = []
+times_per_batch = []
 
 for e in range(1, config["episodes"] + 1):
 
@@ -132,7 +134,8 @@ for e in range(1, config["episodes"] + 1):
         trader.memory.analyze_missed_opportunities(action_space)
 
         rem_batches -= 1
-        pbar.suffix = rem_time(t, rem_batches)
+        times_per_batch.append((time.time() - t))
+        pbar.suffix = rem_time(times_per_batch, rem_batches)
 
     trader.model.save(
         f"{config['model_directory']}/{config['model_name']}_{'terminal' if e == config['episodes'] else f'ep{e}'}_{now}.h5"
