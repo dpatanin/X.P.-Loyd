@@ -1,5 +1,5 @@
 ---
-  model_name: v1-prototype
+  model_name: prototype-V1
   model_directory: models
 
   # Trading sessions are expected as individual files
@@ -22,20 +22,21 @@
   initial_balance: 10000.00
   
   # Hyperparameter
-  episodes: 100
-  batch_size: 4
-  sequence_length: 5
+  episodes: 50
+  batch_size: 512
+  sequence_length: 10
   action_space:
     threshold: 0.2 # 0.00 - 1; 1 -> no action
-    trade_limit: 500 # Limit to trade at once
+    trade_limit: 75 # Limit to trade at once
   agent:
     update_frequency: 5 # Target network
-    memory_size: 2000
+    memory_size: 350000
     gamma: 0.95
     epsilon: 1.0
     epsilon_final: 0.01
-    epsilon_decay: 0.995
+    epsilon_decay: 0.999
+    learning_rate: 0.16
   reward_factors:
-    session_total: 1.5
-    intrinsic: 0.75
+    session_total: 2
+    intrinsic: 1
     hindsight: 0.5

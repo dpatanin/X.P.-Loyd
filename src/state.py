@@ -43,7 +43,7 @@ class State:
         assert self.has_position(), "No position to exit."
         profit = (
             (self.data["Close"].iloc[-1] - self.entry_price)
-            * abs(self.contracts)
+            * self.contracts
             * price_per_contract
         )
         self.balance += profit

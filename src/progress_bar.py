@@ -25,15 +25,19 @@ class ProgressBar(tqdm):
             desc=self.gen_description(),
         )
 
-    def gen_description(self): 
-        start = f'{self.prefix}|' if self.prefix else ''
-        end = f'|{self.suffix}' if self.suffix else ''
+    def gen_description(self):
+        start = f"{self.prefix}|" if self.prefix else ""
+        end = f"|{self.suffix}" if self.suffix else ""
         return f"{start}Episode {self.curr_ep}/{self.episodes}|Batch {self.curr_b}/{self.batches}|Sequence {self.curr_s}/{self.sequences_per_batch}{end}"
 
     def update(self, ep: int = None, batch: int = None, seq: int = None):
-        diff_e = (ep - self.curr_ep) * self.batches * self.sequences_per_batch
-        diff_b = (batch - self.curr_b) * self.sequences_per_batch
-        diff_s = seq - self.curr_s
+        diff_e = (
+            ((ep or self.curr_ep) - self.curr_ep)
+            * self.batches
+            * self.sequences_per_batch
+        )
+        diff_b = ((batch or self.curr_b) - self.curr_b) * self.sequences_per_batch
+        diff_s = (seq or self.curr_s) - self.curr_s
         super().update(diff_e + diff_b + diff_s)
 
         super().set_description

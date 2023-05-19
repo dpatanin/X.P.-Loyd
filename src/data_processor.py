@@ -28,6 +28,7 @@ class DataProcessor:
         self.batched_dir: list[list[str]] = self.batch_dir() if dir else [[]]
 
     def load_file(self, file_path: str) -> pd.DataFrame:
+        # sourcery skip: pandas-avoid-inplace
         data = pd.read_csv(file_path)
 
         self.assert_columns(data)
@@ -60,7 +61,11 @@ class DataProcessor:
     def batch_dir(self):
         assert os.path.exists(self.dir), f"{self.dir} does not exist."
         ls = os.listdir(self.dir)
-        ls.sort()
-        del ls[: (len(ls) % self.batch_size)]
+        num_batches = len(ls) // self.batch_size
+        remaining_paths = len(ls) % self.batch_size
 
-        return [ls[i : i + self.batch_size] for i in range(0, len(ls), self.batch_size)]
+        batches = [ls[i:i + self.batch_size] for i in range(0, num_batches * self.batch_size, self.batch_size)]
+        if remaining_paths:
+            batches.append(ls[-remaining_paths:])
+
+        return batches

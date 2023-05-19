@@ -11,6 +11,7 @@ import yaml
 from yaml.loader import FullLoader
 from datetime import datetime
 import time
+import warnings
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -47,28 +48,31 @@ trader = FreeLaborTrader(
     epsilon=config["agent"]["epsilon"],
     epsilon_final=config["agent"]["epsilon_final"],
     epsilon_decay=config["agent"]["epsilon_decay"],
+    learning_rate=config["agent"]["learning_rate"],
 )
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 trader.model.summary()
 
 
 def calc_terminal_reward(reward: float, state: "State") -> float:
-    if state.has_position or state.balance < 0:
-        return -100000000000000000000
+    if state.has_position():
+        reward += state.exit_position(config["tick_value"])
+    if state.balance < 0:
+        return reward - 10000000000000000000000
     else:
-        return (reward + states.balance - config["initial_balance"]) * config[
+        return (reward + state.balance - config["initial_balance"]) * config[
             "reward_factors"
         ]["session_total"]
 
 
-def rem_time(it_time: float, it_left: int):
-    rem_time_sec = it_left * (time.time() - it_time)
+def rem_time(times: list[int], it_left: int):
+    rem_time_sec = it_left * (sum(times) / len(times))
     return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
 
 
-def avg_balance(states: list["State"]):
+def avg_profit(states: list["State"]):
     sum_balance = sum(state.balance for state in states)
-    return sum_balance / config["batch_size"]
+    return (sum_balance / config["batch_size"]) - config["initial_balance"]
 
 
 ########################### Training ###########################
@@ -91,7 +95,8 @@ pbar = ProgressBar(
 )
 
 rem_batches = config["episodes"] * len(dp.batched_dir)
-balance_list_train = []
+profit_list = []
+times_per_batch = []
 
 for e in range(1, config["episodes"] + 1):
 
@@ -109,13 +114,12 @@ for e in range(1, config["episodes"] + 1):
                 state.data = seq
             snapshot = states.copy()  # States before action; For experiences
 
-            balance_list_train.append(avg_balance(states))
-
             q_values = trader.predict(states)
             rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
 
             done = idx == len(batch) - 1
             if done:
+                profit_list.append(avg_profit(states))
                 rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
 
             for snap, reward, state in zip(snapshot, rewards, states.copy()):
@@ -130,60 +134,66 @@ for e in range(1, config["episodes"] + 1):
         trader.memory.analyze_missed_opportunities(action_space)
 
         rem_batches -= 1
-        pbar.suffix = rem_time(t, rem_batches)
+        times_per_batch.append((time.time() - t))
+        pbar.suffix = rem_time(times_per_batch, rem_batches)
 
-    # Save the model every 10 episodes
-    if e % 10 == 0:
-        trader.model.save(
-            f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
-        )
+    trader.model.save(
+        f"{config['model_directory']}/{config['model_name']}_{'terminal' if e == config['episodes'] else f'ep{e}'}_{now}.h5"
+    )
 
 pbar.close()
-df = pd.DataFrame(balance_list_train)
-df.to_excel(f"data/monitoring_training_ep{e}_{now}.xlsx")
-trader.model.save(terminal_model)
+df = pd.DataFrame(profit_list)
+df.to_excel(f"data/training_{config['model_name']}_{now}.xlsx")
 
 ###################### Validation | Test #######################
+
+# The performance issue is insignificant; Complexity rises significant otherwise
+warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 dp.dir = config["validation_data"]
 # dp.dir = config["test_data"]
 dp.batched_dir = dp.batch_dir()
-dp.step_size = 1
-trader.memory.clear()
-trader.load(terminal_model)
+dp.step_size = 5
+trader.load(f"{config['model_directory']}/_name_.h5")
 
-pbar = ProgressBar(
-    episodes=1,
-    batches=len(dp.batched_dir),
-    sequences_per_batch=len(dp.load_batch(0)),
-    prefix="Validation",
-    suffix="Remaining time: ???",
-    leave=True,
-)
-balance_list_val = []
+for trial in range(1, 6):
+    pbar = ProgressBar(
+        episodes=1,
+        batches=len(dp.batched_dir),
+        sequences_per_batch=len(dp.load_batch(0)),
+        prefix="Validation",
+        suffix="Remaining time: ???",
+        leave=True,
+    )
+    balance_list = pd.DataFrame()
 
-for i in range(len(dp.batched_dir) - 1):
-    t1 = time.time()
-    batch = dp.load_batch(i)
+    for i in range(len(dp.batched_dir)):
+        t1 = time.time()
+        batch = dp.load_batch(i)
 
-    # Initial states
-    states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
-        "batch_size"
-    ]
+        # Initial states
+        states = [
+            State(data=empty_sequence(), balance=config["initial_balance"])
+        ] * config["batch_size"]
 
-    for idx, sequences in enumerate(batch):
-        for seq, state in zip(sequences, states):
-            state.data = seq
+        for idx, s in enumerate(states):
+            # +1 to keep initial balance
+            balance_list[f"b{i}s{idx}"] = [s.balance] * (len(batch) + 1)
 
-        balance_list_val.extend(state.balance for state in states)
+        for n, sequences in enumerate(batch):
+            for seq, state in zip(sequences, states):
+                state.data = seq
 
-        q_values = trader.predict(states)
-        for q, s in zip(q_values, states):
-            action_space.take_action(q, s)
+            q_values = trader.predict(states)
+            for ids, qs in enumerate(zip(q_values, states)):
+                action_space.take_action(qs[0], qs[1])
+                balance_list[f"b{i}s{ids}"].iloc[n + 1] = qs[1].balance
 
-        pbar.update(batch=i + 1, seq=idx)
+            pbar.update(batch=i + 1, seq=n + 1)
 
-    pbar.suffix = rem_time(t1, len(dp.batched_dir) - i)
+        pbar.suffix = rem_time(t1, len(dp.batched_dir) - i)
 
-df = pd.DataFrame(balance_list_val)
-df.to_excel(f"data/monitoring_validation_{now}.xlsx")
+    pbar.close()
+    balance_list.to_excel(
+        f"data/validation_{config['model_name']}_trial{trial}_{now}.xlsx"
+    )
