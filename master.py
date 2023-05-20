@@ -154,7 +154,7 @@ dp.dir = config["validation_data"]
 # dp.dir = config["test_data"]
 dp.batched_dir = dp.batch_dir()
 dp.step_size = 5
-trader.load(f"{config['model_directory']}/_name_.h5")
+trader.load(f"{config['model_directory']}/prototype-V1_terminal_19_05_2023 11_23_45.h5")
 
 for trial in range(1, 6):
     pbar = ProgressBar(
@@ -166,9 +166,10 @@ for trial in range(1, 6):
         leave=True,
     )
     balance_list = pd.DataFrame()
+    times_per_batch = []
 
     for i in range(len(dp.batched_dir)):
-        t1 = time.time()
+        t = time.time()
         batch = dp.load_batch(i)
 
         # Initial states
@@ -191,7 +192,8 @@ for trial in range(1, 6):
 
             pbar.update(batch=i + 1, seq=n + 1)
 
-        pbar.suffix = rem_time(t1, len(dp.batched_dir) - i)
+        times_per_batch.append((time.time() - t))
+        pbar.suffix = rem_time(times_per_batch, len(dp.batched_dir) - i)
 
     pbar.close()
     balance_list.to_excel(
