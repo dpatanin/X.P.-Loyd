@@ -156,46 +156,45 @@ dp.batched_dir = dp.batch_dir()
 dp.step_size = 5
 trader.load(f"{config['model_directory']}/prototype-V1_terminal_19_05_2023 11_23_45.h5")
 
-for trial in range(1, 6):
-    pbar = ProgressBar(
-        episodes=1,
-        batches=len(dp.batched_dir),
-        sequences_per_batch=len(dp.load_batch(0)),
-        prefix="Validation",
-        suffix="Remaining time: ???",
-        leave=True,
-    )
-    balance_list = pd.DataFrame()
-    times_per_batch = []
+pbar = ProgressBar(
+    episodes=1,
+    batches=len(dp.batched_dir),
+    sequences_per_batch=len(dp.load_batch(0)),
+    prefix="Validation",
+    suffix="Remaining time: ???",
+    leave=True,
+)
+balance_list = pd.DataFrame()
+times_per_batch = []
 
-    for i in range(len(dp.batched_dir)):
-        t = time.time()
-        batch = dp.load_batch(i)
+for i in range(len(dp.batched_dir)):
+    t = time.time()
+    batch = dp.load_batch(i)
 
-        # Initial states
-        states = [
-            State(data=empty_sequence(), balance=config["initial_balance"])
-        ] * config["batch_size"]
+    # Initial states
+    states = [
+        State(data=empty_sequence(), balance=config["initial_balance"])
+    ] * config["batch_size"]
 
-        for idx, s in enumerate(states):
-            # +1 to keep initial balance
-            balance_list[f"b{i}s{idx}"] = [s.balance] * (len(batch) + 1)
+    for idx, s in enumerate(states):
+        # +1 to keep initial balance
+        balance_list[f"b{i}s{idx}"] = [s.balance] * (len(batch) + 1)
 
-        for n, sequences in enumerate(batch):
-            for seq, state in zip(sequences, states):
-                state.data = seq
+    for n, sequences in enumerate(batch):
+        for seq, state in zip(sequences, states):
+            state.data = seq
 
-            q_values = trader.predict(states)
-            for ids, qs in enumerate(zip(q_values, states)):
-                action_space.take_action(qs[0], qs[1])
-                balance_list[f"b{i}s{ids}"].iloc[n + 1] = qs[1].balance
+        q_values = trader.predict(states)
+        for ids, qs in enumerate(zip(q_values, states)):
+            action_space.take_action(qs[0], qs[1])
+            balance_list[f"b{i}s{ids}"].iloc[n + 1] = qs[1].balance
 
-            pbar.update(batch=i + 1, seq=n + 1)
+        pbar.update(batch=i + 1, seq=n + 1)
 
-        times_per_batch.append((time.time() - t))
-        pbar.suffix = rem_time(times_per_batch, len(dp.batched_dir) - i)
+    times_per_batch.append((time.time() - t))
+    pbar.suffix = rem_time(times_per_batch, len(dp.batched_dir) - i)
 
-    pbar.close()
-    balance_list.to_excel(
-        f"data/validation_{config['model_name']}_trial{trial}_{now}.xlsx"
-    )
+pbar.close()
+balance_list.to_excel(
+    f"data/validation_{config['model_name']}_{now}.xlsx"
+)
