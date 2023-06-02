@@ -51,10 +51,44 @@ Tensorflow uses by default the GPU. If you want to manually check whether GPU is
     print(device_lib.list_local_devices()) // To see full list of devices
 ```
 
-## Run
+## Training
 
-Preprocess: `python preprocess.py`
+Everything necessary to train the AI is put into the `/ai-training` directory.
+
+### Data
+
+Inside you need to create locally a few directories:
+
+- One directory where your models will be saved to (default: `ai-training/models`)
+- One directory holding your data (default: `ai-training/data`)
+- By default, the data is intended to be split into:
+  - Training data (default: `ai-training/data/training`)
+  - Validation data (default: `ai-training/data/validation`)
+  - Test data (default: `ai-training/data/test`)
+
+You can of course organize however you wish, simply adjust the `config.yaml` file accordingly.
+The project expects the data to represent each trading session by a separate `.csv` file and be of **exactly the same size**.
+`preprocess.py` is designed for our data. You can ignore it if you preprocess your data elsewhere.
+If using the provided script, you should adjust the preprocess script to fit your specific needs.
+
+Keep in mind to include the data headers inside the `config.yaml` as all which are not specified will be dropped.
+
+### Config / Hyperparameter
+
+All project parameters and hyperparameter are defined inside the `ai-training/config.yaml`.
+It is intended to make changes simpler and provide an overview, rather than serving actual, project wide setting.
+Most of those variables are simply forwarded in the `master.py`.
+
+### Run
+
 Run: `python master.py`
 
-The preprocessing script is designed for our data. The important part is. You can skip this part if you preprocess your data elsewhere.
-If using the provided script, you should adjust the preprocess script to fit your specific needs.
+The `master.py` will start and train a model as specified.
+It also includes a validation/test block which may lead to inaccurate results if run during the same initiation as the training.
+We recommend doing separate runs.
+
+**Important:** Don't forget to set the epsilon right to avoid random behavior during validation.
+
+## Server
+
+TBD
