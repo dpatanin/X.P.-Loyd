@@ -5,6 +5,7 @@ from src.trader import FreeLaborTrader
 from src.state import State
 from src.action_space import ActionSpace
 from src.progress_bar import ProgressBar
+import tensorflow as tf
 import pandas as pd
 import numpy as np
 import yaml
@@ -99,7 +100,6 @@ profit_list = []
 times_per_batch = []
 
 for e in range(1, config["episodes"] + 1):
-
     for i in range(len(dp.batched_dir)):
         t = time.time()
         batch = dp.load_batch(i)
@@ -137,6 +137,7 @@ for e in range(1, config["episodes"] + 1):
         times_per_batch.append((time.time() - t))
         pbar.suffix = rem_time(times_per_batch, rem_batches)
 
+    tf.saved_model.save(trader.model, f'/{config["model_directory"]}')
     trader.model.save(
         f"{config['model_directory']}/{config['model_name']}_{'terminal' if e == config['episodes'] else f'ep{e}'}_{now}.h5"
     )
@@ -172,9 +173,9 @@ for i in range(len(dp.batched_dir)):
     batch = dp.load_batch(i)
 
     # Initial states
-    states = [
-        State(data=empty_sequence(), balance=config["initial_balance"])
-    ] * config["batch_size"]
+    states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
+        "batch_size"
+    ]
 
     for idx, s in enumerate(states):
         # +1 to keep initial balance
@@ -195,6 +196,4 @@ for i in range(len(dp.batched_dir)):
     pbar.suffix = rem_time(times_per_batch, len(dp.batched_dir) - i)
 
 pbar.close()
-balance_list.to_excel(
-    f"data/validation_{config['model_name']}_{now}.xlsx"
-)
+balance_list.to_excel(f"data/validation_{config['model_name']}_{now}.xlsx")

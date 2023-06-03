@@ -92,3 +92,5 @@ We recommend doing separate runs.
 ## Server
 
 TBD
+
+Docker
