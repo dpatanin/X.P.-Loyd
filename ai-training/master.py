@@ -13,6 +13,7 @@ from yaml.loader import FullLoader
 from datetime import datetime
 import time
 import warnings
+from os import listdir
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -137,7 +138,16 @@ for e in range(1, config["episodes"] + 1):
         times_per_batch.append((time.time() - t))
         pbar.suffix = rem_time(times_per_batch, rem_batches)
 
-    tf.saved_model.save(trader.model, f'/{config["model_directory"]}')
+    # Save the model to be served
+    version = 1
+    try:
+        versions = listdir(F'/{config["model_directory"]}/{config["model_name"]}/')
+        version = max(versions) + 1
+    except:
+        pass
+    tf.saved_model.save(trader.model, f'/{config["model_directory"]}/{config["model_name"]}/{version}')
+
+    # Save copy in h5 format
     trader.model.save(
         f"{config['model_directory']}/{config['model_name']}_{'terminal' if e == config['episodes'] else f'ep{e}'}_{now}.h5"
     )
