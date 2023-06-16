@@ -13,7 +13,6 @@ from yaml.loader import FullLoader
 from datetime import datetime
 import time
 import warnings
-from os import listdir
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
