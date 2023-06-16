@@ -1,11 +1,10 @@
-FROM tensorflow/serving
+FROM tensorflow/serving:latest-gpu
 
 WORKDIR /
 
 COPY . /server
 
-ENV MODEL_NAME="prototype-V1_terminal_19_05_2023 11_23_45.pb"
-ENV MODEL_BASE_PATH=/
+ENV MODEL_BASE_PATH=/server
 
 EXPOSE 8501
 RUN apt-get -y update && apt-get install -y python
