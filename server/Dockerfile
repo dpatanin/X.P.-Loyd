@@ -1,12 +1,12 @@
-FROM tensorflow/serving:latest-gpu
+FROM python:3.9
 
-WORKDIR /
+WORKDIR /app
 
-COPY . /server
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-ENV MODEL_BASE_PATH=/server
+COPY . .
 
-EXPOSE 8501
-RUN apt-get -y update && apt-get install -y python
+EXPOSE 8000
 
-CMD ["python", "server.py"]
+CMD [ "python", "server.py" ]

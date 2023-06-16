@@ -2,7 +2,5 @@
 .vs
 env
 data
-models
 __pycache__
 assets
-variables
