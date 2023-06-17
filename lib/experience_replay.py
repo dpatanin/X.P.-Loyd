@@ -1,8 +1,10 @@
 import random
 from lib.action_space import ActionSpace
 from lib.state import State
+from lib.constants import CLOSE
 from collections import deque
 from typing import Deque, Tuple
+
 
 
 class ExperienceReplayBuffer:
@@ -77,8 +79,8 @@ class HERBuffer(ExperienceReplayBuffer):
         for xp in experiences:
             s, r, ns, d = xp
 
-            current_price: float = s.data["close"].iloc[-1]
-            price_diff: float = ns.data["close"].iloc[-1] - current_price
+            current_price: float = s.data[CLOSE].iloc[-1]
+            price_diff: float = ns.data[CLOSE].iloc[-1] - current_price
 
             if (
                 self.__check_missed_opportunity(s.contracts, ns.contracts, price_diff)

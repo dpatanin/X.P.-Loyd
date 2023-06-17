@@ -5,7 +5,8 @@
   data_dir: data/training # Trading sessions are expected as individual files
 
   # General config
-  #! Close & Volume headers are required; not listed headers will be dropped _after_ preprocessing
+  #! close & volume headers are required; have to match the constants in `lib/constants.py` 
+  # Not listed headers will be dropped _after_ preprocessing
   data_headers:
     - progress
     - open
