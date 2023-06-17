@@ -36,7 +36,7 @@ def handle_get_request():
     # Read data in order
     data = pd.DataFrame({header: request.json[header] for header in HEADERS})
     for sv in STATE_VALS:
-        data[sv] = request.json[sv]
+        data[sv] = [request.json[sv]] * len(request.json[HEADERS[0]])
     logging.debug(f"Data read: {str(data)}")
 
     # Make a request to the model
