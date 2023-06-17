@@ -91,6 +91,9 @@ We recommend doing separate runs.
 
 ## Server
 
-TBD
+To serve the model you need to install [Docker](https://www.docker.com/products/docker-desktop/) first.
+To start the server run `docker-compose up --build` from the root directory.
+This will start two containers:
 
-Docker
+- One hosting a python server to handle & process the client requests & model responses
+- One serving the model via tensorflow-serving
