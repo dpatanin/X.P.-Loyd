@@ -1,5 +1,5 @@
 from lib.state import State
-from lib.constants import VOLUME
+from lib.constants import VOLUME, ACTION_SHORT, ACTION_LONG, ACTION_EXIT, ACTION_STAY
 
 
 class ActionSpace:
@@ -46,18 +46,24 @@ class ActionSpace:
             contracts - round(abs(overhead / self.ppc)) if overhead <= 0 else contracts
         )
 
-    def take_action(self, q: float, state: "State") -> float:
+    def take_action(self, q: float, state: "State"):
+        """
+        Takes action on a state inplace.
+        Returns tuple with reward and taken action.
+        """
+        action = ACTION_STAY
         if q == 0:
-            return 0
+            return (0.00, action)
 
         abs_q = abs(q)
         position = state.has_position()
         amount = self.calc_trade_amount(q, state)
-        reward = 0
+        reward = 0.00
 
         if abs_q < self.threshold:
             if self.is_opposite_direction(q, position):
                 reward = state.exit_position(self.ppc)
+                action = ACTION_EXIT
         else:
             if position:
                 if not self.is_opposite_direction(q, position):
@@ -67,12 +73,14 @@ class ActionSpace:
             if q > 0:
                 amount = self.remove_overhead(amount, state.balance)
                 state.enter_long(amount, self.ppc)
+                action = ACTION_LONG
             else:
                 state.enter_short(amount, self.ppc)
+                action = ACTION_SHORT
 
             reward += amount * self.ppc * self.intrinsic_fac
 
-        return reward
+        return (reward, action)
 
     def is_opposite_direction(self, q: float, position: int) -> bool:
         return (q > 0 and position < 0) or (q < 0 and position > 0)

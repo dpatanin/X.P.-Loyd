@@ -1,11 +1,13 @@
-import requests
+from lib.constants import BALANCE, ENTRY_PRICE, CONTRACTS, ACTION_STAY, ACTION_EXIT
+from lib.action_space import ActionSpace
+from lib.state import State
 from flask import Flask, request, jsonify
+import requests
 import logging
 import pandas as pd
+
 import yaml
 from yaml.loader import FullLoader
-from lib.state import State
-from lib.constants import BALANCE, ENTRY_PRICE, CONTRACTS
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -14,21 +16,30 @@ app = Flask(__name__)
 # Configure logging
 logging.basicConfig(filename="server.log", level=logging.DEBUG)
 
+action_space = ActionSpace(
+    threshold=config["action_space"]["threshold"],
+    price_per_contract=config["tick_value"],
+    limit=config["action_space"]["trade_limit"],
+    intrinsic_fac=config["reward_factors"]["intrinsic"],
+)
+
 
 # Endpoint for handling GET requests
 @app.route("/predict", methods=["POST"])
 def handle_get_request():
     logging.debug(f"Request received: {request}")
-    logging.debug(f"Data received: {request.json}")
+    content = request.json
+    logging.debug(f"Content received: {content}")
 
     data = pd.DataFrame(
-        {header: request.json[header] for header in config["data_headers"]}
+        {header: content[header] for header in config["data_headers"]}
     )
+    data["closeNorm"] = content["closeNorm"]  # TODO: Delete me
     state = State(
         data,
-        balance=request.json[BALANCE],
-        contracts=request.json[CONTRACTS],
-        entry_price=request.json[ENTRY_PRICE],
+        balance=content[BALANCE],
+        contracts=content[CONTRACTS],
+        entry_price=content[ENTRY_PRICE],
     )
     logging.debug(f"State constructed: {str(state)}")
 
@@ -37,11 +48,21 @@ def handle_get_request():
         "http://tensorflow-serve:8501/v1/models/prototype-V1:predict",
         json={"instances": [state.to_numpy().tolist()]},
     )
-    logging.debug(f"Model Response: {model_response.json()}")
+    logging.debug(f"Model response: {model_response}")
+    logging.debug(f"Model content: {model_response.json()}")
 
-    predicted_result: float = model_response.json()
+    prediction: float = model_response.json()["predictions"][0][0]
+    logging.debug(f"Model prediction: {prediction}")
 
-    return jsonify({"result": predicted_result})
+    # Take action, calculate amount inversely & return response
+    amount = action_space.calc_trade_amount(prediction, state)
+    action = action_space.take_action(prediction, state)[1]
+    if action in [ACTION_EXIT, ACTION_STAY]:
+        amount = 0
+
+    response = {"action": action, "amount": amount}
+
+    return jsonify(response)
 
 
 if __name__ == "__main__":

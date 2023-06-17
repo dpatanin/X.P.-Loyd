@@ -108,7 +108,9 @@ for e in range(1, config["episodes"] + 1):
             snapshot = states.copy()  # States before action; For experiences
 
             q_values = trader.predict(states)
-            rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
+            rewards = [
+                action_space.take_action(q, s)[0] for q, s in zip(q_values, states)
+            ]
 
             done = idx == len(batch) - 1
             if done:

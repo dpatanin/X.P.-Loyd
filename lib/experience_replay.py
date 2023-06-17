@@ -6,7 +6,6 @@ from collections import deque
 from typing import Deque, Tuple
 
 
-
 class ExperienceReplayBuffer:
     """
     A basic experience replay buffer representing a collection of transitions.\n
@@ -88,7 +87,7 @@ class HERBuffer(ExperienceReplayBuffer):
             ):
                 price_shift_ref = price_diff
                 alt_q = self.__calc_q_for_action(action_space.threshold, price_diff)
-                reward = action_space.take_action(alt_q, s, ns)
+                reward = action_space.take_action(alt_q, s, ns)[0]
 
                 self.add((s, reward, ns, d))
                 alt_state = ns
@@ -99,8 +98,8 @@ class HERBuffer(ExperienceReplayBuffer):
                     or ns.contracts != 0
                 ):
                     q = self.__calc_q_for_exit(action_space.threshold, alt_q)
-                    reward = self.reward_fac * action_space.take_action(
-                        q, alt_state, ns
+                    reward = (
+                        self.reward_fac * action_space.take_action(q, alt_state, ns)[0]
                     )
 
                     self.add((alt_state, reward, ns, d))
@@ -108,8 +107,8 @@ class HERBuffer(ExperienceReplayBuffer):
                     alt_q = 0.00
                 else:
                     q = self.__calc_q_for_no_action(action_space.threshold, alt_q)
-                    reward = self.reward_fac * action_space.take_action(
-                        q, alt_state, ns
+                    reward = (
+                        self.reward_fac * action_space.take_action(q, alt_state, ns)[0]
                     )
 
                     # Ensure continuity of actions
