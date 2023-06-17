@@ -3,15 +3,14 @@ services:
   tensorflow-serve:
     image: tensorflow/serving:latest-gpu
     volumes:
-      - ./ai-training/models:/models
+      - ./models:/models
     command: --model_base_path=/models --rest_api_port=8501 --model_name=prototype-V1
     networks:
       - trading
 
   python-server:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      dockerfile: ./server/Dockerfile
     ports:
       - 8000:8000
     depends_on:
