@@ -33,10 +33,9 @@ action_space = ActionSpace(
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
 dp = DataProcessor(
-    headers=config["data_headers"],
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
-    dir=config["data_dir"],
+    headers=config["data_headers"],
 )
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
@@ -78,7 +77,14 @@ def avg_profit(states: list["State"]):
 
 ########################### Training ###########################
 
+dp.dir = config["data_dir"]
 dp.batched_dir = dp.batch_dir()
+terminal_model = (
+    f"{config['model_directory']}/"
+    + f"{config['model_name']}_"
+    + f"{now}"
+    + "_terminal.h5"
+)
 pbar = ProgressBar(
     episodes=config["episodes"],
     batches=len(dp.batched_dir),
