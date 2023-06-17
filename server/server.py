@@ -11,7 +11,6 @@ HEADERS = [
     "low",
     "close",
     "volume",
-    "closeNorm",
 ]
 STATE_VALS = [
     "contracts",

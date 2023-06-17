@@ -14,8 +14,8 @@ data = pd.read_csv("data/source.csv")
 names = ["%05d" % x for x in range(100000)]
 
 print("Indexing...")
-start_indices = data[data["DateTime"].str.endswith("18:00:00")].index.to_list()
-end_indices = data[data["DateTime"].str.endswith("16:00:00")].index.to_list()
+start_indices = data[data["dateTime"].str.endswith("18:00:00")].index.to_list()
+end_indices = data[data["dateTime"].str.endswith("16:00:00")].index.to_list()
 
 indices = [(s, "s") for s in start_indices]
 indices.extend([(e, "e") for e in end_indices])
@@ -52,18 +52,18 @@ def interpolate(session: pd.DataFrame):  # sourcery skip: pandas-avoid-inplace
             first = session.iloc[i]
             second = session.iloc[i + 1]
             diff = (
-                datetime.fromisoformat(second["DateTime"])
-                - datetime.fromisoformat(first["DateTime"])
+                datetime.fromisoformat(second["dateTime"])
+                - datetime.fromisoformat(first["dateTime"])
             ).total_seconds() / 60
 
             if diff > 1:
                 inter = first.copy()
-                inter["DateTime"] = str(
-                    datetime.fromisoformat(inter["DateTime"]) + timedelta(minutes=1)
+                inter["dateTime"] = str(
+                    datetime.fromisoformat(inter["dateTime"]) + timedelta(minutes=1)
                 )
-                inter["Volume"] = round((first["Volume"] + second["Volume"]) / 2)
+                inter["volume"] = round((first["volume"] + second["volume"]) / 2)
 
-                for c in ["Open", "High", "Low", "Close"]:
+                for c in ["open", "high", "low", "close"]:
                     inter[c] = round(((first[c] + second[c]) * 4) / 2) / 4
 
                 interpolations.append((session.index[i] + 0.5, inter.tolist()))
@@ -88,19 +88,17 @@ for index, name in tqdm(zip(indices, names[: len(indices)]), leave=True):
     # Interpolate missing data
     if len(session.index) < TIMESTEPS:
         interpolate(session)
-    session.drop(["DateTime"], axis=1, inplace=True)
+    session.drop(["dateTime"], axis=1, inplace=True)
 
     # Add progress indicator
     progress = [(100 / TIMESTEPS) * x for x in range(1, TIMESTEPS + 1)]
-    session.insert(0, "Progress", progress)
+    session.insert(0, "progress", progress)
 
     # Normalizing
-    session["Open"] -= session["Open"].iloc[0]
-    session["High"] -= session["High"].iloc[0]
-    session["Low"] -= session["Low"].iloc[0]
-
-    # Keeping original close prizes for calculations
-    session["CloseNorm"] = session["Close"] - session["Close"].iloc[0]
+    session["open"] -= session["open"].iloc[0]
+    session["high"] -= session["high"].iloc[0]
+    session["low"] -= session["low"].iloc[0]
+    session["close"] -= session["close"].iloc[0]
     # -----------------------------
 
     session.to_csv(f"{config['data_dir']}/{name}.csv", sep=",", index=False)
