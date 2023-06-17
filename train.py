@@ -1,10 +1,10 @@
 import math
 
-from src.data_processor import DataProcessor
-from src.trader import FreeLaborTrader
-from src.state import State
-from src.action_space import ActionSpace
-from src.progress_bar import ProgressBar
+from lib.data_processor import DataProcessor
+from lib.trader import FreeLaborTrader
+from lib.state import State
+from lib.action_space import ActionSpace
+from lib.progress_bar import ProgressBar
 import tensorflow as tf
 import pandas as pd
 import numpy as np

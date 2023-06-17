@@ -1,4 +1,4 @@
-from src.state import State
+from lib.state import State
 
 
 class ActionSpace:
