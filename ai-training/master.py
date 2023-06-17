@@ -12,7 +12,6 @@ import yaml
 from yaml.loader import FullLoader
 from datetime import datetime
 import time
-import warnings
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -78,7 +77,7 @@ def avg_profit(states: list["State"]):
 
 ########################### Training ###########################
 
-dp.dir = config["training_data"]
+dp.dir = config["data_dir"]
 dp.batched_dir = dp.batch_dir()
 terminal_model = (
     f"{config['model_directory']}/"
@@ -138,7 +137,9 @@ for e in range(1, config["episodes"] + 1):
         pbar.suffix = rem_time(times_per_batch, rem_batches)
 
     # Save the model to be served
-    tf.saved_model.save(trader.model, f'/{config["model_directory"]}/{config["version"]}')
+    tf.saved_model.save(
+        trader.model, f'/{config["model_directory"]}/{config["version"]}'
+    )
 
     # Save copy in h5 format
     trader.model.save(
