@@ -33,19 +33,6 @@ class ActionSpace:
             abs(((abs(q) - self.threshold) / (1 - self.threshold)) * max_amount)
         )
 
-    def remove_overhead(self, contracts: int, balance: float) -> int:
-        """
-        Calculates the overhead of contracts in regard to the balance.
-        Returns the new calculated trade amount without the overhead.
-        """
-        if balance <= 0:
-            return 0
-
-        overhead = balance - (contracts * self.ppc)
-        return (
-            contracts - round(abs(overhead / self.ppc)) if overhead <= 0 else contracts
-        )
-
     def take_action(self, q: float, state: "State"):
         """
         Takes action on a state inplace.
@@ -71,7 +58,6 @@ class ActionSpace:
                 reward = state.exit_position(self.ppc)
 
             if q > 0:
-                amount = self.remove_overhead(amount, state.balance)
                 state.enter_long(amount, self.ppc)
                 action = ACTION_LONG
             else:
