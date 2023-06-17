@@ -77,8 +77,8 @@ class HERBuffer(ExperienceReplayBuffer):
         for xp in experiences:
             s, r, ns, d = xp
 
-            current_price: float = s.data["close"].iloc[-1]
-            price_diff: float = ns.data["close"].iloc[-1] - current_price
+            current_price: float = s.data["Close"].iloc[-1]
+            price_diff: float = ns.data["Close"].iloc[-1] - current_price
 
             if (
                 self.__check_missed_opportunity(s.contracts, ns.contracts, price_diff)

@@ -27,7 +27,7 @@ class ActionSpace:
         """
         Scales the q value prediction to the amount of contracts to trade.
         """
-        max_amount = min(state.data["volume"].median(), self.limit)
+        max_amount = min(state.data["Volume"].median(), self.limit)
         return round(
             abs(((abs(q) - self.threshold) / (1 - self.threshold)) * max_amount)
         )

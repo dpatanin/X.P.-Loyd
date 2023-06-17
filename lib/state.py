@@ -29,20 +29,20 @@ class State:
 
     def enter_long(self, contracts: int, price_per_contract: float):
         self.assert_valid_operation(contracts, price_per_contract)
-        self.entry_price = self.data["close"].iloc[-1] if contracts > 0 else 0.00
+        self.entry_price = self.data["Close"].iloc[-1] if contracts > 0 else 0.00
         self.balance -= contracts * price_per_contract
         self.contracts = contracts
 
     def enter_short(self, contracts: int, price_per_contract: float):
         self.assert_valid_operation(contracts, price_per_contract)
-        self.entry_price = self.data["close"].iloc[-1] if contracts > 0 else 0.00
+        self.entry_price = self.data["Close"].iloc[-1] if contracts > 0 else 0.00
         self.balance += contracts * price_per_contract
         self.contracts = -contracts
 
     def exit_position(self, price_per_contract: float) -> float:
         assert self.has_position(), "No position to exit."
         profit = (
-            (self.data["close"].iloc[-1] - self.entry_price)
+            (self.data["Close"].iloc[-1] - self.entry_price)
             * self.contracts
             * price_per_contract
         )
@@ -68,9 +68,9 @@ class State:
         Human readable Dataframe representation of the State object.
         """
         df = pd.DataFrame(self.data)
-        df["contracts"] = self.contracts
-        df["entryPrice"] = self.entry_price
-        df["balance"] = self.balance
+        df["Contracts"] = self.contracts
+        df["EntryPrice"] = self.entry_price
+        df["Balance"] = self.balance
         return df
 
     def to_numpy(self):
@@ -80,7 +80,7 @@ class State:
         return self.to_df().to_numpy()
 
     def assert_columns(self):
-        req_columns = ["close", "volume"]
+        req_columns = ["Close", "Volume"]
         if missing_columns := set(req_columns) - set(self.data.columns):
             raise ValueError(f"Sequence is missing required columns: {missing_columns}")
 

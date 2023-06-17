@@ -7,12 +7,13 @@
   # General config
   #! Close & Volume headers are required; not listed headers will be dropped _after_ preprocessing
   data_headers:
-    - progress
-    - open
-    - high
-    - low
-    - close
-    - volume
+    - Progress
+    - Open
+    - High
+    - Low
+    - Close
+    - CloseNorm
+    - Volume
   tick_size: 0.25 # Currently not in use
   tick_value: 12.50 # Represents price per contract
   initial_balance: 10000.00
