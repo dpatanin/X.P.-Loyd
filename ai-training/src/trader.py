@@ -1,5 +1,5 @@
-from lib.experience_replay import HERBuffer
-from lib.state import State
+from src.experience_replay import HERBuffer
+from src.state import State
 import numpy as np
 import tensorflow as tf
 import random

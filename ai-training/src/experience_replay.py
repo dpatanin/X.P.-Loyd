@@ -1,6 +1,6 @@
 import random
-from lib.action_space import ActionSpace
-from lib.state import State
+from src.action_space import ActionSpace
+from src.state import State
 from collections import deque
 from typing import Deque, Tuple
 
