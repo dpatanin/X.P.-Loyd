@@ -34,7 +34,6 @@ def handle_get_request():
     data = pd.DataFrame(
         {header: content[header] for header in config["data_headers"]}
     )
-    data["closeNorm"] = content["closeNorm"]  # TODO: Delete me
     state = State(
         data,
         balance=content[BALANCE],
