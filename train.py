@@ -134,7 +134,7 @@ for e in range(1, config["episodes"] + 1):
 
     # Save the model to be served
     tf.saved_model.save(
-        trader.model, f'/{config["model_directory"]}/{config["version"]}'
+        trader.model, f'./{config["model_directory"]}/{config["version"]}'
     )
 
     # Save copy in h5 format
