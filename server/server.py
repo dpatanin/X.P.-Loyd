@@ -31,9 +31,7 @@ def handle_get_request():
     content = request.json
     logging.debug(f"Content received: {content}")
 
-    data = pd.DataFrame(
-        {header: content[header] for header in config["data_headers"]}
-    )
+    data = pd.DataFrame({header: content[header] for header in config["data_headers"]})
     state = State(
         data,
         balance=content[BALANCE],
