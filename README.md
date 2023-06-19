@@ -53,14 +53,21 @@ Tensorflow uses by default the GPU. If you want to manually check whether GPU is
 
 ## Training
 
+Everything necessary to train the AI is put into the `/ai-training` directory.
+
 ### Data
 
-You have to use your own data for the training.
-Once you have the data you need to create locally a directory at `./data/training`.
-This is where the preprocessed data will go.
+Inside you need to create locally a few directories:
+
+- One directory where your models will be saved to (default: `ai-training/models`)
+- One directory holding your data (default: `ai-training/data`)
+- By default, the data is intended to be split into:
+  - Training data (default: `ai-training/data/training`)
+  - Validation data (default: `ai-training/data/validation`)
+  - Test data (default: `ai-training/data/test`)
 
 You can of course organize however you wish, simply adjust the `config.yaml` file accordingly.
-The project expects the data to represent each trading session by a separate `.csv` file and consist of **exactly the same number of timesteps**.
+The project expects the data to represent each trading session by a separate `.csv` file and be of **exactly the same size**.
 `preprocess.py` is designed for our data. You can ignore it if you preprocess your data elsewhere.
 If using the provided script, you should adjust the preprocess script to fit your specific needs.
 
@@ -68,21 +75,25 @@ Keep in mind to include the data headers inside the `config.yaml` as all which a
 
 ### Config / Hyperparameter
 
-All project parameters and hyperparameter are defined inside the `config.yaml`.
+All project parameters and hyperparameter are defined inside the `ai-training/config.yaml`.
 It is intended to make changes simpler and provide an overview, rather than serving actual, project wide setting.
-Though this config helps to ensure that the setup for serving the model does not differ from the training environment.
+Most of those variables are simply forwarded in the `master.py`.
 
 ### Run
 
-Run: `python train.py`
+Run: `python master.py`
 
-The `train.py` will start and train a model as specified.
+The `master.py` will start and train a model as specified.
+It also includes a validation/test block which may lead to inaccurate results if run during the same initiation as the training.
+We recommend doing separate runs.
+
+**Important:** Don't forget to set the epsilon right to avoid random behavior during validation.
 
 ## Server
 
 To serve the model you need to install [Docker](https://www.docker.com/products/docker-desktop/) first.
 To start the server run `docker-compose up --build` from the root directory.
-This will build and start two containers:
+This will start two containers:
 
 - One hosting a python server to handle & process the client requests & model responses
 - One serving the model via tensorflow-serving
