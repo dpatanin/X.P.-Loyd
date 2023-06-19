@@ -1,6 +1,7 @@
 import random
-from src.action_space import ActionSpace
-from src.state import State
+from lib.action_space import ActionSpace
+from lib.state import State
+from lib.constants import CLOSE
 from collections import deque
 from typing import Deque, Tuple
 
@@ -77,8 +78,8 @@ class HERBuffer(ExperienceReplayBuffer):
         for xp in experiences:
             s, r, ns, d = xp
 
-            current_price: float = s.data["Close"].iloc[-1]
-            price_diff: float = ns.data["Close"].iloc[-1] - current_price
+            current_price: float = s.data[CLOSE].iloc[-1]
+            price_diff: float = ns.data[CLOSE].iloc[-1] - current_price
 
             if (
                 self.__check_missed_opportunity(s.contracts, ns.contracts, price_diff)
@@ -86,7 +87,7 @@ class HERBuffer(ExperienceReplayBuffer):
             ):
                 price_shift_ref = price_diff
                 alt_q = self.__calc_q_for_action(action_space.threshold, price_diff)
-                reward = action_space.take_action(alt_q, s, ns)
+                reward = action_space.take_action(alt_q, s, ns)[0]
 
                 self.add((s, reward, ns, d))
                 alt_state = ns
@@ -97,8 +98,8 @@ class HERBuffer(ExperienceReplayBuffer):
                     or ns.contracts != 0
                 ):
                     q = self.__calc_q_for_exit(action_space.threshold, alt_q)
-                    reward = self.reward_fac * action_space.take_action(
-                        q, alt_state, ns
+                    reward = (
+                        self.reward_fac * action_space.take_action(q, alt_state, ns)[0]
                     )
 
                     self.add((alt_state, reward, ns, d))
@@ -106,8 +107,8 @@ class HERBuffer(ExperienceReplayBuffer):
                     alt_q = 0.00
                 else:
                     q = self.__calc_q_for_no_action(action_space.threshold, alt_q)
-                    reward = self.reward_fac * action_space.take_action(
-                        q, alt_state, ns
+                    reward = (
+                        self.reward_fac * action_space.take_action(q, alt_state, ns)[0]
                     )
 
                     # Ensure continuity of actions

@@ -2,22 +2,18 @@
   model_name: prototype-V1
   model_directory: models # Be aware of the location for serving
   version: 1 # Only important when developing/serving different versions
-
-  # Trading sessions are expected as individual files
-  training_data: data/training
-  validation_data: data/validation
-  test_data: data/test
+  data_dir: data/training # Trading sessions are expected as individual files
 
   # General config
-  #! Close & Volume headers are required; not listed headers will be dropped _after_ preprocessing
+  #! close & volume headers are required; have to match the constants in `lib/constants.py` 
+  # Not listed headers will be dropped _after_ preprocessing
   data_headers:
-    - Progress
-    - Open
-    - High
-    - Low
-    - Close
-    - CloseNorm
-    - Volume
+    - progress
+    - open
+    - high
+    - low
+    - close
+    - volume
   tick_size: 0.25 # Currently not in use
   tick_value: 12.50 # Represents price per contract
   initial_balance: 10000.00

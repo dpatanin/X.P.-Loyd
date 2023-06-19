@@ -1,10 +1,11 @@
+from lib.constants import CLOSE, CONTRACTS, ENTRY_PRICE, BALANCE
 import pandas as pd
 
 
 class State:
     """
     This object represents one state.\n
-    Ensures that data contains 'Close' & 'Volume' columns.
+    Ensures that data contains 'close' column.
     Entering positions modifies this state. To feed it to a model use the `to_numpy()` method.
 
     |`data`: Sequence of this state's price data as a pandas DataFrame.
@@ -29,20 +30,20 @@ class State:
 
     def enter_long(self, contracts: int, price_per_contract: float):
         self.assert_valid_operation(contracts, price_per_contract)
-        self.entry_price = self.data["Close"].iloc[-1] if contracts > 0 else 0.00
+        self.entry_price = self.data[CLOSE].iloc[-1] if contracts > 0 else 0.00
         self.balance -= contracts * price_per_contract
         self.contracts = contracts
 
     def enter_short(self, contracts: int, price_per_contract: float):
         self.assert_valid_operation(contracts, price_per_contract)
-        self.entry_price = self.data["Close"].iloc[-1] if contracts > 0 else 0.00
+        self.entry_price = self.data[CLOSE].iloc[-1] if contracts > 0 else 0.00
         self.balance += contracts * price_per_contract
         self.contracts = -contracts
 
     def exit_position(self, price_per_contract: float) -> float:
         assert self.has_position(), "No position to exit."
         profit = (
-            (self.data["Close"].iloc[-1] - self.entry_price)
+            (self.data[CLOSE].iloc[-1] - self.entry_price)
             * self.contracts
             * price_per_contract
         )
@@ -68,9 +69,9 @@ class State:
         Human readable Dataframe representation of the State object.
         """
         df = pd.DataFrame(self.data)
-        df["Contracts"] = self.contracts
-        df["EntryPrice"] = self.entry_price
-        df["Balance"] = self.balance
+        df[CONTRACTS] = [self.contracts] * len(df.index)
+        df[ENTRY_PRICE] = [self.entry_price] * len(df.index)
+        df[BALANCE] = [self.balance] * len(df.index)
         return df
 
     def to_numpy(self):
@@ -80,7 +81,7 @@ class State:
         return self.to_df().to_numpy()
 
     def assert_columns(self):
-        req_columns = ["Close", "Volume"]
+        req_columns = [CLOSE]
         if missing_columns := set(req_columns) - set(self.data.columns):
             raise ValueError(f"Sequence is missing required columns: {missing_columns}")
 

@@ -1,10 +1,10 @@
 import math
 
-from src.data_processor import DataProcessor
-from src.trader import FreeLaborTrader
-from src.state import State
-from src.action_space import ActionSpace
-from src.progress_bar import ProgressBar
+from lib.data_processor import DataProcessor
+from lib.trader import FreeLaborTrader
+from lib.state import State
+from lib.action_space import ActionSpace
+from lib.progress_bar import ProgressBar
 import tensorflow as tf
 import pandas as pd
 import numpy as np
@@ -12,7 +12,6 @@ import yaml
 from yaml.loader import FullLoader
 from datetime import datetime
 import time
-import warnings
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -34,9 +33,10 @@ action_space = ActionSpace(
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
 dp = DataProcessor(
+    headers=config["data_headers"],
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
-    headers=config["data_headers"],
+    dir=config["data_dir"],
 )
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
@@ -78,14 +78,7 @@ def avg_profit(states: list["State"]):
 
 ########################### Training ###########################
 
-dp.dir = config["training_data"]
 dp.batched_dir = dp.batch_dir()
-terminal_model = (
-    f"{config['model_directory']}/"
-    + f"{config['model_name']}_"
-    + f"{now}"
-    + "_terminal.h5"
-)
 pbar = ProgressBar(
     episodes=config["episodes"],
     batches=len(dp.batched_dir),
@@ -115,7 +108,9 @@ for e in range(1, config["episodes"] + 1):
             snapshot = states.copy()  # States before action; For experiences
 
             q_values = trader.predict(states)
-            rewards = [action_space.take_action(q, s) for q, s in zip(q_values, states)]
+            rewards = [
+                action_space.take_action(q, s)[0] for q, s in zip(q_values, states)
+            ]
 
             done = idx == len(batch) - 1
             if done:
@@ -138,7 +133,9 @@ for e in range(1, config["episodes"] + 1):
         pbar.suffix = rem_time(times_per_batch, rem_batches)
 
     # Save the model to be served
-    tf.saved_model.save(trader.model, f'/{config["model_directory"]}/{config["version"]}')
+    tf.saved_model.save(
+        trader.model, f'./{config["model_directory"]}/{config["version"]}'
+    )
 
     # Save copy in h5 format
     trader.model.save(
@@ -148,55 +145,3 @@ for e in range(1, config["episodes"] + 1):
 pbar.close()
 df = pd.DataFrame(profit_list)
 df.to_excel(f"data/training_{config['model_name']}_{now}.xlsx")
-
-###################### Validation | Test #######################
-
-# The performance issue is insignificant; Complexity rises significant otherwise
-warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
-
-dp.dir = config["validation_data"]
-# dp.dir = config["test_data"]
-dp.batched_dir = dp.batch_dir()
-dp.step_size = 5
-trader.load(f"{config['model_directory']}/prototype-V1_terminal_19_05_2023 11_23_45.h5")
-
-pbar = ProgressBar(
-    episodes=1,
-    batches=len(dp.batched_dir),
-    sequences_per_batch=len(dp.load_batch(0)),
-    prefix="Validation",
-    suffix="Remaining time: ???",
-    leave=True,
-)
-balance_list = pd.DataFrame()
-times_per_batch = []
-
-for i in range(len(dp.batched_dir)):
-    t = time.time()
-    batch = dp.load_batch(i)
-
-    # Initial states
-    states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
-        "batch_size"
-    ]
-
-    for idx, s in enumerate(states):
-        # +1 to keep initial balance
-        balance_list[f"b{i}s{idx}"] = [s.balance] * (len(batch) + 1)
-
-    for n, sequences in enumerate(batch):
-        for seq, state in zip(sequences, states):
-            state.data = seq
-
-        q_values = trader.predict(states)
-        for ids, qs in enumerate(zip(q_values, states)):
-            action_space.take_action(qs[0], qs[1])
-            balance_list[f"b{i}s{ids}"].iloc[n + 1] = qs[1].balance
-
-        pbar.update(batch=i + 1, seq=n + 1)
-
-    times_per_batch.append((time.time() - t))
-    pbar.suffix = rem_time(times_per_batch, len(dp.batched_dir) - i)
-
-pbar.close()
-balance_list.to_excel(f"data/validation_{config['model_name']}_{now}.xlsx")
