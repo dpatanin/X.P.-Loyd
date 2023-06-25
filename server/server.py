@@ -42,7 +42,7 @@ def handle_get_request():
 
     # Make a request to the model
     model_response = requests.post(
-        "http://tensorflow-serve:8501/v1/models/prototype-V1:predict",
+        "http://tensorflow-serve:8501/v1/models/model:predict",
         json={"instances": [state.to_numpy().tolist()]},
     )
     logging.debug(f"Model response: {model_response}")
