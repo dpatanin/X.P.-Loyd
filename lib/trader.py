@@ -2,6 +2,7 @@ from lib.experience_replay import HERBuffer
 from lib.state import State
 import numpy as np
 import tensorflow as tf
+from copy import copy
 import random
 
 
@@ -73,14 +74,15 @@ class FreeLaborTrader:
 
     def load(self, path: str) -> None:
         new_model = tf.keras.models.load_model(path)
-        if self.model.get_config() == new_model.get_config():
-            self.model = new_model
-        else:
+        if self.model.get_config() != new_model.get_config():
             raise AssertionError(
                 "Loaded model differs from training setup.\n"
                 + f"Expected: {self.model.get_config()}\n"
                 + f"Loaded: {new_model.get_config()}"
             )
+
+        self.model = new_model
+        self.target_model = copy(new_model)
 
     def predict(self, states: list["State"]) -> list[float]:
         """
