@@ -2,7 +2,6 @@ from lib.experience_replay import HERBuffer
 from lib.state import State
 import numpy as np
 import tensorflow as tf
-from copy import copy
 import random
 
 
@@ -82,7 +81,7 @@ class FreeLaborTrader:
             )
 
         self.model = new_model
-        self.target_model = copy(new_model)
+        self.target_model = tf.keras.models.load_model(path)  # Loading a copy
 
     def predict(self, states: list["State"]) -> list[float]:
         """
