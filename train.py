@@ -78,6 +78,8 @@ def avg_profit(states: list["State"]):
 
 ########################### Training ###########################
 
+# trader.load("models/[name].h5")
+
 dp.batched_dir = dp.batch_dir()
 pbar = ProgressBar(
     episodes=config["episodes"],
