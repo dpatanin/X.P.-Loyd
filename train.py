@@ -12,6 +12,7 @@ import yaml
 from yaml.loader import FullLoader
 from datetime import datetime
 import time
+import os
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -76,6 +77,15 @@ def avg_profit(states: list["State"]):
     return (sum_balance / config["batch_size"]) - config["initial_balance"]
 
 
+def saved_model():
+    versions = []
+    versions.extend(int(item) for item in os.listdir("./models/") if (item.isdigit()))
+
+    tf.saved_model.save(
+        trader.model, f'./{config["model_directory"]}/{max(versions) + 1}'
+    )
+
+
 ########################### Training ###########################
 
 # trader.load("models/[name].h5")
@@ -134,15 +144,16 @@ for e in range(1, config["episodes"] + 1):
         times_per_batch.append((time.time() - t))
         pbar.suffix = rem_time(times_per_batch, rem_batches)
 
-    # Save the model to be served
-    tf.saved_model.save(
-        trader.model, f'./{config["model_directory"]}/{config["version"]}'
-    )
+    if e < config["episodes"]:
+        trader.model.save(
+            f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
+        )
+    else:
+        trader.model.save(
+            f"{config['model_directory']}/{config['model_name']}_terminal_{now}.h5"
+        )
+        saved_model() # Save the model for tensorflow-serving
 
-    # Save copy in h5 format
-    trader.model.save(
-        f"{config['model_directory']}/{config['model_name']}_{'terminal' if e == config['episodes'] else f'ep{e}'}_{now}.h5"
-    )
 
 pbar.close()
 df = pd.DataFrame(profit_list)

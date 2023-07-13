@@ -1,7 +1,6 @@
 ---
   model_name: prototype-V1
   model_directory: models # Be aware of the location for serving
-  version: 1 # Only important when developing/serving different versions
   data_dir: data/training # Trading sessions are expected as individual files
 
   # General config
