@@ -73,14 +73,15 @@ class FreeLaborTrader:
 
     def load(self, path: str) -> None:
         new_model = tf.keras.models.load_model(path)
-        if self.model.get_config() == new_model.get_config():
-            self.model = new_model
-        else:
+        if self.model.get_config() != new_model.get_config():
             raise AssertionError(
                 "Loaded model differs from training setup.\n"
                 + f"Expected: {self.model.get_config()}\n"
                 + f"Loaded: {new_model.get_config()}"
             )
+
+        self.model = new_model
+        self.target_model = tf.keras.models.load_model(path)  # Loading a copy
 
     def predict(self, states: list["State"]) -> list[float]:
         """
