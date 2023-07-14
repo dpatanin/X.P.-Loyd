@@ -153,15 +153,16 @@ Note: After adding a e.g. strategy, you also have to enable it in the right sigh
 
 Custom scripts such as strategies and indicators are written in [NinjaScript](https://ninjatrader.com/support/helpGuides/nt8/NT%20HelpGuide%20English.html?ninjascript.htm).
 It's NinjaTrader's custom language based on C#. Though, be aware that it is fairly limited. You can develop right in their own NinjaScript editor window (tab: `new`).
-This repository always holds the latest `TradingAgent.cs` file, which you can simply copy to `C:\Users\[User]\Documents\NinjaTrader 8\bin\Custom\Strategies`, given the default installation.
-
+This repository always holds the latest `TradingAgent.cs` file, which you need to copy to `C:\Users\[User]\Documents\NinjaTrader 8\bin\Custom\Strategies`, given the default installation.
 To see outputs such as errors or prints, you need to open the `NinjaScript Output` window (tab: `new`).
+
+For development: Be aware that changes to the file inside the NinjaScript editor must be copied to the file inside this repository.
+As of now, it is not possible to reference strategies outside the NinjaTrader directory.
 
 ### .NET frameworks
 
 To add third party frameworks you need to add a reference to the respective `.dll` file. Right click inside the NinjaScript editor and open "References".
-There you can add the reference to the `.dll` file. We recommend to safe your referenced files under `C:\Users\[User]\Documents\NinjaTrader 8\bin\Custom` to keep things simple.
-The `.dll` files we use are also put inside the `.net/` folder.
+There you can add the reference to the `.dll` file. The `.dll` files we use are inside the `.net/` folder. You can simply reference them from there.
 
 Here's also a list referencing all required frameworks and libraries:
 
