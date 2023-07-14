@@ -136,3 +136,35 @@ The response will be a json and look like this:
 ```
 
 Possible `action` are defined in the `/lib/constants.py`.
+
+## NinjaTrader
+
+Our brokerage platform of choice is [NinjaTrader](https://ninjatrader.com/). The simulation/playback of data is free as is the local downloadable platform.
+To download the platform itself register and download the platform. After that set up your workspace to your liking. There are a few key functions to note, especially when scripting for it.
+
+### Simulation / Playback
+
+To work locally we use the `playback` option. You find it under the tab `connections`.
+To use it you need to download the respective historical / market replay data. Once connected, you require a chart for the playback. You can create charts under the tab `new`.
+After the chart is done, it will have icons at the very top for further function, such as adding indicators and strategies. This is important as those are the functions for our custom scripts.
+Note: After adding a e.g. strategy, you also have to enable it in the right sight of the strategies window.
+
+### Scripting
+
+Custom scripts such as strategies and indicators are written in [NinjaScript](https://ninjatrader.com/support/helpGuides/nt8/NT%20HelpGuide%20English.html?ninjascript.htm).
+It's NinjaTrader's custom language based on C#. Though, be aware that it is fairly limited. You can develop right in their own NinjaScript editor window (tab: `new`).
+This repository always holds the latest `TradingAgent.cs` file, which you can simply copy to `C:\Users\[User]\Documents\NinjaTrader 8\bin\Custom\Strategies`, given the default installation.
+
+To see outputs such as errors or prints, you need to open the `NinjaScript Output` window (tab: `new`).
+
+### .NET frameworks
+
+To add third party frameworks you need to add a reference to the respective `.dll` file. Right click inside the NinjaScript editor and open "References".
+There you can add the reference to the `.dll` file. We recommend to safe your referenced files under `C:\Users\[User]\Documents\NinjaTrader 8\bin\Custom` to keep things simple.
+The `.dll` files we use are also put inside the `.net/` folder.
+
+Here's also a list referencing all required frameworks and libraries:
+
+- [Newtonsoft](https://github.com/JamesNK/Newtonsoft.Json/releases)
+
+Note: As of now, the libraries/frameworks must be .net 4.8 compliant.
