@@ -156,8 +156,11 @@ It's NinjaTrader's custom language based on C#. Though, be aware that it is fair
 This repository always holds the latest `TradingAgent.cs` file, which you need to copy to `C:\Users\[User]\Documents\NinjaTrader 8\bin\Custom\Strategies`, given the default installation.
 To see outputs such as errors or prints, you need to open the `NinjaScript Output` window (tab: `new`).
 
-For development: Be aware that changes to the file inside the NinjaScript editor must be copied to the file inside this repository.
-As of now, it is not possible to reference strategies outside the NinjaTrader directory.
+Hints for development:
+
+- Be aware that changes to the file inside the NinjaScript editor must be copied to the file inside this repository. As of now, it is not possible to reference strategies outside the NinjaTrader directory.
+- When working on a script, simply compiling or saving the file won't update the strategy when loaded, you have to remove and add the strategy again.
+- Be aware which properties for a strategy must be set in what way so that the script and the referenced methods trigger properly.
 
 ### .NET frameworks
 
