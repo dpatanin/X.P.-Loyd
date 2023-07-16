@@ -114,7 +114,7 @@ For the current configuration the request might look like this:
   "open": [0, 25, 0, 12.5, -100, -25, -150, 0, 250, 200],
   "high": [12.5, 50, 25, 12.5, -75, 0, -50, 12.5, 275, 250],
   "low": [-25, 0, -50, 0, -200, -50, -200, 0, 200, 100],
-  "close": [25, 0, 12.5, -4100, -25, -50, 0, 250, 200, 500],
+  "close": [25, 0, 12.5, -100, -25, -50, 0, 250, 200, 500],
   "volume": [788, 122, 850, 657, 234, 888, 1453, 456, 654, 453],
   "contracts": 5,
   "entryPrice": 3500,
@@ -162,7 +162,8 @@ As of now, it is not possible to reference strategies outside the NinjaTrader di
 ### .NET frameworks
 
 To add third party frameworks you need to add a reference to the respective `.dll` file. Right click inside the NinjaScript editor and open "References".
-There you can add the reference to the `.dll` file. The `.dll` files we use are inside the `.net/` folder. You can simply reference them from there.
+There you can add the reference to the `.dll` file. The `.dll` files we use are inside the `.net/` folder.
+Since it can lead to unexpected behavior and errors we recommend to copy the `.dll` files inside the `C:\Users\[User]\Documents\NinjaTrader 8\bin\Custom` and reference it from there.
 
 Here's also a list referencing all required frameworks and libraries:
 
