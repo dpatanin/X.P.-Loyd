@@ -21,8 +21,6 @@ using NinjaTrader.Gui.Tools;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.Core.FloatingPoint;
-using NinjaTrader.NinjaScript.Indicators;
-using NinjaTrader.NinjaScript.DrawingTools;
 #endregion
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -41,12 +39,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	
 	public class TradingAgent : Strategy
 	{
-		private SMA smaFast;
-		private SMA smaSlow;
-		
-		private Timer timer; // Timer object to trigger the request
-        private bool isFirstMinute = true; // Flag to send the request on the first minute
-		
 		private MockData data = new MockData()
 		{
 			progress = new List<double> {0.111,0.112,0.113,0.114,0.115,0.116,0.117,0.118,0.119,0.2},
@@ -86,57 +78,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				IsInstantiatedOnEachOptimizationIteration = true;
 			}
-			else if (State == State.DataLoaded)
-			{
-				smaFast = SMA(10);
-				smaSlow = SMA(25);
-
-				smaFast.Plots[0].Brush = Brushes.Azure;
-				smaSlow.Plots[0].Brush = Brushes.Crimson;
-
-				AddChartIndicator(smaFast);
-				AddChartIndicator(smaSlow);
-				
-				InitializeTimer();
-			}
 		}
-		
-		private void InitializeTimer()
-        {
-            // Calculate the time until the next minute
-            DateTime now = Time[0];
-            DateTime nextMinute = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute + 1, 0);
-            TimeSpan timeUntilNextMinute = nextMinute - now;
-
-            // Set up the timer to trigger the request
-            timer = new Timer(OnTimerCallback, null, timeUntilNextMinute, TimeSpan.FromMinutes(1));
-        }
 		
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar == BarsRequiredToTrade)
+			if (State == State.Historical)
 				return;
-
-			if (CrossAbove(smaFast, smaSlow, 1))
-				EnterLong();
-			else if (CrossBelow(smaFast, smaSlow, 1))
-				EnterShort();
+			
+			if (IsFirstTickOfBar && Position.MarketPosition == MarketPosition.Flat)
+			{
+				SendHttpRequest(Newtonsoft.Json.JsonConvert.SerializeObject(data));
+			}
 		}
 		
-		private void OnTimerCallback(object state)
-        {
-            DateTime now = Time[0];
-
-            // Check if it's the first minute or a subsequent minute
-            if (isFirstMinute || now.Second == 0)
-            {
-                // Reset the flag after the first minute
-                isFirstMinute = false;
-
-                // Send the HTTP request
-                SendHttpRequest(Newtonsoft.Json.JsonConvert.SerializeObject(data));
-            }
-        }
 
 		private async void SendHttpRequest(string json)
         {
