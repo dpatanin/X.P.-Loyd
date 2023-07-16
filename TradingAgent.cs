@@ -24,6 +24,7 @@ using NinjaTrader.Core.FloatingPoint;
 #endregion
 namespace NinjaTrader.NinjaScript.Strategies
 {
+	// TODO: Placeholder for data class
 	public class MockData
     {
         public List<double> progress { get; set; }
@@ -39,6 +40,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	
 	public class TradingAgent : Strategy
 	{
+		// TODO: Placeholder to test sending requests 
 		private MockData data = new MockData()
 		{
 			progress = new List<double> {0.111,0.112,0.113,0.114,0.115,0.116,0.117,0.118,0.119,0.2},
@@ -81,6 +83,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 		
 		protected override void OnBarUpdate()
+		// TODO: Placeholder for when to send requests 
 		{
 			if (State == State.Historical)
 				return;
@@ -98,32 +101,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 try
                 {
-                    // Define the URL to send the request to
                     var url = "http://localhost:8000/predict";
-
-                    // Create the HTTP content with the JSON body
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                    // Send the POST request
                     var response = await httpClient.PostAsync(url, content);
 
-                    // Check if the request was successful
                     if (response.IsSuccessStatusCode)
                     {
-                        // Get the response content as a string
                         var responseContent = await response.Content.ReadAsStringAsync();
 
-                        // Print the response content
                         Print("POST request sent successfully. Response: " + responseContent);
 						
-						// Parse the JSON response
 		                dynamic parsedResponse = Newtonsoft.Json.JsonConvert.DeserializeObject(responseContent);
-
-		                // Extract the action and amount from the response
 		                string action = parsedResponse.action;
 		                int amount = parsedResponse.amount;
 						
-						// Take action based on the response
 		                switch (action)
 		                {
 		                    case "LONG":
@@ -149,13 +140,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else
                     {
-                        // Request failed
                         Print("POST request failed. Response status code: " + response.StatusCode);
                     }
                 }
                 catch (Exception ex)
                 {
-                    // Handle any exceptions
                     Print("Exception occurred: " + ex.Message);
                 }
             }
