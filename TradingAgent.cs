@@ -85,7 +85,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (State == State.Historical)
 				return;
 			
-			if (IsFirstTickOfBar && Position.MarketPosition == MarketPosition.Flat)
+			if (IsFirstTickOfBar)
 			{
 				SendHttpRequest(Newtonsoft.Json.JsonConvert.SerializeObject(data));
 			}
@@ -115,6 +115,37 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         // Print the response content
                         Print("POST request sent successfully. Response: " + responseContent);
+						
+						// Parse the JSON response
+		                dynamic parsedResponse = Newtonsoft.Json.JsonConvert.DeserializeObject(responseContent);
+
+		                // Extract the action and amount from the response
+		                string action = parsedResponse.action;
+		                int amount = parsedResponse.amount;
+						
+						// Take action based on the response
+		                switch (action)
+		                {
+		                    case "LONG":
+		                        EnterLong(amount);
+		                        Print("Entered a long position with amount: " + amount);
+		                        break;
+		                    case "SHORT":
+		                        EnterShort(amount);
+		                        Print("Entered a short position with amount: " + amount);
+		                        break;
+		                    case "STAY":
+		                        Print("No action taken. Stay in current position.");
+		                        break;
+		                    case "EXIT":
+		                        ExitLong();
+								ExitShort();
+		                        Print("Exited all positions.");
+		                        break;
+		                    default:
+		                        Print("Invalid action received from the response.");
+		                        break;
+		                }
                     }
                     else
                     {
@@ -129,5 +160,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
         }
+		
 	}
 }
