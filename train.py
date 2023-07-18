@@ -110,7 +110,7 @@ for e in range(1, config["episodes"] + 1):
         batch = dp.load_batch(i)
 
         # Initial states
-        states = [
+        states: list[State] = [
             State(data=empty_sequence(), balance=config["initial_balance"])
         ] * config["batch_size"]
 
@@ -175,6 +175,7 @@ rem_batches = len(dp.batched_dir)
 trader.memory.clear()
 trader.epsilon = 0  # This removes random choices
 balance_list = pd.DataFrame()
+action_list = pd.DataFrame()
 times_per_batch = []
 
 
@@ -183,13 +184,14 @@ for i in range(len(dp.batched_dir)):
     batch = dp.load_batch(i)
 
     # Initial states
-    states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
-        "batch_size"
-    ]
+    states: list[State] = [
+        State(data=empty_sequence(), balance=config["initial_balance"])
+    ] * config["batch_size"]
 
     for idb, s in enumerate(states):
         # +1 to keep initial balance
         balance_list[f"b{i}s{idb}"] = [s.balance] * (len(batch) + 1)
+        action_list[f"b{i}s{idb}"] = ["STAY"] * (len(batch) + 1)
 
     for idx, sequences in enumerate(batch):
         for seq, state in zip(sequences, states):
@@ -197,8 +199,9 @@ for i in range(len(dp.batched_dir)):
 
         q_values = trader.predict(states)
         for ids, qs in enumerate(zip(q_values, states)):
-            # TODO: record actions
-            action_space.take_action(qs[0], qs[1])
+            action_list[f"b{i}s{ids}"].iloc[idx + 1] = action_space.take_action(
+                qs[0], qs[1]
+            )[1]
             balance_list[f"b{i}s{ids}"].iloc[idx + 1] = qs[1].balance
 
         pbar.update(batch=i + 1, seq=idx + 1)
@@ -208,4 +211,5 @@ for i in range(len(dp.batched_dir)):
     pbar.suffix = rem_time(times_per_batch, rem_batches)
 
 pbar.close()
-balance_list.to_excel(f"data/validation_{config['model_name']}_{now}.xlsx")
+action_list.to_excel(f"data/validation_actions_{config['model_name']}_{now}.xlsx")
+balance_list.to_excel(f"data/validation_balances_{config['model_name']}_{now}.xlsx")
