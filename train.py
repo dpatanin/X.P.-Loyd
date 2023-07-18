@@ -152,9 +152,46 @@ for e in range(1, config["episodes"] + 1):
         trader.model.save(
             f"{config['model_directory']}/{config['model_name']}_terminal_{now}.h5"
         )
-        saved_model() # Save the model for tensorflow-serving
+        saved_model()  # Save the model for tensorflow-serving
 
 
 pbar.close()
+df = pd.DataFrame(profit_list)
+df.to_excel(f"data/training_{config['model_name']}_{now}.xlsx")
+
+
+########################### Validation ###########################
+
+pbar = ProgressBar(
+    episodes=1,
+    batches=1,
+    sequences_per_batch=len(dp.load_batch(0)),
+    prefix="Validation",
+    suffix=rem_time(times_per_batch, 1),
+    leave=True,
+)
+
+trader.memory.clear()
+trader.epsilon = 0  # This removes random choices
+
+# Use last batch for local validation
+batch = dp.load_batch(len(dp.batched_dir) - 1)
+
+# Initial states
+states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
+    "batch_size"
+]
+
+for idx, sequences in enumerate(batch):
+    for seq, state in zip(sequences, states):
+        state.data = seq
+    snapshot = states.copy()  # States before action; For experiences
+
+    q_values = trader.predict(states)
+    actions = [action_space.take_action(q, s)[1] for q, s in zip(q_values, states)]
+
+pbar.close()
+
+# TODO: Gather & save validation data
 df = pd.DataFrame(profit_list)
 df.to_excel(f"data/training_{config['model_name']}_{now}.xlsx")
