@@ -164,34 +164,48 @@ df.to_excel(f"data/training_{config['model_name']}_{now}.xlsx")
 
 pbar = ProgressBar(
     episodes=1,
-    batches=1,
+    batches=len(dp.batched_dir),
     sequences_per_batch=len(dp.load_batch(0)),
     prefix="Validation",
-    suffix=rem_time(times_per_batch, 1),
+    suffix="Remaining time: ???",
     leave=True,
 )
 
+rem_batches = len(dp.batched_dir)
 trader.memory.clear()
 trader.epsilon = 0  # This removes random choices
+balance_list = pd.DataFrame()
+times_per_batch = []
 
-# Use last batch for local validation
-batch = dp.load_batch(len(dp.batched_dir) - 1)
 
-# Initial states
-states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
-    "batch_size"
-]
+for i in range(len(dp.batched_dir)):
+    t = time.time()
+    batch = dp.load_batch(i)
 
-for idx, sequences in enumerate(batch):
-    for seq, state in zip(sequences, states):
-        state.data = seq
-    snapshot = states.copy()  # States before action; For experiences
+    # Initial states
+    states = [State(data=empty_sequence(), balance=config["initial_balance"])] * config[
+        "batch_size"
+    ]
 
-    q_values = trader.predict(states)
-    actions = [action_space.take_action(q, s)[1] for q, s in zip(q_values, states)]
+    for idb, s in enumerate(states):
+        # +1 to keep initial balance
+        balance_list[f"b{i}s{idb}"] = [s.balance] * (len(batch) + 1)
+
+    for idx, sequences in enumerate(batch):
+        for seq, state in zip(sequences, states):
+            state.data = seq
+
+        q_values = trader.predict(states)
+        for ids, qs in enumerate(zip(q_values, states)):
+            # TODO: record actions
+            action_space.take_action(qs[0], qs[1])
+            balance_list[f"b{i}s{ids}"].iloc[idx + 1] = qs[1].balance
+
+        pbar.update(batch=i + 1, seq=idx + 1)
+
+    rem_batches -= 1
+    times_per_batch.append((time.time() - t))
+    pbar.suffix = rem_time(times_per_batch, rem_batches)
 
 pbar.close()
-
-# TODO: Gather & save validation data
-df = pd.DataFrame(profit_list)
-df.to_excel(f"data/training_{config['model_name']}_{now}.xlsx")
+balance_list.to_excel(f"data/validation_{config['model_name']}_{now}.xlsx")
