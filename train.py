@@ -199,9 +199,9 @@ for i in range(len(dp.batched_dir)):
 
         q_values = trader.predict(states)
         for ids, qs in enumerate(zip(q_values, states)):
-            action_list[f"b{i}s{ids}"].iloc[idx + 1] = action_space.take_action(
-                qs[0], qs[1]
-            )[1]
+            amount = action_space.calc_trade_amount(qs[0], qs[1])
+            action = action_space.take_action(qs[0], qs[1])[1]
+            action_list[f"b{i}s{ids}"].iloc[idx + 1] = f"{action}|{amount}"
             balance_list[f"b{i}s{ids}"].iloc[idx + 1] = qs[1].balance
 
         pbar.update(batch=i + 1, seq=idx + 1)
