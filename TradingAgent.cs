@@ -105,7 +105,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				volumeList.Add(Volume[i]);
 			}
 			contracts = Position.Quantity;
-			entryPrice = GetCurrentAsk();
+			entryPrice = Position.AveragePrice;
 			balance = GetAccountBalance();
 		}
 		
