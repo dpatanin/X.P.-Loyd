@@ -37,6 +37,8 @@ def handle_get_request():
         balance=content[BALANCE],
         contracts=content[CONTRACTS],
         entry_price=content[ENTRY_PRICE],
+        tick_size=content["tick_size"],
+        tick_value=content["tick_value"]
     )
     logging.debug(f"State constructed: {str(state)}")
 

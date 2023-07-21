@@ -56,7 +56,7 @@ class HERBuffer(ExperienceReplayBuffer):
     A extended experience replay using the principle of a hindsight replay.\n
     It creates additional experiences/transition from existing ones.
 
-    |`reward_fac`: Weight of rewards for ind hindsight generated experiences.
+    |`reward_fac`: Weight of rewards for in hindsight generated experiences.
     """
 
     def __init__(self, max_size=2000, reward_fac=1):
