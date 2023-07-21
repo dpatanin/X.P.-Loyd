@@ -86,6 +86,17 @@ def saved_model():
     )
 
 
+def init_states() -> list[State]:
+    return [
+        State(
+            data=empty_sequence(),
+            balance=config["initial_balance"],
+            tick_size=config["tick_size"],
+            tick_value=config["tick_value"],
+        )
+    ] * config["batch_size"]
+
+
 ########################### Training ###########################
 
 # trader.load("models/[name].h5")
@@ -108,11 +119,7 @@ for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
         t = time.time()
         batch = dp.load_batch(i)
-
-        # Initial states
-        states: list[State] = [
-            State(data=empty_sequence(), balance=config["initial_balance"])
-        ] * config["batch_size"]
+        states = init_states()
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
@@ -182,11 +189,7 @@ times_per_batch = []
 for i in range(len(dp.batched_dir)):
     t = time.time()
     batch = dp.load_batch(i)
-
-    # Initial states
-    states: list[State] = [
-        State(data=empty_sequence(), balance=config["initial_balance"])
-    ] * config["batch_size"]
+    states = init_states()
 
     for idb, s in enumerate(states):
         # +1 to keep initial balance

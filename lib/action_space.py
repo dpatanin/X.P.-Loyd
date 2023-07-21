@@ -58,10 +58,10 @@ class ActionSpace:
                 reward = state.exit_position(self.ppc)
 
             if q > 0:
-                state.enter_long(amount, self.ppc)
+                state.enter_long(amount)
                 action = ACTION_LONG
             else:
-                state.enter_short(amount, self.ppc)
+                state.enter_short(amount)
                 action = ACTION_SHORT
 
             reward += amount * self.ppc * self.intrinsic_fac
