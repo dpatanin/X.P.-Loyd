@@ -1,18 +1,19 @@
 import math
+import os
+import time
+from datetime import datetime
 
-from lib.data_processor import DataProcessor
-from lib.trader import FreeLaborTrader
-from lib.state import State
-from lib.action_space import ActionSpace
-from lib.progress_bar import ProgressBar
-import tensorflow as tf
-import pandas as pd
 import numpy as np
+import pandas as pd
+import tensorflow as tf
 import yaml
 from yaml.loader import FullLoader
-from datetime import datetime
-import time
-import os
+
+from lib.action_space import ActionSpace
+from lib.data_processor import DataProcessor
+from lib.progress_bar import ProgressBar
+from lib.state import State
+from lib.trader import FreeLaborTrader
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)

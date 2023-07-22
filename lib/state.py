@@ -1,5 +1,6 @@
-from lib.constants import CLOSE, CONTRACTS, ENTRY_PRICE, BALANCE
 import pandas as pd
+
+from lib.constants import BALANCE, CLOSE, CONTRACTS, ENTRY_PRICE
 
 
 class State:

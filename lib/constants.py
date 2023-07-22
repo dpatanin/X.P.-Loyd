@@ -1,10 +1,10 @@
-VOLUME = 'volume'
-CLOSE = 'close'
-CONTRACTS = 'contracts'
-ENTRY_PRICE = 'entryPrice'
-BALANCE = 'balance'
+VOLUME = "volume"
+CLOSE = "close"
+CONTRACTS = "contracts"
+ENTRY_PRICE = "entryPrice"
+BALANCE = "balance"
 
-ACTION_LONG = 'LONG'
-ACTION_SHORT = 'SHORT'
-ACTION_EXIT = 'EXIT'
-ACTION_STAY = 'STAY'
+ACTION_LONG = "LONG"
+ACTION_SHORT = "SHORT"
+ACTION_EXIT = "EXIT"
+ACTION_STAY = "STAY"

@@ -1,9 +1,10 @@
 import random
-from lib.action_space import ActionSpace
-from lib.state import State
-from lib.constants import CLOSE
 from collections import deque
 from typing import Deque, Tuple
+
+from lib.action_space import ActionSpace
+from lib.constants import CLOSE
+from lib.state import State
 
 
 class ExperienceReplayBuffer:

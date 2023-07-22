@@ -1,9 +1,10 @@
-import pandas as pd
-from tqdm import tqdm
 import random
-import yaml
-from yaml.loader import FullLoader
 from datetime import datetime, timedelta
+
+import pandas as pd
+import yaml
+from tqdm import tqdm
+from yaml.loader import FullLoader
 
 TIMESTEPS = 1321
 with open("config.yaml") as f:

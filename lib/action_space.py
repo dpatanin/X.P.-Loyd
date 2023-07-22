@@ -1,5 +1,5 @@
+from lib.constants import ACTION_EXIT, ACTION_LONG, ACTION_SHORT, ACTION_STAY, VOLUME
 from lib.state import State
-from lib.constants import VOLUME, ACTION_SHORT, ACTION_LONG, ACTION_EXIT, ACTION_STAY
 
 
 class ActionSpace:

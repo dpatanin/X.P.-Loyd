@@ -1,13 +1,14 @@
-from lib.constants import BALANCE, ENTRY_PRICE, CONTRACTS, ACTION_STAY, ACTION_EXIT
-from lib.action_space import ActionSpace
-from lib.state import State
-from flask import Flask, request, jsonify
-import requests
 import logging
-import pandas as pd
 
+import pandas as pd
+import requests
 import yaml
+from flask import Flask, jsonify, request
 from yaml.loader import FullLoader
+
+from lib.action_space import ActionSpace
+from lib.constants import ACTION_EXIT, ACTION_STAY, BALANCE, CONTRACTS, ENTRY_PRICE
+from lib.state import State
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
