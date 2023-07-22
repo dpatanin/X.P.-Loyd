@@ -171,20 +171,23 @@ pbar = ProgressBar(
 rem_batches = len(dp.batched_dir)
 trader.memory.clear()
 trader.epsilon = 0  # This removes random choices
-balance_list = pd.DataFrame()
-action_list = pd.DataFrame()
 times_per_batch = []
 
+# Initialize dataFrames (not adding columns dynamically due to performance)
+column_headers = []
+for i in range(len(dp.batched_dir)):
+    column_headers.extend(f"b{i}s{n}" for n in range(config["batch_size"]))
+
+init_balances = [[config["initial_balance"]] * len(column_headers)] * (len(batch) + 1)
+init_actions = [["STAY"] * len(column_headers)] * (len(batch) + 1)
+
+balance_list = pd.DataFrame(init_balances, columns=column_headers)
+action_list = pd.DataFrame(init_actions, columns=column_headers)
 
 for i in range(len(dp.batched_dir)):
     t = time.time()
     batch = dp.load_batch(i)
     states = init_states()
-
-    for idb, s in enumerate(states):
-        # +1 to keep initial balance
-        balance_list[f"b{i}s{idb}"] = [s.balance] * (len(batch) + 1)
-        action_list[f"b{i}s{idb}"] = ["STAY"] * (len(batch) + 1)
 
     for idx, sequences in enumerate(batch):
         for seq, state in zip(sequences, states):
