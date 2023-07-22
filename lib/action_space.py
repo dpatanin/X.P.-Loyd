@@ -24,10 +24,12 @@ class ActionSpace:
     def calc_trade_amount(self, q: float, state: "State") -> int:
         """
         Scales the q value prediction to the amount of contracts to trade.
+        Returns at least the amount of `1` contracts.
         """
         max_amount = min(state.data[VOLUME].median(), self.limit)
-        return round(
-            abs(((abs(q) - self.threshold) / (1 - self.threshold)) * max_amount)
+        return max(
+            round(abs(((abs(q) - self.threshold) / (1 - self.threshold)) * max_amount)),
+            1,
         )
 
     def take_action(self, q: float, state: "State"):
