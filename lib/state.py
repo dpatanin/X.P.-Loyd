@@ -77,7 +77,7 @@ class State:
             raise ValueError(f"Sequence is missing required columns: {missing_columns}")
 
     def assert_valid_operation(self, contracts: int):
-        assert self.contracts != 0, "Exit current position first."
+        assert self.contracts == 0, "Exit current position first."
         assert (
             contracts > 0
         ), f"Invalid amount of contracts provided. Received: {contracts}."
