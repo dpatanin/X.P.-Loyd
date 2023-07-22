@@ -43,11 +43,6 @@ def rem_time(times: list[int], it_left: int):
     return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
 
 
-def avg_profit(states: list["State"]):
-    sum_balance = sum(state.balance for state in states)
-    return (sum_balance / config["batch_size"]) - config["initial_balance"]
-
-
 def saved_model():
     versions = []
     versions.extend(int(item) for item in os.listdir("./models/") if (item.isdigit()))
@@ -110,7 +105,6 @@ pbar = ProgressBar(
 )
 
 rem_batches = config["episodes"] * len(dp.batched_dir)
-profit_list = []
 times_per_batch = []
 
 for e in range(1, config["episodes"] + 1):
@@ -131,7 +125,6 @@ for e in range(1, config["episodes"] + 1):
 
             done = idx == len(batch) - 1
             if done:
-                profit_list.append(avg_profit(states))
                 rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
 
             for snap, reward, state in zip(snapshot, rewards, states.copy()):
@@ -159,10 +152,7 @@ for e in range(1, config["episodes"] + 1):
         )
         saved_model()  # Save the model for tensorflow-serving
 
-
 pbar.close()
-df = pd.DataFrame(profit_list)
-df.to_excel(f"data/training_{config['model_name']}_{now}.xlsx")
 
 
 ########################### Validation ###########################
