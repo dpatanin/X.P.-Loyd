@@ -202,5 +202,9 @@ for i in range(len(dp.batched_dir)):
     pbar.suffix = rem_time(times_per_batch, rem_batches)
 
 pbar.close()
-action_list.to_excel(f"data/validation_actions_{config['model_name']}_{now}.xlsx")
-balance_list.to_excel(f"data/validation_balances_{config['model_name']}_{now}.xlsx")
+writer = pd.ExcelWriter(
+    f"data/validation_{config['model_name']}_{now}.xlsx", engine="xlsxwriter"
+)
+action_list.to_excel(writer, sheet_name="actions", index=False)
+balance_list.to_excel(writer, sheet_name="balances", index=False)
+writer.close()
