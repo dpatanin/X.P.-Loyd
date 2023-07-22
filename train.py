@@ -29,7 +29,7 @@ def empty_sequence() -> pd.DataFrame:
 
 def calc_terminal_reward(reward: float, state: "State") -> float:
     if state.contracts != 0:
-        reward += state.exit_position(config["tick_value"])
+        reward += state.exit_position()
     if state.balance < 0:
         return -10000000000000000000000000
     else:
