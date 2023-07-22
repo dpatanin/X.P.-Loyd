@@ -207,6 +207,6 @@ pbar.close()
 writer = pd.ExcelWriter(
     f"data/validation_{config['model_name']}_{now}.xlsx", engine="xlsxwriter"
 )
-action_list.to_excel(writer, sheet_name="actions", index=False)
 balance_list.to_excel(writer, sheet_name="balances", index=False)
+action_list.to_excel(writer, sheet_name="actions", index=False)
 writer.close()
