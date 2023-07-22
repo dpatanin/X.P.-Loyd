@@ -29,7 +29,6 @@ def empty_sequence() -> pd.DataFrame:
 
 action_space = ActionSpace(
     threshold=config["action_space"]["threshold"],
-    price_per_contract=config["tick_value"],
     limit=config["action_space"]["trade_limit"],
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )

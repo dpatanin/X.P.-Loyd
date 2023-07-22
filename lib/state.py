@@ -34,16 +34,16 @@ class State:
 
     def enter_long(self, contracts: int):
         self.assert_valid_operation(contracts)
-        self.entry_price = self.data[CLOSE].iloc[-1] if contracts > 0 else 0.00
+        self.entry_price = self.data[CLOSE].iloc[-1]
         self.contracts = contracts
 
     def enter_short(self, contracts: int):
         self.assert_valid_operation(contracts)
-        self.entry_price = self.data[CLOSE].iloc[-1] if contracts > 0 else 0.00
+        self.entry_price = self.data[CLOSE].iloc[-1]
         self.contracts = -contracts
 
     def exit_position(self) -> float:
-        assert self.has_position(), "No position to exit."
+        assert self.contracts != 0, "No position to exit."
         profit = (
             ((self.data[CLOSE].iloc[-1] - self.entry_price) / self.tick_size)
             * self.tick_value
@@ -88,11 +88,9 @@ class State:
             raise ValueError(f"Sequence is missing required columns: {missing_columns}")
 
     def assert_valid_operation(self, contracts: int):
+        assert self.contracts != 0, "Exit current position first."
         assert (
-            not self.has_position()
-        ), f"Exit current position first. Current position: {self.has_position()}."
-        assert (
-            contracts >= 0
+            contracts > 0
         ), f"Invalid amount of contracts provided. Received: {contracts}."
 
     def __str__(self):

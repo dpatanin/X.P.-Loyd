@@ -16,11 +16,8 @@ class ActionSpace:
     If above threshold, enter the predicted position. If already in that position, keep your contracts and reenter.
     """
 
-    def __init__(
-        self, threshold: float, price_per_contract: float, limit: int, intrinsic_fac=1
-    ):
+    def __init__(self, threshold: float, limit: int, intrinsic_fac=1):
         self.threshold = threshold
-        self.ppc = price_per_contract
         self.limit = limit
         self.intrinsic_fac = intrinsic_fac
 
@@ -39,23 +36,13 @@ class ActionSpace:
         Returns tuple with reward and taken action.
         """
         action = ACTION_STAY
-        if q == 0:
-            return (0.00, action)
-
-        abs_q = abs(q)
-        position = state.has_position()
-        amount = self.calc_trade_amount(q, state)
         reward = 0.00
+        abs_q = abs(q)
+        amount = self.calc_trade_amount(q, state)
 
-        if abs_q < self.threshold:
-            if self.is_opposite_direction(q, position):
-                reward = state.exit_position(self.ppc)
-                action = ACTION_EXIT
-        else:
-            if position:
-                if not self.is_opposite_direction(q, position):
-                    amount += abs(state.contracts)
-                reward = state.exit_position(self.ppc)
+        if abs_q > self.threshold:
+            if state.contracts != 0:
+                reward = state.exit_position()
 
             if q > 0:
                 state.enter_long(amount)
@@ -64,9 +51,11 @@ class ActionSpace:
                 state.enter_short(amount)
                 action = ACTION_SHORT
 
-            reward += amount * self.ppc * self.intrinsic_fac
+        elif abs_q < self.threshold and self.is_opposite_direction(q, state):
+            reward = state.exit_position()
+            action = ACTION_EXIT
 
-        return (reward, action)
+        return (reward * self.intrinsic_fac, action)
 
-    def is_opposite_direction(self, q: float, position: int) -> bool:
-        return (q > 0 and position < 0) or (q < 0 and position > 0)
+    def is_opposite_direction(self, q: float, state: State) -> bool:
+        return (q > 0 and state.contracts < 0) or (q < 0 and state.contracts > 0)

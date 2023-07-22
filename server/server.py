@@ -18,7 +18,6 @@ logging.basicConfig(filename="server.log", level=logging.DEBUG)
 
 action_space = ActionSpace(
     threshold=config["action_space"]["threshold"],
-    price_per_contract=config["tick_value"],
     limit=config["action_space"]["trade_limit"],
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
@@ -38,7 +37,7 @@ def handle_get_request():
         contracts=content[CONTRACTS],
         entry_price=content[ENTRY_PRICE],
         tick_size=content["tick_size"],
-        tick_value=content["tick_value"]
+        tick_value=content["tick_value"],
     )
     logging.debug(f"State constructed: {str(state)}")
 
