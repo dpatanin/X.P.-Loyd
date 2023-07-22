@@ -27,34 +27,6 @@ def empty_sequence() -> pd.DataFrame:
     return pd.DataFrame(empty, columns=config["data_headers"])
 
 
-action_space = ActionSpace(
-    threshold=config["action_space"]["threshold"],
-    limit=config["action_space"]["trade_limit"],
-    intrinsic_fac=config["reward_factors"]["intrinsic"],
-)
-dp = DataProcessor(
-    headers=config["data_headers"],
-    sequence_length=config["sequence_length"],
-    batch_size=config["batch_size"],
-    dir=config["data_dir"],
-)
-trader = FreeLaborTrader(
-    sequence_length=config["sequence_length"],
-    batch_size=config["batch_size"],
-    num_features=num_features(),
-    memory_size=config["agent"]["memory_size"],
-    update_freq=config["agent"]["update_frequency"],
-    hindsight_reward_fac=config["reward_factors"]["hindsight"],
-    gamma=config["agent"]["gamma"],
-    epsilon=config["agent"]["epsilon"],
-    epsilon_final=config["agent"]["epsilon_final"],
-    epsilon_decay=config["agent"]["epsilon_decay"],
-    learning_rate=config["agent"]["learning_rate"],
-)
-now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
-trader.model.summary()
-
-
 def calc_terminal_reward(reward: float, state: "State") -> float:
     if state.contracts != 0:
         reward += state.exit_position(config["tick_value"])
@@ -95,6 +67,33 @@ def init_states() -> list[State]:
         )
     ] * config["batch_size"]
 
+
+action_space = ActionSpace(
+    threshold=config["action_space"]["threshold"],
+    limit=config["action_space"]["trade_limit"],
+    intrinsic_fac=config["reward_factors"]["intrinsic"],
+)
+dp = DataProcessor(
+    headers=config["data_headers"],
+    sequence_length=config["sequence_length"],
+    batch_size=config["batch_size"],
+    dir=config["data_dir"],
+)
+trader = FreeLaborTrader(
+    sequence_length=config["sequence_length"],
+    batch_size=config["batch_size"],
+    num_features=num_features(),
+    memory_size=config["agent"]["memory_size"],
+    update_freq=config["agent"]["update_frequency"],
+    hindsight_reward_fac=config["reward_factors"]["hindsight"],
+    gamma=config["agent"]["gamma"],
+    epsilon=config["agent"]["epsilon"],
+    epsilon_final=config["agent"]["epsilon_final"],
+    epsilon_decay=config["agent"]["epsilon_decay"],
+    learning_rate=config["agent"]["learning_rate"],
+)
+now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
+trader.model.summary()
 
 ########################### Training ###########################
 
