@@ -55,20 +55,9 @@ class State:
 
         return profit
 
-    def has_position(self):
-        """
-        return: 1 for long position, -1 for short position, 0 for no position
-        """
-        if self.contracts > 0:
-            return 1
-        elif self.contracts < 0:
-            return -1
-        else:
-            return 0
-
     def to_df(self) -> pd.DataFrame:
         """
-        Human readable Dataframe representation of the State object.
+        Human readable DataFrame representation of the State object.
         """
         df = pd.DataFrame(self.data)
         df[CONTRACTS] = [self.contracts] * len(df.index)

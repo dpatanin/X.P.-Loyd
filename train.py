@@ -56,7 +56,7 @@ trader.model.summary()
 
 
 def calc_terminal_reward(reward: float, state: "State") -> float:
-    if state.has_position():
+    if state.contracts != 0:
         reward += state.exit_position(config["tick_value"])
     if state.balance < 0:
         return -10000000000000000000000000
