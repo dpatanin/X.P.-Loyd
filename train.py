@@ -19,7 +19,7 @@ with open("config.yaml") as f:
 
 
 def num_features() -> int:
-    return len(State(data=empty_sequence()).to_df().columns)
+    return len(State(data=empty_sequence(), tick_size=0, tick_value=0).to_df().columns)
 
 
 def empty_sequence() -> pd.DataFrame:
