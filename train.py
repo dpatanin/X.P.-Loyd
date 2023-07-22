@@ -91,12 +91,12 @@ trader = FreeLaborTrader(
 )
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 trader.model.summary()
+dp.batched_dir = dp.batch_dir()
 
 ########################### Training ###########################
 
 # trader.load("models/[name].h5")
 
-dp.batched_dir = dp.batch_dir()
 pbar = ProgressBar(
     episodes=config["episodes"],
     batches=len(dp.batched_dir),
@@ -159,19 +159,8 @@ pbar.close()
 
 ########################### Validation ###########################
 
-pbar = ProgressBar(
-    episodes=1,
-    batches=len(dp.batched_dir),
-    sequences_per_batch=len(dp.load_batch(0)),
-    prefix="Validation",
-    suffix="Remaining time: ???",
-    leave=True,
-)
-
-rem_batches = len(dp.batched_dir)
 trader.memory.clear()
 trader.epsilon = 0  # This removes random choices
-times_per_batch = []
 
 # Initialize dataFrames (not adding columns dynamically due to performance)
 column_headers = []
@@ -183,6 +172,18 @@ init_actions = [["STAY"] * len(column_headers)] * (len(batch) + 1)
 
 balance_list = pd.DataFrame(init_balances, columns=column_headers)
 action_list = pd.DataFrame(init_actions, columns=column_headers)
+
+pbar = ProgressBar(
+    episodes=1,
+    batches=len(dp.batched_dir),
+    sequences_per_batch=len(dp.load_batch(0)),
+    prefix="Validation",
+    suffix="Remaining time: ???",
+    leave=True,
+)
+
+rem_batches = len(dp.batched_dir)
+times_per_batch = []
 
 for i in range(len(dp.batched_dir)):
     t = time.time()
