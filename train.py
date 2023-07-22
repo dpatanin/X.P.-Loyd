@@ -60,7 +60,8 @@ def init_states() -> list[State]:
             tick_size=config["tick_size"],
             tick_value=config["tick_value"],
         )
-    ] * config["batch_size"]
+        for _ in range(config["batch_size"])
+    ]
 
 
 action_space = ActionSpace(
