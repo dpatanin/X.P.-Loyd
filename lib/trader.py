@@ -3,7 +3,7 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from lib.experience_replay import HERBuffer
+from lib.experience_replay import ExperienceReplayBuffer
 from lib.state import State
 
 
@@ -25,19 +25,17 @@ class FreeLaborTrader:
     def __init__(
         self,
         sequence_length: int,
-        sequences_per_batch: int,
         batch_size: int,
         num_features: int,
         update_freq=5,
-        hindsight_reward_fac=1.00,
         gamma=0.95,
         epsilon=1.0,
         epsilon_final=0.01,
         epsilon_decay=0.995,
         learning_rate=0.01,
     ):
-        self.train_size = sequences_per_batch * batch_size
-        self.memory = HERBuffer(round(self.train_size * 2.5), hindsight_reward_fac)
+        self.batch_size = batch_size
+        self.memory = ExperienceReplayBuffer(batch_size * 5)
 
         self.gamma = gamma
         self.epsilon = epsilon
@@ -95,7 +93,7 @@ class FreeLaborTrader:
     def batch_train(self):
         self.target_update_cd -= 1
 
-        (states, rewards, next_states, dones) = self.memory.sample(self.train_size)
+        (states, rewards, next_states, dones) = self.memory.sample(self.batch_size)
         # Convert the dones list to a binary mask; (1 for not done, 0 for done)
         masks = tf.cast(tf.logical_not(dones), dtype=tf.float32)
 

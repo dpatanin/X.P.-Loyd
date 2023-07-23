@@ -52,6 +52,7 @@ class ExperienceReplayBuffer:
         return len(self.buffer)
 
 
+# TODO: Fix HER algorithm i.e. implement it properly
 class HERBuffer(ExperienceReplayBuffer):
     """
     A extended experience replay using the principle of a hindsight replay.\n
@@ -60,9 +61,8 @@ class HERBuffer(ExperienceReplayBuffer):
     |`reward_fac`: Weight of rewards for in hindsight generated experiences.
     """
 
-    def __init__(self, max_size=2000, reward_fac=1):
+    def __init__(self, max_size=2000):
         super().__init__(max_size)
-        self.reward_fac = reward_fac
 
     def analyze_missed_opportunities(self, action_space: "ActionSpace"):
         """
@@ -99,18 +99,14 @@ class HERBuffer(ExperienceReplayBuffer):
                     or ns.contracts != 0
                 ):
                     q = self.__calc_q_for_exit(action_space.threshold, alt_q)
-                    reward = (
-                        self.reward_fac * action_space.take_action(q, alt_state, ns)[0]
-                    )
+                    reward = action_space.take_action(q, alt_state, ns)[0]
 
                     self.add((alt_state, reward, ns, d))
                     alt_state = None
                     alt_q = 0.00
                 else:
                     q = self.__calc_q_for_no_action(action_space.threshold, alt_q)
-                    reward = (
-                        self.reward_fac * action_space.take_action(q, alt_state, ns)[0]
-                    )
+                    reward = action_space.take_action(q, alt_state, ns)[0]
 
                     # Ensure continuity of actions
                     ns.balance = alt_state.balance

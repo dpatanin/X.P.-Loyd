@@ -82,11 +82,9 @@ sequences_per_batch = len(dp.load_batch(0))
 
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
-    sequences_per_batch=sequences_per_batch,
     batch_size=config["batch_size"],
     num_features=num_features(),
     update_freq=config["agent"]["update_frequency"],
-    hindsight_reward_fac=config["reward_factors"]["hindsight"],
     gamma=config["agent"]["gamma"],
     epsilon=config["agent"]["epsilon"],
     epsilon_final=config["agent"]["epsilon_final"],
@@ -136,14 +134,13 @@ for e in range(1, config["episodes"] + 1):
             for snap, reward, state in zip(snapshot, rewards, states.copy()):
                 trader.memory.add((snap, reward, state, done))
 
+            if len(trader.memory) > config["batch_size"]:
+                trader.batch_train()
 
             pbar.update(e, i + 1, idx + 1)
 
-        if len(trader.memory) >= trader.train_size:
-            trader.batch_train()
-            
-        # Create hindsight experiences
-        trader.memory.analyze_missed_opportunities(action_space)
+        # TODO: Create hindsight experiences
+        # trader.memory.analyze_missed_opportunities(action_space)
 
         rem_batches -= 1
         times_per_batch.append((time.time() - t))

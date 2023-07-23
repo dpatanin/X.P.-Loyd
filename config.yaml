@@ -1,5 +1,5 @@
 ---
-  model_name: with-her
+  model_name: base
   model_directory: models # Be aware of the location for serving
   data_dir: data/training # Trading sessions are expected as individual files
 
@@ -34,4 +34,3 @@
   reward_factors:
     session_total: 2
     intrinsic: 1
-    hindsight: 0.5
