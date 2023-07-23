@@ -25,9 +25,9 @@ class FreeLaborTrader:
     def __init__(
         self,
         sequence_length: int,
+        sequences_per_batch: int,
         batch_size: int,
         num_features: int,
-        memory_size=2000,
         update_freq=5,
         hindsight_reward_fac=1.00,
         gamma=0.95,
@@ -36,10 +36,8 @@ class FreeLaborTrader:
         epsilon_decay=0.995,
         learning_rate=0.01,
     ):
-        self.num_features = num_features
-        self.batch_size = batch_size
-        self.sequence_length = sequence_length
-        self.memory = HERBuffer(memory_size, hindsight_reward_fac)
+        self.train_size = sequences_per_batch * batch_size
+        self.memory = HERBuffer(self.train_size * 2.5, hindsight_reward_fac)
 
         self.gamma = gamma
         self.epsilon = epsilon
@@ -49,16 +47,16 @@ class FreeLaborTrader:
         self.target_update_cd = update_freq
 
         self.optimizer = tf.keras.optimizers.Adamax(learning_rate=learning_rate)
-        self.model = self.build_model()
-        self.target_model = self.build_model()
+        self.model = self.__build_model(sequence_length, num_features)
+        self.target_model = self.__build_model(sequence_length, num_features)
 
-    def build_model(self):
+    def __build_model(self, input_dim1: int, input_dim2: int):
         model = tf.keras.Sequential()
         model.add(
             tf.keras.layers.Conv1D(
                 filters=32,
                 kernel_size=3,
-                input_shape=(self.sequence_length, self.num_features),
+                input_shape=(input_dim1, input_dim2),
                 activation="relu",
             )
         )
@@ -97,7 +95,7 @@ class FreeLaborTrader:
     def batch_train(self):
         self.target_update_cd -= 1
 
-        (states, rewards, next_states, dones) = self.memory.sample(self.batch_size)
+        (states, rewards, next_states, dones) = self.memory.sample(self.train_size)
         # Convert the dones list to a binary mask; (1 for not done, 0 for done)
         masks = tf.cast(tf.logical_not(dones), dtype=tf.float32)
 
