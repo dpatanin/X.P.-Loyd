@@ -37,7 +37,7 @@ class FreeLaborTrader:
         learning_rate=0.01,
     ):
         self.train_size = sequences_per_batch * batch_size
-        self.memory = HERBuffer(self.train_size * 2.5, hindsight_reward_fac)
+        self.memory = HERBuffer(round(self.train_size * 2.5), hindsight_reward_fac)
 
         self.gamma = gamma
         self.epsilon = epsilon
