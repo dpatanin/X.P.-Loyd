@@ -208,13 +208,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		                        Print("Exited all positions.");
 		                        break;
 		                    default:
-		                        Print("Invalid action received from the response.");
+								ExitPosition();
+		                        Print("Invalid action received from the response. Exited all positions.");
 		                        break;
 		                }
                     }
                     else
                     {
+						ExitPosition();
                         Print("POST request failed. Response status code: " + response.StatusCode);
+						Print("Exited all positions.")
                     }
                 }
                 catch (Exception ex)
