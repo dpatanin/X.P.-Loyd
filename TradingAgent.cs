@@ -36,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private int numBar;
 		private int sequenceLength = 10;
 
-		public class MockData
+		public class RequestData
         {
             public List<double> progressList = new List<double>();
             public List<double> openList = new List<double>();
@@ -49,7 +49,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public double balance;
 		}
 
-		private MockData data = new MockData();
+		private RequestData data = new RequestData();
 
 		protected override void OnStateChange()
 		{
@@ -165,35 +165,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (response.IsSuccessStatusCode)
                     {
                         var responseContent = await response.Content.ReadAsStringAsync();
-
                         Print("POST request sent successfully. Response: " + responseContent);
-
-                        dynamic parsedResponse = Newtonsoft.Json.JsonConvert.DeserializeObject(responseContent);
-                        string action = parsedResponse.action;
-                        int amount = parsedResponse.amount;
-
-                        switch (action)
-                        {
-                            case "LONG":
-                                EnterLong(amount);
-                                Print("Entered a long position with amount: " + amount);
-                                break;
-                            case "SHORT":
-                                EnterShort(amount);
-                                Print("Entered a short position with amount: " + amount);
-                                break;
-                            case "STAY":
-                                Print("No action taken. Stay in current position.");
-                                break;
-                            case "EXIT":
-                                ExitLong();
-                                ExitShort();
-                                Print("Exited all positions.");
-                                break;
-                            default:
-                                Print("Invalid action received from the response.");
-                                break;
-                        }
+						
+		                dynamic parsedResponse = Newtonsoft.Json.JsonConvert.DeserializeObject(responseContent);
+		                string action = parsedResponse.action;
+		                int amount = parsedResponse.amount;
+						
+		                switch (action)
+		                {
+		                    case "LONG":
+								ExitPosition();
+		                        EnterLong(amount);
+		                        Print("Entered a long position with amount: " + amount);
+		                        break;
+		                    case "SHORT":
+								ExitPosition();
+		                        EnterShort(amount);
+		                        Print("Entered a short position with amount: " + amount);
+		                        break;
+		                    case "STAY":
+		                        Print("No action taken. Stay in current position.");
+		                        break;
+		                    case "EXIT":
+		                        ExitPosition();
+		                        Print("Exited all positions.");
+		                        break;
+		                    default:
+		                        Print("Invalid action received from the response.");
+		                        break;
+		                }
                     }
                     else
                     {
@@ -206,6 +206,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
         }
+		
+		private void ExitPosition()
+		{
+			ExitLong();
+			ExitShort();	
+		}
 		
 		#region Properties
 
