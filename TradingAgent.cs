@@ -35,15 +35,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private bool isLastSequence;
 		private int numBar;
 		private int sequenceLength = 10;
+		
+		// Initial price data for normalizing
+		private double initOpen;
+		private double initHigh;
+		private double initLow;
+		private double initClose;
 
 		public class RequestData
         {
-            public List<double> progressList = new List<double>();
-            public List<double> openList = new List<double>();
-            public List<double> highList = new List<double>();
-            public List<double> lowList = new List<double>();
-            public List<double> closeList = new List<double>();
-            public List<double> volumeList = new List<double>();
+            public List<double> progress = new List<double>();
+            public List<double> open = new List<double>();
+            public List<double> high = new List<double>();
+            public List<double> low = new List<double>();
+            public List<double> close = new List<double>();
+            public List<double> volume = new List<double>();
             public int contracts;
             public double entryPrice;
             public double balance;
@@ -86,6 +92,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 				firstDateTime = Time[0];
 				lastDateTime = Time[0].Date.AddHours(18);
 				isExecuted = true;
+				
+				initOpen = Open[0];
+				initHigh = High[0];
+				initLow = Low[0];
+				initClose = Close[0];
 			}
 			
 			CalcProgress();
@@ -102,11 +113,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{			
 			for (int i = 0; i < sequenceLength; i++)
 			{
-				data.openList.Add(Open[i]);
-				data.highList.Add(High[i]);
-				data.lowList.Add(Low[i]);
-				data.closeList.Add(Close[i]);
-				data.volumeList.Add(Volume[i]);
+				data.open.Add(Open[i] - initOpen);
+				data.high.Add(High[i] - initHigh);
+				data.low.Add(Low[i] - initLow);
+				data.close.Add(Close[i] - initClose);
+				data.volume.Add(Volume[i]);
 			}
 			data.contracts = Position.Quantity;
 			data.entryPrice = Position.AveragePrice;
@@ -115,17 +126,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		private void ClearData()
 		{
-			data.progressList.Clear();
-			data.openList.Clear();
-			data.highList.Clear();
-			data.lowList.Clear();
-			data.closeList.Clear();
-			data.volumeList.Clear();
+			data.progress.Clear();
+			data.open.Clear();
+			data.high.Clear();
+			data.low.Clear();
+			data.close.Clear();
+			data.volume.Clear();
 		}
 		
 		private double GetAccountBalance()
 		{
-			Account a = Account.All.First(t => t.Name == "Sim101");
+			Account a = Account.All.First(t => t.Name == "Playback101");
 			double value = a.Get(AccountItem.CashValue, Currency.UsDollar);
 			return value;
 		}
@@ -136,9 +147,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double firstHours = (firstDateTime - firstDateTime.Date).TotalHours;
 			double lastHours = (lastDateTime - lastDateTime.Date).TotalHours;
 			double hourDiff = lastHours - firstHours;
-			data.progressList.Add(numBar / (hourDiff * 60));
+			data.progress.Add(numBar / (hourDiff * 60));
 			
-			if(data.progressList.Last() == 1)
+			if(data.progress.Last() == 1)
 			{
 				ResetParameters();
 			}
