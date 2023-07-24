@@ -37,6 +37,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private int sequenceLength = 10;
 		
 		// Initial price data for normalizing
+		private bool initCollected = false;
 		private double initOpen;
 		private double initHigh;
 		private double initLow;
@@ -84,7 +85,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 		protected override async void OnBarUpdate()
 		{
 		    if (State == State.Historical)
-                return;
+                return;	
+
+			if (CurrentBars[0] > 0 && !initCollected)
+			{
+				initCollected = true;
+
+				initOpen = Open[0];
+				initHigh = High[0];
+				initLow = Low[0];
+				initClose = Close[0];
+			}
 
 			numBar = CurrentBar;
 			if(!isExecuted)
@@ -92,11 +103,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				firstDateTime = Time[0];
 				lastDateTime = Time[0].Date.AddHours(18);
 				isExecuted = true;
-				
-				initOpen = Open[0];
-				initHigh = High[0];
-				initLow = Low[0];
-				initClose = Close[0];
 			}
 			
 			CalcProgress();
