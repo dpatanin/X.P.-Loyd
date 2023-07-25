@@ -21,7 +21,6 @@ class FreeLaborTrader:
     |`gamma`: Weight inside the loss functions.
     |`epsilon`, `epsilon_final`, `epsilon_decay`: Exploration parameters.
     """
-
     def __init__(
         self,
         sequence_length: int,
