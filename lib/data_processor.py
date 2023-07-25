@@ -1,5 +1,6 @@
-import pandas as pd
 import os
+
+import pandas as pd
 
 
 class DataProcessor:
@@ -19,7 +20,6 @@ class DataProcessor:
         step_size: int = None,
         dir: str = None,
     ):
-
         self.dir = dir
         self.column_headers = headers
         self.sequence_length = sequence_length
@@ -64,7 +64,10 @@ class DataProcessor:
         num_batches = len(ls) // self.batch_size
         remaining_paths = len(ls) % self.batch_size
 
-        batches = [ls[i:i + self.batch_size] for i in range(0, num_batches * self.batch_size, self.batch_size)]
+        batches = [
+            ls[i : i + self.batch_size]
+            for i in range(0, num_batches * self.batch_size, self.batch_size)
+        ]
         if remaining_paths:
             batches.append(ls[-remaining_paths:])
 

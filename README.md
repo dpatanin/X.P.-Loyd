@@ -118,7 +118,9 @@ For the current configuration the request might look like this:
   "volume": [788, 122, 850, 657, 234, 888, 1453, 456, 654, 453],
   "contracts": 5,
   "entryPrice": 3500,
-  "balance": 10000
+  "balance": 10000,
+  "tick_size": 0.25,
+  "tick_value": 12.5
 }
 ```
 
