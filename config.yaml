@@ -1,7 +1,8 @@
 ---
   model_name: after-stat-tests
   model_directory: models # Be aware of the location for serving
-  data_dir: data/training # Trading sessions are expected as individual files
+  data_training: data/training # Trading sessions are expected as individual files
+  data_validation: data/validation
 
   # General config
   #! close & volume headers are required; have to match the constants in `lib/constants.py` 
