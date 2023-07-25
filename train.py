@@ -166,8 +166,8 @@ trader.epsilon = 0  # This removes random choices
 
 # Initialize dataFrames (not adding columns dynamically due to performance)
 column_headers = []
-for i in range(len(dp.batched_dir)):
-    column_headers.extend(f"b{i}s{n}" for n in range(config["batch_size"]))
+for i, sessions in enumerate(dp.batched_dir):
+    column_headers.extend(f"b{i}s{n}" for n in range(len(sessions)))
 
 # +1 for initial states
 init_balances = [[config["initial_balance"]] * len(column_headers)] * (
