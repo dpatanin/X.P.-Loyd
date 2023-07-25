@@ -1,25 +1,26 @@
 import math
+import os
+import time
+from datetime import datetime
 
-from lib.data_processor import DataProcessor
-from lib.trader import FreeLaborTrader
-from lib.state import State
-from lib.action_space import ActionSpace
-from lib.progress_bar import ProgressBar
-import tensorflow as tf
-import pandas as pd
 import numpy as np
+import pandas as pd
+import tensorflow as tf
 import yaml
 from yaml.loader import FullLoader
-from datetime import datetime
-import time
-import os
+
+from lib.action_space import ActionSpace
+from lib.data_processor import DataProcessor
+from lib.progress_bar import ProgressBar
+from lib.state import State
+from lib.trader import FreeLaborTrader
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
 
 
 def num_features() -> int:
-    return len(State(data=empty_sequence()).to_df().columns)
+    return len(State(data=empty_sequence(), tick_size=0, tick_value=0).to_df().columns)
 
 
 def empty_sequence() -> pd.DataFrame:
@@ -27,9 +28,45 @@ def empty_sequence() -> pd.DataFrame:
     return pd.DataFrame(empty, columns=config["data_headers"])
 
 
+def calc_terminal_reward(reward: float, state: "State") -> float:
+    if state.contracts != 0:
+        reward += state.exit_position()
+    if state.balance < 0:
+        return -10000000000000000000000000
+    else:
+        return (reward + state.balance - config["initial_balance"]) * config[
+            "reward_factors"
+        ]["session_total"]
+
+
+def rem_time(times: list[int], it_left: int):
+    rem_time_sec = it_left * (sum(times) / len(times))
+    return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
+
+
+def saved_model():
+    versions = []
+    versions.extend(int(item) for item in os.listdir("./models/") if (item.isdigit()))
+
+    tf.saved_model.save(
+        trader.model, f'./{config["model_directory"]}/{max(versions) + 1}'
+    )
+
+
+def init_states() -> list[State]:
+    return [
+        State(
+            data=empty_sequence(),
+            balance=config["initial_balance"],
+            tick_size=config["tick_size"],
+            tick_value=config["tick_value"],
+        )
+        for _ in range(config["batch_size"])
+    ]
+
+
 action_space = ActionSpace(
     threshold=config["action_space"]["threshold"],
-    price_per_contract=config["tick_value"],
     limit=config["action_space"]["trade_limit"],
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
@@ -54,43 +91,12 @@ trader = FreeLaborTrader(
 )
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 trader.model.summary()
-
-
-def calc_terminal_reward(reward: float, state: "State") -> float:
-    if state.has_position():
-        reward += state.exit_position(config["tick_value"])
-    if state.balance < 0:
-        return -10000000000000000000000000
-    else:
-        return (reward + state.balance - config["initial_balance"]) * config[
-            "reward_factors"
-        ]["session_total"]
-
-
-def rem_time(times: list[int], it_left: int):
-    rem_time_sec = it_left * (sum(times) / len(times))
-    return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
-
-
-def avg_profit(states: list["State"]):
-    sum_balance = sum(state.balance for state in states)
-    return (sum_balance / config["batch_size"]) - config["initial_balance"]
-
-
-def saved_model():
-    versions = []
-    versions.extend(int(item) for item in os.listdir("./models/") if (item.isdigit()))
-
-    tf.saved_model.save(
-        trader.model, f'./{config["model_directory"]}/{max(versions) + 1}'
-    )
-
+dp.batched_dir = dp.batch_dir()
 
 ########################### Training ###########################
 
 # trader.load("models/[name].h5")
 
-dp.batched_dir = dp.batch_dir()
 pbar = ProgressBar(
     episodes=config["episodes"],
     batches=len(dp.batched_dir),
@@ -101,18 +107,13 @@ pbar = ProgressBar(
 )
 
 rem_batches = config["episodes"] * len(dp.batched_dir)
-profit_list = []
 times_per_batch = []
 
 for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
         t = time.time()
         batch = dp.load_batch(i)
-
-        # Initial states
-        states: list[State] = [
-            State(data=empty_sequence(), balance=config["initial_balance"])
-        ] * config["batch_size"]
+        states = init_states()
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
@@ -126,7 +127,6 @@ for e in range(1, config["episodes"] + 1):
 
             done = idx == len(batch) - 1
             if done:
-                profit_list.append(avg_profit(states))
                 rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
 
             for snap, reward, state in zip(snapshot, rewards, states.copy()):
@@ -154,13 +154,24 @@ for e in range(1, config["episodes"] + 1):
         )
         saved_model()  # Save the model for tensorflow-serving
 
-
 pbar.close()
-df = pd.DataFrame(profit_list)
-df.to_excel(f"data/training_{config['model_name']}_{now}.xlsx")
 
 
 ########################### Validation ###########################
+
+trader.memory.clear()
+trader.epsilon = 0  # This removes random choices
+
+# Initialize dataFrames (not adding columns dynamically due to performance)
+column_headers = []
+for i in range(len(dp.batched_dir)):
+    column_headers.extend(f"b{i}s{n}" for n in range(config["batch_size"]))
+
+init_balances = [[config["initial_balance"]] * len(column_headers)] * (len(batch) + 1)
+init_actions = [["STAY"] * len(column_headers)] * (len(batch) + 1)
+
+balance_list = pd.DataFrame(init_balances, columns=column_headers)
+action_list = pd.DataFrame(init_actions, columns=column_headers)
 
 pbar = ProgressBar(
     episodes=1,
@@ -172,26 +183,12 @@ pbar = ProgressBar(
 )
 
 rem_batches = len(dp.batched_dir)
-trader.memory.clear()
-trader.epsilon = 0  # This removes random choices
-balance_list = pd.DataFrame()
-action_list = pd.DataFrame()
 times_per_batch = []
-
 
 for i in range(len(dp.batched_dir)):
     t = time.time()
     batch = dp.load_batch(i)
-
-    # Initial states
-    states: list[State] = [
-        State(data=empty_sequence(), balance=config["initial_balance"])
-    ] * config["batch_size"]
-
-    for idb, s in enumerate(states):
-        # +1 to keep initial balance
-        balance_list[f"b{i}s{idb}"] = [s.balance] * (len(batch) + 1)
-        action_list[f"b{i}s{idb}"] = ["STAY"] * (len(batch) + 1)
+    states = init_states()
 
     for idx, sequences in enumerate(batch):
         for seq, state in zip(sequences, states):
@@ -211,5 +208,9 @@ for i in range(len(dp.batched_dir)):
     pbar.suffix = rem_time(times_per_batch, rem_batches)
 
 pbar.close()
-action_list.to_excel(f"data/validation_actions_{config['model_name']}_{now}.xlsx")
-balance_list.to_excel(f"data/validation_balances_{config['model_name']}_{now}.xlsx")
+writer = pd.ExcelWriter(
+    f"data/validation_{config['model_name']}_{now}.xlsx", engine="xlsxwriter"
+)
+balance_list.to_excel(writer, sheet_name="balances", index=False)
+action_list.to_excel(writer, sheet_name="actions", index=False)
+writer.close()

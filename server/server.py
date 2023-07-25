@@ -1,13 +1,14 @@
-from lib.constants import BALANCE, ENTRY_PRICE, CONTRACTS, ACTION_STAY, ACTION_EXIT
-from lib.action_space import ActionSpace
-from lib.state import State
-from flask import Flask, request, jsonify
-import requests
 import logging
-import pandas as pd
 
+import pandas as pd
+import requests
 import yaml
+from flask import Flask, jsonify, request
 from yaml.loader import FullLoader
+
+from lib.action_space import ActionSpace
+from lib.constants import ACTION_EXIT, ACTION_STAY, BALANCE, CONTRACTS, ENTRY_PRICE
+from lib.state import State
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
@@ -18,7 +19,6 @@ logging.basicConfig(filename="server.log", level=logging.DEBUG)
 
 action_space = ActionSpace(
     threshold=config["action_space"]["threshold"],
-    price_per_contract=config["tick_value"],
     limit=config["action_space"]["trade_limit"],
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
@@ -37,6 +37,8 @@ def handle_get_request():
         balance=content[BALANCE],
         contracts=content[CONTRACTS],
         entry_price=content[ENTRY_PRICE],
+        tick_size=content["tick_size"],
+        tick_value=content["tick_value"],
     )
     logging.debug(f"State constructed: {str(state)}")
 

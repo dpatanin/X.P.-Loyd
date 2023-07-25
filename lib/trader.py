@@ -1,8 +1,10 @@
-from lib.experience_replay import HERBuffer
-from lib.state import State
+import random
+
 import numpy as np
 import tensorflow as tf
-import random
+
+from lib.experience_replay import HERBuffer
+from lib.state import State
 
 
 class FreeLaborTrader:

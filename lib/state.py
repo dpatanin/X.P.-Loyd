@@ -1,5 +1,6 @@
-from lib.constants import CLOSE, CONTRACTS, ENTRY_PRICE, BALANCE
 import pandas as pd
+
+from lib.constants import BALANCE, CLOSE, CONTRACTS, ENTRY_PRICE
 
 
 class State:
@@ -17,6 +18,8 @@ class State:
     def __init__(
         self,
         data: pd.DataFrame,
+        tick_size: float,
+        tick_value: float,
         balance=0.00,
         entry_price=0.00,
         contracts=0,
@@ -24,28 +27,28 @@ class State:
         self.data = data
         self.assert_columns()
 
+        self.tick_size = tick_size
+        self.tick_value = tick_value
         self.balance = balance
         self.entry_price = entry_price
         self.contracts = contracts
 
-    def enter_long(self, contracts: int, price_per_contract: float):
-        self.assert_valid_operation(contracts, price_per_contract)
-        self.entry_price = self.data[CLOSE].iloc[-1] if contracts > 0 else 0.00
-        self.balance -= contracts * price_per_contract
+    def enter_long(self, contracts: int):
+        self.assert_valid_operation(contracts)
+        self.entry_price = self.data[CLOSE].iloc[-1]
         self.contracts = contracts
 
-    def enter_short(self, contracts: int, price_per_contract: float):
-        self.assert_valid_operation(contracts, price_per_contract)
-        self.entry_price = self.data[CLOSE].iloc[-1] if contracts > 0 else 0.00
-        self.balance += contracts * price_per_contract
+    def enter_short(self, contracts: int):
+        self.assert_valid_operation(contracts)
+        self.entry_price = self.data[CLOSE].iloc[-1]
         self.contracts = -contracts
 
-    def exit_position(self, price_per_contract: float) -> float:
-        assert self.has_position(), "No position to exit."
+    def exit_position(self) -> float:
+        assert self.contracts != 0, "No position to exit."
         profit = (
-            (self.data[CLOSE].iloc[-1] - self.entry_price)
+            ((self.data[CLOSE].iloc[-1] - self.entry_price) / self.tick_size)
+            * self.tick_value
             * self.contracts
-            * price_per_contract
         )
         self.balance += profit
         self.entry_price = 0
@@ -53,20 +56,9 @@ class State:
 
         return profit
 
-    def has_position(self):
-        """
-        return: 1 for long position, -1 for short position, 0 for no position
-        """
-        if self.contracts > 0:
-            return 1
-        elif self.contracts < 0:
-            return -1
-        else:
-            return 0
-
     def to_df(self) -> pd.DataFrame:
         """
-        Human readable Dataframe representation of the State object.
+        Human readable DataFrame representation of the State object.
         """
         df = pd.DataFrame(self.data)
         df[CONTRACTS] = [self.contracts] * len(df.index)
@@ -85,16 +77,11 @@ class State:
         if missing_columns := set(req_columns) - set(self.data.columns):
             raise ValueError(f"Sequence is missing required columns: {missing_columns}")
 
-    def assert_valid_operation(self, contracts: int, price_per_contract: float):
+    def assert_valid_operation(self, contracts: int):
+        assert self.contracts == 0, "Exit current position first."
         assert (
-            not self.has_position()
-        ), f"Exit current position first. Current position: {self.has_position()}."
-        assert (
-            contracts >= 0
+            contracts > 0
         ), f"Invalid amount of contracts provided. Received: {contracts}."
-        assert (
-            price_per_contract > 0
-        ), f"Invalid price per contract provided. Received: {price_per_contract}."
 
     def __str__(self):
         return self.to_df().__str__()
