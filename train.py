@@ -54,7 +54,7 @@ def saved_model():
     )
 
 
-def init_states() -> list[State]:
+def init_states(amount: int) -> list[State]:
     return [
         State(
             data=empty_sequence(),
@@ -62,7 +62,7 @@ def init_states() -> list[State]:
             tick_size=config["tick_size"],
             tick_value=config["tick_value"],
         )
-        for _ in range(config["batch_size"])
+        for _ in range(amount)
     ]
 
 
@@ -115,7 +115,7 @@ for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
         t = time.time()
         batch = dp.load_batch(i)
-        states = init_states()
+        states = init_states(len(batch[0]))
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
@@ -168,11 +168,10 @@ def validate(label: str, writer: pd.ExcelWriter):
     for i, sessions in enumerate(dp.batched_dir):
         column_headers.extend(f"b{i}s{n}" for n in range(len(sessions)))
 
-    # +1 for initial states
     init_balances = [[config["initial_balance"]] * len(column_headers)] * (
-        sequences_per_batch + 1
+        sequences_per_batch
     )
-    init_actions = [["STAY"] * len(column_headers)] * (sequences_per_batch + 1)
+    init_actions = [["STAY"] * len(column_headers)] * (sequences_per_batch)
 
     balance_list = pd.DataFrame(init_balances, columns=column_headers)
     action_list = pd.DataFrame(init_actions, columns=column_headers)
@@ -192,7 +191,7 @@ def validate(label: str, writer: pd.ExcelWriter):
     for i in range(len(dp.batched_dir)):
         t = time.time()
         batch = dp.load_batch(i)
-        states = init_states()
+        states = init_states(len(batch[0]))
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
@@ -202,8 +201,8 @@ def validate(label: str, writer: pd.ExcelWriter):
             for ids, qs in enumerate(zip(q_values, states)):
                 amount = action_space.calc_trade_amount(qs[0], qs[1])
                 action = action_space.take_action(qs[0], qs[1])[1]
-                action_list[f"b{i}s{ids}"].iloc[idx + 1] = f"{action}|{amount}"
-                balance_list[f"b{i}s{ids}"].iloc[idx + 1] = qs[1].balance
+                action_list[f"b{i}s{ids}"].iloc[idx] = f"{action}|{amount}"
+                balance_list[f"b{i}s{ids}"].iloc[idx] = qs[1].balance
 
             pbar.update(batch=i + 1, seq=idx + 1)
 
