@@ -49,7 +49,8 @@ def saved_model():
     versions.extend(int(item) for item in os.listdir("./models/") if (item.isdigit()))
 
     tf.saved_model.save(
-        trader.model, f'./{config["model_directory"]}/{max(versions) + 1}'
+        trader.model,
+        f'./{config["model_directory"]}/{max(versions) + 1 if versions else 1}',
     )
 
 
@@ -70,28 +71,29 @@ action_space = ActionSpace(
     limit=config["action_space"]["trade_limit"],
     intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
+
 dp = DataProcessor(
     headers=config["data_headers"],
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
     dir=config["data_dir"],
 )
+sequences_per_batch = len(dp.load_batch(0))
+
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
     num_features=num_features(),
-    memory_size=config["agent"]["memory_size"],
     update_freq=config["agent"]["update_frequency"],
-    hindsight_reward_fac=config["reward_factors"]["hindsight"],
     gamma=config["agent"]["gamma"],
     epsilon=config["agent"]["epsilon"],
     epsilon_final=config["agent"]["epsilon_final"],
     epsilon_decay=config["agent"]["epsilon_decay"],
     learning_rate=config["agent"]["learning_rate"],
 )
-now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 trader.model.summary()
-dp.batched_dir = dp.batch_dir()
+
+now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 
 ########################### Training ###########################
 
@@ -100,7 +102,7 @@ dp.batched_dir = dp.batch_dir()
 pbar = ProgressBar(
     episodes=config["episodes"],
     batches=len(dp.batched_dir),
-    sequences_per_batch=len(dp.load_batch(0)),
+    sequences_per_batch=sequences_per_batch,
     prefix="Training",
     suffix="Remaining time: ???",
     leave=True,
@@ -137,8 +139,8 @@ for e in range(1, config["episodes"] + 1):
 
             pbar.update(e, i + 1, idx + 1)
 
-        # Create hindsight experiences
-        trader.memory.analyze_missed_opportunities(action_space)
+        # TODO: Create hindsight experiences
+        # trader.memory.analyze_missed_opportunities(action_space)
 
         rem_batches -= 1
         times_per_batch.append((time.time() - t))
@@ -164,11 +166,14 @@ trader.epsilon = 0  # This removes random choices
 
 # Initialize dataFrames (not adding columns dynamically due to performance)
 column_headers = []
-for i in range(len(dp.batched_dir)):
-    column_headers.extend(f"b{i}s{n}" for n in range(config["batch_size"]))
+for i, sessions in enumerate(dp.batched_dir):
+    column_headers.extend(f"b{i}s{n}" for n in range(len(sessions)))
 
-init_balances = [[config["initial_balance"]] * len(column_headers)] * (len(batch) + 1)
-init_actions = [["STAY"] * len(column_headers)] * (len(batch) + 1)
+# +1 for initial states
+init_balances = [[config["initial_balance"]] * len(column_headers)] * (
+    sequences_per_batch + 1
+)
+init_actions = [["STAY"] * len(column_headers)] * (sequences_per_batch + 1)
 
 balance_list = pd.DataFrame(init_balances, columns=column_headers)
 action_list = pd.DataFrame(init_actions, columns=column_headers)
@@ -176,7 +181,7 @@ action_list = pd.DataFrame(init_actions, columns=column_headers)
 pbar = ProgressBar(
     episodes=1,
     batches=len(dp.batched_dir),
-    sequences_per_batch=len(dp.load_batch(0)),
+    sequences_per_batch=sequences_per_batch,
     prefix="Validation",
     suffix="Remaining time: ???",
     leave=True,

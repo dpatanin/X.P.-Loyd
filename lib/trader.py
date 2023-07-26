@@ -3,7 +3,7 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from lib.experience_replay import HERBuffer
+from lib.experience_replay import ExperienceReplayBuffer
 from lib.state import State
 
 
@@ -21,25 +21,20 @@ class FreeLaborTrader:
     |`gamma`: Weight inside the loss functions.
     |`epsilon`, `epsilon_final`, `epsilon_decay`: Exploration parameters.
     """
-
     def __init__(
         self,
         sequence_length: int,
         batch_size: int,
         num_features: int,
-        memory_size=2000,
         update_freq=5,
-        hindsight_reward_fac=1.00,
         gamma=0.95,
         epsilon=1.0,
         epsilon_final=0.01,
         epsilon_decay=0.995,
         learning_rate=0.01,
     ):
-        self.num_features = num_features
         self.batch_size = batch_size
-        self.sequence_length = sequence_length
-        self.memory = HERBuffer(memory_size, hindsight_reward_fac)
+        self.memory = ExperienceReplayBuffer(batch_size * 5)
 
         self.gamma = gamma
         self.epsilon = epsilon
@@ -49,16 +44,16 @@ class FreeLaborTrader:
         self.target_update_cd = update_freq
 
         self.optimizer = tf.keras.optimizers.Adamax(learning_rate=learning_rate)
-        self.model = self.build_model()
-        self.target_model = self.build_model()
+        self.model = self.__build_model(sequence_length, num_features)
+        self.target_model = self.__build_model(sequence_length, num_features)
 
-    def build_model(self):
+    def __build_model(self, input_dim1: int, input_dim2: int):
         model = tf.keras.Sequential()
         model.add(
             tf.keras.layers.Conv1D(
                 filters=32,
                 kernel_size=3,
-                input_shape=(self.sequence_length, self.num_features),
+                input_shape=(input_dim1, input_dim2),
                 activation="relu",
             )
         )
