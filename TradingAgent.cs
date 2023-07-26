@@ -29,12 +29,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class TradingAgent : Strategy
 	{	
-		private DateTime firstDateTime;
-		private DateTime lastDateTime;
-		private bool isExecuted;
-		private bool isLastSequence;
 		private int numBar;
 		private int sequenceLength = 10;
+		private int totalBarsInSession = 1380;
 		
 		// Initial price data for normalizing
 		private bool initCollected = false;
@@ -73,7 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
 				OrderFillResolution							= OrderFillResolution.Standard;
 				Slippage									= 0;
-				StartBehavior								= StartBehavior.WaitUntilFlat;
+				StartBehavior								= StartBehavior.ImmediatelySubmit;
 				TimeInForce									= TimeInForce.Gtc;
 				TraceOrders									= false;
 				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
@@ -82,6 +79,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				IsInstantiatedOnEachOptimizationIteration	= true;
 			}
 		}
+		
+		
 		protected override async void OnBarUpdate()
 		{
 		    if (State == State.Historical)
@@ -96,18 +95,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 				initLow = Low[0];
 				initClose = Close[0];
 			}
+			
+			data.progress.Add(((double)Bars.BarsSinceNewTradingDay / totalBarsInSession) * 100);
 
 			numBar = CurrentBar;
-			if(!isExecuted)
-			{
-				firstDateTime = Time[0];
-				lastDateTime = Time[0].Date.AddHours(18);
-				isExecuted = true;
-			}
-			
-			CalcProgress();
-			
-			if((numBar % sequenceLength == 0 && numBar != 0) || isLastSequence)
+			if(numBar % sequenceLength == 0 && numBar != 0)
 			{
 				CollectData();
 				SendHttpRequest(Newtonsoft.Json.JsonConvert.SerializeObject(data));
@@ -147,28 +139,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			return value;
 		}
 		
-		//Calculate the current progress
-		private void CalcProgress()
-		{
-			double firstHours = (firstDateTime - firstDateTime.Date).TotalHours;
-			double lastHours = (lastDateTime - lastDateTime.Date).TotalHours;
-			double hourDiff = lastHours - firstHours;
-			data.progress.Add(numBar / (hourDiff * 60));
-			
-			if(data.progress.Last() == 1)
-			{
-				ResetParameters();
-			}
-		}
-		
-		//Resets Parameters because new Trading Day begins
-		private void ResetParameters()
-		{
-			numBar = 0;
-			isExecuted = false;
-			isLastSequence = true;
-		}
-		
 		private async void SendHttpRequest(string json)
         {
             using (var httpClient = new HttpClient())
@@ -205,24 +175,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 		                        break;
 		                    case "EXIT":
 		                        ExitPosition();
-		                        Print("Exited all positions.");
 		                        break;
 		                    default:
+		                        Print("Invalid action received from the response.");
 								ExitPosition();
-		                        Print("Invalid action received from the response. Exited all positions.");
 		                        break;
 		                }
                     }
                     else
                     {
-						ExitPosition();
                         Print("POST request failed. Response status code: " + response.StatusCode);
-						Print("Exited all positions.")
+						ExitPosition();
                     }
                 }
                 catch (Exception ex)
                 {
                     Print("Exception occurred: " + ex.Message);
+					ExitPosition();
                 }
             }
         }
@@ -230,7 +199,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void ExitPosition()
 		{
 			ExitLong();
-			ExitShort();	
+			ExitShort();
+			Print("Exited all positions.");
 		}
 		
 		#region Properties
