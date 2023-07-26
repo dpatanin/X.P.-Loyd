@@ -53,18 +53,13 @@ Tensorflow uses by default the GPU. If you want to manually check whether GPU is
 
 ## Training
 
-Everything necessary to train the AI is put into the `/ai-training` directory.
+The main file for the training is `train.py` and the majority of classes are put into `/lib`.
 
 ### Data
 
-Inside you need to create locally a few directories:
-
-- One directory where your models will be saved to (default: `ai-training/models`)
-- One directory holding your data (default: `ai-training/data`)
-- By default, the data is intended to be split into:
-  - Training data (default: `ai-training/data/training`)
-  - Validation data (default: `ai-training/data/validation`)
-  - Test data (default: `ai-training/data/test`)
+The data is not provided as we use bought data. But once have acquired your own data, we recommend to create a `/data` directory
+at the root of this project. Within you will want a subfolder `/training` for the dataset used for training and `/validation`
+for the dataset used for a separate validation step.
 
 You can of course organize however you wish, simply adjust the `config.yaml` file accordingly.
 The project expects the data to represent each trading session by a separate `.csv` file and be of **exactly the same size**.
@@ -75,19 +70,16 @@ Keep in mind to include the data headers inside the `config.yaml` as all which a
 
 ### Config / Hyperparameter
 
-All project parameters and hyperparameter are defined inside the `ai-training/config.yaml`.
+All project parameters and hyperparameter are defined inside the `config.yaml`.
 It is intended to make changes simpler and provide an overview, rather than serving actual, project wide setting.
-Most of those variables are simply forwarded in the `master.py`.
+Most of those variables are simply forwarded in the `train.py`.
 
 ### Run
 
-Run: `python master.py`
+Run: `python train.py`
 
-The `master.py` will start and train a model as specified.
-It also includes a validation/test block which may lead to inaccurate results if run during the same initiation as the training.
-We recommend doing separate runs.
-
-**Important:** Don't forget to set the epsilon right to avoid random behavior during validation.
+The `train.py` will start and train a model as specified.
+It also includes a validation on the trained data as well as validation on a separate dataset.
 
 ## Server
 
@@ -142,14 +134,14 @@ Possible `action` are defined in the `/lib/constants.py`.
 ## NinjaTrader
 
 Our brokerage platform of choice is [NinjaTrader](https://ninjatrader.com/). The simulation/playback of data is free as is the local downloadable platform.
-To download the platform itself register and download the platform. After that set up your workspace to your liking. There are a few key functions to note, especially when scripting for it.
+To download the platform itself register and download it. After that set up your workspace to your liking. There are a few key functions to note, especially when scripting.
 
 ### Simulation / Playback
 
-To work locally we use the `playback` option. You find it under the tab `connections`.
-To use it you need to download the respective historical / market replay data. Once connected, you require a chart for the playback. You can create charts under the tab `new`.
+To work locally we use the `playback` or `simulation` option. You find those under the tab `connections`.
+To use the playback you need to download the respective historical / market replay data. Once connected, you require a chart. You can create charts under the tab `new`.
 After the chart is done, it will have icons at the very top for further function, such as adding indicators and strategies. This is important as those are the functions for our custom scripts.
-Note: After adding a e.g. strategy, you also have to enable it in the right sight of the strategies window.
+Note: After adding a e.g. strategy, you might have to enable it in the right sight of the strategies window.
 
 ### Scripting
 
