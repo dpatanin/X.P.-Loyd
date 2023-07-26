@@ -219,7 +219,8 @@ def validate(label: str, writer: pd.ExcelWriter):
 trader.memory.clear()
 trader.epsilon = 0  # This removes random choices
 writer = pd.ExcelWriter(
-    f"data/validation_{config['model_name']}_{now}.xlsx", engine="xlsxwriter"
+    f"{config['validation_dir']}/validation_{config['model_name']}_{now}.xlsx",
+    engine="xlsxwriter",
 )
 
 validate("Training", writer)
