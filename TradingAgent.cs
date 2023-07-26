@@ -1,3 +1,4 @@
+
 #region Using declarations
 using System;
 using System.Collections.Generic;
@@ -22,79 +23,122 @@ using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.Core.FloatingPoint;
 #endregion
+
+
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	// TODO: Placeholder for data class
-	public class MockData
-    {
-        public List<double> progress { get; set; }
-        public List<double> open { get; set; }
-        public List<double> high { get; set; }
-        public List<double> low { get; set; }
-        public List<double> close { get; set; }
-        public List<double> volume { get; set; }
-        public int contracts { get; set; }
-        public int entryPrice { get; set; }
-        public int balance { get; set; }
-    }
-	
 	public class TradingAgent : Strategy
-	{
-		// TODO: Placeholder to test sending requests 
-		private MockData data = new MockData()
-		{
-			progress = new List<double> {0.111,0.112,0.113,0.114,0.115,0.116,0.117,0.118,0.119,0.2},
-			open = new List<double> {0,25,0,12.5,-100,-25,-150,0,250,200},
-			high = new List<double> {12.5,50,25,12.5,-75,0,-50,12.5,275,250},
-			low = new List<double> {-25,0,-50,0,-200,-50,-200,0,200,100},
-			close = new List<double> {25,0,12.5,-4100,-25,-50,0,250,200,500},
-			volume = new List<double> {788,122,850,657,234,888,1453,456,654,453},
-			contracts = 5,
-			entryPrice = 3500,
-			balance = 10000
-		};
+	{	
+		private int numBar;
+		private int sequenceLength = 10;
+		private int totalBarsInSession = 1380;
+		
+		// Initial price data for normalizing
+		private bool initCollected = false;
+		private double initOpen;
+		private double initHigh;
+		private double initLow;
+		private double initClose;
 
-		private static readonly HttpClient client = new HttpClient();
+		public class RequestData
+        {
+            public List<double> progress = new List<double>();
+            public List<double> open = new List<double>();
+            public List<double> high = new List<double>();
+            public List<double> low = new List<double>();
+            public List<double> close = new List<double>();
+            public List<double> volume = new List<double>();
+            public int contracts;
+            public double entryPrice;
+            public double balance;
+		}
+
+		private RequestData data = new RequestData();
 
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
 			{
-				Description = @"Description";
-				Name = "TradingAgent";
-				Calculate = Calculate.OnBarClose;
-				EntriesPerDirection = 1;
-				EntryHandling = EntryHandling.AllEntries;
-				IsExitOnSessionCloseStrategy = true;
-				ExitOnSessionCloseSeconds = 30;
-				IsFillLimitOnTouch = false;
-				MaximumBarsLookBack = MaximumBarsLookBack.TwoHundredFiftySix;
-				OrderFillResolution = OrderFillResolution.Standard;
-				Slippage = 0;
-				StartBehavior = StartBehavior.WaitUntilFlat;
-				TimeInForce = TimeInForce.Gtc;
-				TraceOrders = false;
-				RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
-				StopTargetHandling = StopTargetHandling.PerEntryExecution;
-				BarsRequiredToTrade = 10;
-
-				IsInstantiatedOnEachOptimizationIteration = true;
+				Description									= @"Enter the description for your new custom Strategy here.";
+				Name										= "TradingAgent";
+				Calculate									= Calculate.OnBarClose;
+				EntriesPerDirection							= 1;
+				EntryHandling								= EntryHandling.AllEntries;
+				IsExitOnSessionCloseStrategy				= true;
+				ExitOnSessionCloseSeconds					= 30;
+				IsFillLimitOnTouch							= false;
+				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
+				OrderFillResolution							= OrderFillResolution.Standard;
+				Slippage									= 0;
+				StartBehavior								= StartBehavior.ImmediatelySubmit;
+				TimeInForce									= TimeInForce.Gtc;
+				TraceOrders									= false;
+				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
+				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
+				BarsRequiredToTrade							= 0;
+				IsInstantiatedOnEachOptimizationIteration	= true;
 			}
 		}
 		
-		protected override void OnBarUpdate()
-		// TODO: Placeholder for when to send requests 
+		
+		protected override async void OnBarUpdate()
 		{
-			if (State == State.Historical)
-				return;
-			
-			if (IsFirstTickOfBar)
+		    if (State == State.Historical)
+                return;	
+
+			if (CurrentBars[0] > 0 && !initCollected)
 			{
+				initCollected = true;
+
+				initOpen = Open[0];
+				initHigh = High[0];
+				initLow = Low[0];
+				initClose = Close[0];
+			}
+			
+			data.progress.Add(((double)Bars.BarsSinceNewTradingDay / totalBarsInSession) * 100);
+
+			numBar = CurrentBar;
+			if(numBar % sequenceLength == 0 && numBar != 0)
+			{
+				CollectData();
 				SendHttpRequest(Newtonsoft.Json.JsonConvert.SerializeObject(data));
+				ClearData();
 			}
 		}
 		
-
+		private void CollectData()
+		{			
+			for (int i = 0; i < sequenceLength; i++)
+			{
+				data.open.Add(Open[i] - initOpen);
+				data.high.Add(High[i] - initHigh);
+				data.low.Add(Low[i] - initLow);
+				data.close.Add(Close[i] - initClose);
+				data.volume.Add(Volume[i]);
+			}
+			data.contracts = Position.Quantity;
+			data.entryPrice = Position.AveragePrice;
+			data.balance = GetAccountBalance();
+		}
+		
+		private void ClearData()
+		{
+			data.progress.Clear();
+			data.open.Clear();
+			data.high.Clear();
+			data.low.Clear();
+			data.close.Clear();
+			data.volume.Clear();
+		}
+		
+		private double GetAccountBalance()
+		{
+			Account a = Account.All.First(t => t.Name == "Playback101");
+			double value = a.Get(AccountItem.CashValue, Currency.UsDollar);
+			return value;
+		}
+		
 		private async void SendHttpRequest(string json)
         {
             using (var httpClient = new HttpClient())
@@ -108,7 +152,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (response.IsSuccessStatusCode)
                     {
                         var responseContent = await response.Content.ReadAsStringAsync();
-
                         Print("POST request sent successfully. Response: " + responseContent);
 						
 		                dynamic parsedResponse = Newtonsoft.Json.JsonConvert.DeserializeObject(responseContent);
@@ -118,10 +161,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		                switch (action)
 		                {
 		                    case "LONG":
+								ExitPosition();
 		                        EnterLong(amount);
 		                        Print("Entered a long position with amount: " + amount);
 		                        break;
 		                    case "SHORT":
+								ExitPosition();
 		                        EnterShort(amount);
 		                        Print("Entered a short position with amount: " + amount);
 		                        break;
@@ -129,26 +174,39 @@ namespace NinjaTrader.NinjaScript.Strategies
 		                        Print("No action taken. Stay in current position.");
 		                        break;
 		                    case "EXIT":
-		                        ExitLong();
-								ExitShort();
-		                        Print("Exited all positions.");
+		                        ExitPosition();
 		                        break;
 		                    default:
 		                        Print("Invalid action received from the response.");
+								ExitPosition();
 		                        break;
 		                }
                     }
                     else
                     {
                         Print("POST request failed. Response status code: " + response.StatusCode);
+						ExitPosition();
                     }
                 }
                 catch (Exception ex)
                 {
                     Print("Exception occurred: " + ex.Message);
+					ExitPosition();
                 }
             }
         }
 		
+		private void ExitPosition()
+		{
+			ExitLong();
+			ExitShort();
+			Print("Exited all positions.");
+		}
+		
+		#region Properties
+
+
+
+		#endregion
 	}
 }
