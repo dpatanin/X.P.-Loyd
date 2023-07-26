@@ -54,7 +54,7 @@ def saved_model():
     )
 
 
-def init_states() -> list[State]:
+def init_states(amount: int) -> list[State]:
     return [
         State(
             data=empty_sequence(),
@@ -62,7 +62,7 @@ def init_states() -> list[State]:
             tick_size=config["tick_size"],
             tick_value=config["tick_value"],
         )
-        for _ in range(config["batch_size"])
+        for _ in range(amount)
     ]
 
 
@@ -76,7 +76,7 @@ dp = DataProcessor(
     headers=config["data_headers"],
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
-    dir=config["data_dir"],
+    dir=config["data_training"],
 )
 sequences_per_batch = len(dp.load_batch(0))
 
@@ -115,7 +115,7 @@ for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
         t = time.time()
         batch = dp.load_batch(i)
-        states = init_states()
+        states = init_states(len(batch[0]))
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
@@ -161,61 +161,72 @@ pbar.close()
 
 ########################### Validation ###########################
 
+
+def validate(label: str, writer: pd.ExcelWriter):
+    # Initialize dataFrames (not adding columns dynamically due to performance)
+    column_headers = []
+    for i, sessions in enumerate(dp.batched_dir):
+        column_headers.extend(f"b{i}s{n}" for n in range(len(sessions)))
+
+    init_balances = [[config["initial_balance"]] * len(column_headers)] * (
+        sequences_per_batch
+    )
+    init_actions = [["STAY"] * len(column_headers)] * (sequences_per_batch)
+
+    balance_list = pd.DataFrame(init_balances, columns=column_headers)
+    action_list = pd.DataFrame(init_actions, columns=column_headers)
+
+    pbar = ProgressBar(
+        episodes=1,
+        batches=len(dp.batched_dir),
+        sequences_per_batch=sequences_per_batch,
+        prefix=f"Validation {label}",
+        suffix="Remaining time: ???",
+        leave=True,
+    )
+
+    rem_batches = len(dp.batched_dir)
+    times_per_batch = []
+
+    for i in range(len(dp.batched_dir)):
+        t = time.time()
+        batch = dp.load_batch(i)
+        states = init_states(len(batch[0]))
+
+        for idx, sequences in enumerate(batch):
+            for seq, state in zip(sequences, states):
+                state.data = seq
+
+            q_values = trader.predict(states)
+            for ids, qs in enumerate(zip(q_values, states)):
+                amount = action_space.calc_trade_amount(qs[0], qs[1])
+                action = action_space.take_action(qs[0], qs[1])[1]
+                action_list[f"b{i}s{ids}"].iloc[idx] = f"{action}|{amount}"
+                balance_list[f"b{i}s{ids}"].iloc[idx] = qs[1].balance
+
+            pbar.update(batch=i + 1, seq=idx + 1)
+
+        rem_batches -= 1
+        times_per_batch.append((time.time() - t))
+        pbar.suffix = rem_time(times_per_batch, rem_batches)
+
+    pbar.close()
+
+    balance_list.to_excel(writer, sheet_name=f"{label}_balances", index=False)
+    action_list.to_excel(writer, sheet_name=f"{label}_actions", index=False)
+
+
 trader.memory.clear()
 trader.epsilon = 0  # This removes random choices
-
-# Initialize dataFrames (not adding columns dynamically due to performance)
-column_headers = []
-for i, sessions in enumerate(dp.batched_dir):
-    column_headers.extend(f"b{i}s{n}" for n in range(len(sessions)))
-
-# +1 for initial states
-init_balances = [[config["initial_balance"]] * len(column_headers)] * (
-    sequences_per_batch + 1
-)
-init_actions = [["STAY"] * len(column_headers)] * (sequences_per_batch + 1)
-
-balance_list = pd.DataFrame(init_balances, columns=column_headers)
-action_list = pd.DataFrame(init_actions, columns=column_headers)
-
-pbar = ProgressBar(
-    episodes=1,
-    batches=len(dp.batched_dir),
-    sequences_per_batch=sequences_per_batch,
-    prefix="Validation",
-    suffix="Remaining time: ???",
-    leave=True,
-)
-
-rem_batches = len(dp.batched_dir)
-times_per_batch = []
-
-for i in range(len(dp.batched_dir)):
-    t = time.time()
-    batch = dp.load_batch(i)
-    states = init_states()
-
-    for idx, sequences in enumerate(batch):
-        for seq, state in zip(sequences, states):
-            state.data = seq
-
-        q_values = trader.predict(states)
-        for ids, qs in enumerate(zip(q_values, states)):
-            amount = action_space.calc_trade_amount(qs[0], qs[1])
-            action = action_space.take_action(qs[0], qs[1])[1]
-            action_list[f"b{i}s{ids}"].iloc[idx + 1] = f"{action}|{amount}"
-            balance_list[f"b{i}s{ids}"].iloc[idx + 1] = qs[1].balance
-
-        pbar.update(batch=i + 1, seq=idx + 1)
-
-    rem_batches -= 1
-    times_per_batch.append((time.time() - t))
-    pbar.suffix = rem_time(times_per_batch, rem_batches)
-
-pbar.close()
 writer = pd.ExcelWriter(
-    f"data/validation_{config['model_name']}_{now}.xlsx", engine="xlsxwriter"
+    f"{config['validation_dir']}/validation_{config['model_name']}_{now}.xlsx",
+    engine="xlsxwriter",
 )
-balance_list.to_excel(writer, sheet_name="balances", index=False)
-action_list.to_excel(writer, sheet_name="actions", index=False)
+
+validate("Training", writer)
+# Loading validation dataset
+dp.dir = config["data_validation"]
+dp.batched_dir = dp.batch_dir()
+validate("Validation", writer)
+
 writer.close()
