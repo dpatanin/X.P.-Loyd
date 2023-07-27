@@ -139,7 +139,11 @@ To download the platform itself register and download it. After that set up your
 ### Simulation / Playback
 
 To work locally we use the `playback` or `simulation` option. You find those under the tab `connections`.
-To use the playback you need to download the respective historical / market replay data. Once connected, you require a chart. You can create charts under the tab `new`.
+To use the playback you need to download the respective historical or market replay data.
+[Follow this guide](https://ninjatrader.com/support/helpGuides/nt8/NT%20HelpGuide%20English.html?playback_connection.htm)
+on how to download and set up the playback connection.
+
+Once connected, you require a chart. You can create charts under the tab `new`.
 After the chart is done, it will have icons at the very top for further function, such as adding indicators and strategies. This is important as those are the functions for our custom scripts.
 Note: After adding a e.g. strategy, you might have to enable it in the right sight of the strategies window.
 
