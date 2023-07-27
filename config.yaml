@@ -35,4 +35,3 @@
     learning_rate: 0.16
   reward_factors:
     session_total: 2
-    intrinsic: 1

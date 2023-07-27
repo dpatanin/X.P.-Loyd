@@ -69,7 +69,6 @@ def init_states(amount: int) -> list[State]:
 action_space = ActionSpace(
     threshold=config["action_space"]["threshold"],
     limit=config["action_space"]["trade_limit"],
-    intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
 
 dp = DataProcessor(
