@@ -9,7 +9,7 @@ from lib.state import State
 
 class FreeLaborTrader:
     """
-    The trader defines the network and maintains a record of the transitions of size `memory_size`.
+    The trader defines the network and maintains a record of the transitions.
     It's purpose is to represent the actor/agent in the environment, providing predictions, memorizing the outcomes
     and lastly training on those observations to improve the predictions.\n
     The trader uses two networks, one primary network is used to make the predictions,
@@ -21,6 +21,7 @@ class FreeLaborTrader:
     |`gamma`: Weight inside the loss functions.
     |`epsilon`, `epsilon_final`, `epsilon_decay`: Exploration parameters.
     """
+
     def __init__(
         self,
         sequence_length: int,
@@ -92,7 +93,12 @@ class FreeLaborTrader:
     def batch_train(self):
         self.target_update_cd -= 1
 
-        (states, rewards, next_states, dones) = self.memory.sample(self.batch_size)
+        memories = self.memory.sample(self.batch_size)
+        states = [m.origin for m in memories]
+        rewards = [m.reward for m in memories]
+        next_states = [m.outcome for m in memories]
+        dones = [m.done for m in memories]
+
         # Convert the dones list to a binary mask; (1 for not done, 0 for done)
         masks = tf.cast(tf.logical_not(dones), dtype=tf.float32)
 

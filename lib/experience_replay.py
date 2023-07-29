@@ -7,27 +7,51 @@ from lib.constants import CLOSE
 from lib.state import State
 
 
+class Memory:
+    def __init__(
+        self,
+        origin: State = None,
+        reward: float = None,
+        outcome: State = None,
+        done: bool = None,
+    ):
+        self.origin = origin
+        self.reward = reward
+        self.outcome = outcome
+        self.done = done
+
+    def is_complete(self):
+        return (
+            self.origin is not None
+            and self.reward is not None
+            and self.outcome is not None
+            and self.done is not None
+        )
+
+    def copy(self):
+        return Memory(
+            origin=self.origin, reward=self.reward, outcome=self.outcome, done=self.done
+        )
+
+
 class ExperienceReplayBuffer:
     """
     A basic experience replay buffer representing a collection of transitions.\n
     Unlike in a standard experience replay, this does not store predictions
     as we use one continuous value and derive the actions therefrom.
 
-    One experience contains: `[State before action, Reward after action, State after action, Flag for session end]`
+    One experience contains: `[State used for prediction, Reward after action, Next state after action, Flag for session end]`
     |`max_size`: Maximum amount of experiences being stored. (New delete oldest when full.)
     """
 
     def __init__(self, max_size=2000):
-        self.buffer: Deque[Tuple["State", float, "State", bool]] = deque(
-            maxlen=max_size
-        )
+        self.buffer: Deque[Memory] = deque(maxlen=max_size)
 
-    def add(self, experience: Tuple["State", float, "State", bool]) -> None:
+    def add(self, experience: Memory) -> None:
+        assert experience.is_complete(), "Received incomplete experience."
         self.buffer.append(experience)
 
-    def sample(
-        self, batch_size: int
-    ) -> Tuple[list["State"], list[float], list["State"], list[bool]]:
+    def sample(self, batch_size: int) -> list[Memory]:
         """
         Randomly samples `batch_size` transitions/experiences.
         """
@@ -35,15 +59,7 @@ class ExperienceReplayBuffer:
         if len(self.buffer) < batch_size:
             raise ValueError("Not enough experiences in the buffer.")
 
-        experiences = random.sample(self.buffer, batch_size)
-        states, rewards, next_states, dones = zip(*experiences)
-
-        return (
-            list(states),
-            list(rewards),
-            list(next_states),
-            list(dones),
-        )
+        return random.sample(self.buffer, batch_size)
 
     def clear(self) -> None:
         self.buffer.clear()
