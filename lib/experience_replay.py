@@ -92,4 +92,5 @@ class HERBuffer(ExperienceReplayBuffer):
             alt_xp = experience.copy()
             alt_xp.q_value *= -1
             alt_xp.reward *= -1
+            alt_xp.outcome.contracts *= -1
             super().add(alt_xp)
