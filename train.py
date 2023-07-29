@@ -116,6 +116,7 @@ for e in range(1, config["episodes"] + 1):
             q_values = trader.predict(states)
             for q, s, m in zip(q_values, states, memories):
                 m.reward = action_space.take_action(q, s)[0]
+                m.q_value = q
                 m.done = done
 
                 if m.is_complete():  # This is mainly a check for first iteration
@@ -127,9 +128,6 @@ for e in range(1, config["episodes"] + 1):
                 trader.batch_train()
 
             pbar.update(e, i + 1, idx + 1)
-
-        # TODO: Create hindsight experiences
-        # trader.memory.analyze_missed_opportunities(action_space)
 
         rem_batches -= 1
         times_per_batch.append((time.time() - t))

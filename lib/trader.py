@@ -3,7 +3,7 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from lib.experience_replay import ExperienceReplayBuffer
+from lib.experience_replay import HERBuffer
 from lib.state import State
 
 
@@ -35,7 +35,7 @@ class FreeLaborTrader:
         learning_rate=0.01,
     ):
         self.batch_size = batch_size
-        self.memory = ExperienceReplayBuffer(batch_size * 5)
+        self.memory = HERBuffer(batch_size * 5)
 
         self.gamma = gamma
         self.epsilon = epsilon
@@ -94,7 +94,8 @@ class FreeLaborTrader:
         self.target_update_cd -= 1
 
         memories = self.memory.sample(self.batch_size)
-        states = [m.origin for m in memories]
+        # states = [m.origin for m in memories]
+        q_values = [m.q_value for m in memories]
         rewards = [m.reward for m in memories]
         next_states = [m.outcome for m in memories]
         dones = [m.done for m in memories]
@@ -104,8 +105,7 @@ class FreeLaborTrader:
 
         # Update the model parameters
         with tf.GradientTape() as tape:
-            # Access q values manually for GradientTape to record for backpropagation
-            q_values = self.model(self.__transform_states(states))[:, 0]
+            # Access target q-values for GradientTape to record for backpropagation
             target_q_values = self.target_model(self.__transform_states(next_states))[
                 :, 0
             ]
