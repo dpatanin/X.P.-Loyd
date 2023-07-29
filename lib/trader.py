@@ -35,7 +35,7 @@ class FreeLaborTrader:
         learning_rate=0.01,
     ):
         self.batch_size = batch_size
-        self.memory = HERBuffer(batch_size * 5)
+        self.memory = HERBuffer(batch_size * 5, epsilon)
 
         self.gamma = gamma
         self.epsilon = epsilon
@@ -125,6 +125,7 @@ class FreeLaborTrader:
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
+            self.memory.ratio = self.epsilon
 
         if self.target_update_cd == 0:
             self.update_target_model()

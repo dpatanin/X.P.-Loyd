@@ -1,9 +1,7 @@
 import random
 from collections import deque
-from typing import Deque, Tuple
+from typing import Deque
 
-from lib.action_space import ActionSpace
-from lib.constants import CLOSE
 from lib.state import State
 
 
@@ -77,17 +75,21 @@ class ExperienceReplayBuffer:
 
 class HERBuffer(ExperienceReplayBuffer):
     """
-    A extended experience replay using the principle of a hindsight replay.\n
-    It creates alternative virtual experiences along the real ones.
+    An extended experience replay using the principle of hindsight replay.\n
+    It creates alternative virtual experiences along with the real ones.
+
+    |`ratio`: Ratio between of hindsight to real experiences (0.00 - 1.00).
     """
 
-    def __init__(self, max_size=2000):
+    def __init__(self, max_size=2000, ratio=1.00):
         super().__init__(max_size)
+        self.ratio = ratio
 
     def add(self, experience: Memory) -> None:
         super().add(experience)
 
-        alt_xp = experience.copy()
-        alt_xp.q_value *= -1
-        alt_xp.reward *= -1
-        super().add(alt_xp)
+        if random.random() < self.ratio:
+            alt_xp = experience.copy()
+            alt_xp.q_value *= -1
+            alt_xp.reward *= -1
+            super().add(alt_xp)
