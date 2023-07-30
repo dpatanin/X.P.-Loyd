@@ -105,7 +105,7 @@ class FreeLaborTrader:
 
         # Update the model parameters
         with tf.GradientTape() as tape:
-            # Access target q-values for GradientTape to record for backpropagation
+            q_values = tf.constant(np.array(q_values), dtype=tf.float32)
             target_q_values = self.target_model(self.__transform_states(next_states))[
                 :, 0
             ]
