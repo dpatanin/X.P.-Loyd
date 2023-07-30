@@ -9,13 +9,11 @@ class Memory:
     def __init__(
         self,
         origin: State = None,
-        q_value: float = None,
         reward: float = None,
         outcome: State = None,
         done: bool = None,
     ):
         self.origin = origin
-        self.q_value = q_value
         self.reward = reward
         self.outcome = outcome
         self.done = done
@@ -23,7 +21,6 @@ class Memory:
     def is_complete(self):
         return (
             self.origin is not None
-            and self.q_value is not None
             and self.reward is not None
             and self.outcome is not None
             and self.done is not None
@@ -32,7 +29,6 @@ class Memory:
     def copy(self):
         return Memory(
             origin=self.origin,
-            q_value=self.q_value,
             reward=self.reward,
             outcome=self.outcome,
             done=self.done,
@@ -71,26 +67,3 @@ class ExperienceReplayBuffer:
 
     def __len__(self) -> int:
         return len(self.buffer)
-
-
-class HERBuffer(ExperienceReplayBuffer):
-    """
-    An extended experience replay using the principle of hindsight replay.\n
-    It creates alternative virtual experiences along with the real ones.
-
-    |`ratio`: Ratio between of hindsight to real experiences (0.00 - 1.00).
-    """
-
-    def __init__(self, max_size=2000, ratio=1.00):
-        super().__init__(max_size)
-        self.ratio = ratio
-
-    def add(self, experience: Memory) -> None:
-        super().add(experience)
-
-        if random.random() < self.ratio:
-            alt_xp = experience.copy()
-            alt_xp.q_value *= -1
-            alt_xp.reward *= -1
-            alt_xp.outcome.contracts *= -1
-            super().add(alt_xp)

@@ -116,7 +116,6 @@ for e in range(1, config["episodes"] + 1):
             q_values = trader.predict(states)
             for q, s, m in zip(q_values, states, memories):
                 m.reward = action_space.take_action(q, s)[0]
-                m.q_value = q
                 m.done = done
 
                 if m.is_complete():  # This is mainly a check for first iteration
