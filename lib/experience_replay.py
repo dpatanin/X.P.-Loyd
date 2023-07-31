@@ -67,3 +67,24 @@ class ExperienceReplayBuffer:
 
     def __len__(self) -> int:
         return len(self.buffer)
+
+class HERBuffer(ExperienceReplayBuffer):
+    """
+    An extended experience replay using the principle of hindsight replay.\n
+    It creates alternative virtual experiences along with the real ones.
+
+    |`ratio`: Ratio between of hindsight to real experiences (0.00 - 1.00).
+    """
+
+    def __init__(self, max_size=2000, ratio=1.00):
+        super().__init__(max_size)
+        self.ratio = ratio
+
+    def add(self, experience: Memory) -> None:
+        super().add(experience)
+
+        if random.random() < self.ratio:
+            alt_xp = experience.copy()
+            alt_xp.reward *= -1
+            alt_xp.outcome.contracts *= -1
+            super().add(alt_xp)
