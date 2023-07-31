@@ -122,7 +122,6 @@ for e in range(1, config["episodes"] + 1):
                     trader.memory.add(m.copy())
                 m.origin = m.outcome
                 m.outcome = None
-                m.q_value = q 
 
             if len(trader.memory) > config["batch_size"]:
                 trader.batch_train()
