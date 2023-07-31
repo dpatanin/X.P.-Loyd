@@ -11,11 +11,13 @@ class Memory:
     def __init__(
         self,
         origin: State = None,
+        q_value: float = None,
         reward: float = None,
         outcome: State = None,
         done: bool = None,
     ):
         self.origin = origin
+        self.q_value = q_value
         self.reward = reward
         self.outcome = outcome
         self.done = done
@@ -23,6 +25,7 @@ class Memory:
     def is_complete(self):
         return (
             self.origin is not None
+            and self.q_value is not None
             and self.reward is not None
             and self.outcome is not None
             and self.done is not None
@@ -30,7 +33,11 @@ class Memory:
 
     def copy(self):
         return Memory(
-            origin=self.origin, reward=self.reward, outcome=self.outcome, done=self.done
+            origin=self.origin,
+            q_value=self.q_value,
+            reward=self.reward,
+            outcome=self.outcome,
+            done=self.done,
         )
 
 
