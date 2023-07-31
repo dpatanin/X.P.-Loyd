@@ -155,32 +155,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print("POST request sent successfully. Response: " + responseContent);
 						
 		                dynamic parsedResponse = Newtonsoft.Json.JsonConvert.DeserializeObject(responseContent);
-		                string action = parsedResponse.action;
-		                int amount = parsedResponse.amount;
+		                double prediction = parsedResponse.prediction;
 						
-		                switch (action)
-		                {
-		                    case "LONG":
-								ExitPosition();
-		                        EnterLong(amount);
-		                        Print("Entered a long position with amount: " + amount);
-		                        break;
-		                    case "SHORT":
-								ExitPosition();
-		                        EnterShort(amount);
-		                        Print("Entered a short position with amount: " + amount);
-		                        break;
-		                    case "STAY":
-		                        Print("No action taken. Stay in current position.");
-		                        break;
-		                    case "EXIT":
-		                        ExitPosition();
-		                        break;
-		                    default:
-		                        Print("Invalid action received from the response.");
-								ExitPosition();
-		                        break;
-		                }
+						ExitPosition();
+						if (prediction > 0)
+						{
+							EnterLong(1);
+							Print("Entered a long position with amount: " + 1);
+						}
+						else if (prediction < 0)
+						{
+							EnterShort(1);
+							Print("Entered a short position with amount: " + 1);
+						}
+						else
+						{
+							Print("No action taken.");
+						}
                     }
                     else
                     {

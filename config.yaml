@@ -23,9 +23,6 @@
   episodes: 75
   batch_size: 512
   sequence_length: 15
-  action_space:
-    threshold: 0.3 # 0.00 - 1; 1 -> no action
-    trade_limit: 10 # Limit to trade at once
   agent:
     update_frequency: 5 # Target network
     gamma: 0.95
