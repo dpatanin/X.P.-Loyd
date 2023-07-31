@@ -95,7 +95,7 @@ class FreeLaborTrader:
         self.target_update_cd -= 1
 
         memories = self.memory.sample(self.batch_size)
-        states = [m.origin for m in memories]
+        # states = [m.origin for m in memories]
         q_values = [m.q_value for m in memories]
         rewards = [m.reward for m in memories]
         next_states = [m.outcome for m in memories]
@@ -108,9 +108,7 @@ class FreeLaborTrader:
         with tf.GradientTape() as tape:
             # Compute Q-values for the next states using the target model
             q_values_next = self.target_model(
-                tf.convert_to_tensor(
-                    self.__transform_states(next_states), dtype=tf.float32
-                )
+                tf.convert_to_tensor(self.__transform_states(next_states))
             )
 
             # Compute the target Q-values based on the Bellman equation
