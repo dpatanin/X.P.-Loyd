@@ -10,6 +10,7 @@ from yaml.loader import FullLoader
 
 from lib.data_processor import DataProcessor
 from lib.experience_replay import Memory
+from lib.metrics_board import MetricsBoard
 from lib.progress_bar import ProgressBar
 from lib.state import State
 from lib.trader import FreeLaborTrader
@@ -56,6 +57,7 @@ dp = DataProcessor(
 )
 sequences_per_batch = len(dp.load_batch(0))
 
+tb = MetricsBoard(log_dir=config["log_dir"])
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],

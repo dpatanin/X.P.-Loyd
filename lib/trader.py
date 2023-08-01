@@ -2,8 +2,10 @@ import random
 
 import numpy as np
 import tensorflow as tf
+from keras.callbacks import TensorBoard
 
 from lib.experience_replay import HERBuffer
+from lib.metrics_board import MetricsBoard
 from lib.state import State
 
 
@@ -27,6 +29,7 @@ class FreeLaborTrader:
         sequence_length: int,
         batch_size: int,
         num_features: int,
+        metrics_board: MetricsBoard,
         update_freq=5,
         gamma=0.95,
         epsilon=1.0,
@@ -36,6 +39,7 @@ class FreeLaborTrader:
     ):
         self.batch_size = batch_size
         self.memory = HERBuffer(batch_size * 5, epsilon)
+        self.metrics_board = metrics_board
 
         self.gamma = gamma
         self.epsilon = epsilon
@@ -103,38 +107,28 @@ class FreeLaborTrader:
         # Convert the dones list to a binary mask; (1 for not done, 0 for done)
         masks = tf.cast(tf.logical_not(dones), dtype=tf.float32)
 
-        # Update the model parameters
         with tf.GradientTape() as tape:
-            # Compute Q-values for the next states using the target model
             q_values_next = self.target_model(
                 tf.convert_to_tensor(self.__transform_states(next_states))
             )
-
-            # Compute the target Q-values based on the Bellman equation
-            # Q(s, a) = r + gamma * max(Q(s', a')) if the episode is not done
-            # Q(s, a) = r if the episode is done (no future rewards)
             target_q_values = (
                 rewards + self.gamma * tf.reduce_max(q_values_next, axis=1) * masks
             )
-
-            # Compute the Q-values that were used to take the actions (stored in q_values)
-            # These values are used as targets for the Q-values for the corresponding states
-            target_q_values_for_actions = self.model(
+            online_q_values = self.model(
                 tf.convert_to_tensor(self.__transform_states(states))
             )
 
-            # Calculate the Mean Squared Error (MSE) loss between the target Q-values and the predicted Q-values
-            loss = tf.reduce_mean(
-                tf.square(target_q_values_for_actions - target_q_values)
-            )
+            loss = tf.reduce_mean(tf.square(online_q_values - target_q_values))
 
-            # Compute gradients of the loss with respect to the model parameters
             gradients = tape.gradient(loss, self.model.trainable_variables)
-
-            # Apply gradients to update the model parameters
             self.optimizer.apply_gradients(
                 zip(gradients, self.model.trainable_variables)
             )
+
+            self.metrics_board.losses.append(loss.numpy())
+            self.metrics_board.rewards.append(rewards)
+            self.metrics_board.append_entropy(online_q_values)
+            self.metrics_board.append_target_values(q_values_next)
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
@@ -146,6 +140,12 @@ class FreeLaborTrader:
 
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
+
+    def log_metrics(self):
+        self.metrics_board.log_metrics(
+            exploration_rate=self.epsilon,
+            learning_rate=self.self.optimizer.learning_rate.numpy(),
+        )
 
     def __transform_states(self, states: list["State"]):
         return np.array([s.data.to_numpy() for s in states])

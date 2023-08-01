@@ -4,6 +4,7 @@
   data_training: data/training # Trading sessions are expected as individual files
   data_validation: data/validation
   validation_dir: data # The foldername where validation summaries are saved
+  log_dir: logs
 
   # General config
   #! close & volume headers are required; have to match the constants in `lib/constants.py` 
