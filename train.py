@@ -8,7 +8,6 @@ import tensorflow as tf
 import yaml
 from yaml.loader import FullLoader
 
-from lib.action_space import ActionSpace
 from lib.data_processor import DataProcessor
 from lib.experience_replay import Memory
 from lib.progress_bar import ProgressBar
@@ -17,10 +16,6 @@ from lib.trader import FreeLaborTrader
 
 with open("config.yaml") as f:
     config = yaml.load(f, Loader=FullLoader)
-
-
-def num_features() -> int:
-    return len(State(data=empty_sequence(), tick_size=0, tick_value=0).to_df().columns)
 
 
 def empty_sequence() -> pd.DataFrame:
@@ -48,17 +43,10 @@ def init_states(amount: int) -> list[State]:
         State(
             data=empty_sequence(),
             balance=config["initial_balance"],
-            tick_size=config["tick_size"],
-            tick_value=config["tick_value"],
         )
         for _ in range(amount)
     ]
 
-
-action_space = ActionSpace(
-    threshold=config["action_space"]["threshold"],
-    limit=config["action_space"]["trade_limit"],
-)
 
 dp = DataProcessor(
     headers=config["data_headers"],
@@ -71,7 +59,7 @@ sequences_per_batch = len(dp.load_batch(0))
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
-    num_features=num_features(),
+    num_features=len(config["data_headers"]),
     update_freq=config["agent"]["update_frequency"],
     gamma=config["agent"]["gamma"],
     epsilon=config["agent"]["epsilon"],
@@ -109,8 +97,9 @@ for e in range(1, config["episodes"] + 1):
 
             q_values = trader.predict(states)
             for q, s, m in zip(q_values, states, memories):
-                m.reward = action_space.take_action(q, s)[0]
                 m.done = done
+                m.reward = s.exit_position()
+                s.enter_position(q)
 
                 if m.is_complete():  # This is mainly a check for first iteration
                     trader.memory.add(m.copy())
@@ -123,9 +112,10 @@ for e in range(1, config["episodes"] + 1):
             pbar.update()
 
     if e < config["episodes"]:
-        trader.model.save(
-            f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
-        )
+        if e % 10 == 0:
+            trader.model.save(
+                f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
+            )
     else:
         trader.model.save(
             f"{config['model_directory']}/{config['model_name']}_terminal_{now}.h5"
@@ -147,7 +137,7 @@ def validate(label: str, writer: pd.ExcelWriter):
     init_balances = [[config["initial_balance"]] * len(column_headers)] * (
         sequences_per_batch
     )
-    init_actions = [["STAY"] * len(column_headers)] * (sequences_per_batch)
+    init_actions = [["INIT"] * len(column_headers)] * (sequences_per_batch)
 
     balance_list = pd.DataFrame(init_balances, columns=column_headers)
     action_list = pd.DataFrame(init_actions, columns=column_headers)
@@ -170,9 +160,9 @@ def validate(label: str, writer: pd.ExcelWriter):
 
             q_values = trader.predict(states)
             for ids, qs in enumerate(zip(q_values, states)):
-                amount = action_space.calc_trade_amount(qs[0], qs[1])
-                action = action_space.take_action(qs[0], qs[1])[1]
-                action_list[f"b{i}s{ids}"].iloc[idx] = f"{action}|{amount}"
+                qs[1].exit_position()
+                qs[1].enter_position(qs[0])
+                action_list[f"b{i}s{ids}"].iloc[idx] = "LONG" if qs[0] > 0 else "SHORT"
                 balance_list[f"b{i}s{ids}"].iloc[idx] = qs[1].balance
 
             pbar.update()

@@ -29,6 +29,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class TradingAgent : Strategy
 	{	
+		#region Properties
+
+		[NinjaScriptProperty]
+		[Display(Name = "Trade Amount", GroupName = "Trading Agent Parameters", Order = 2)]
+		public int tradeAmount
+		{ get; set; }
+
+		#endregion
+
 		private int numBar;
 		private int sequenceLength = 10;
 		private int totalBarsInSession = 1380;
@@ -77,6 +86,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
 				BarsRequiredToTrade							= 0;
 				IsInstantiatedOnEachOptimizationIteration	= true;
+				tradeAmount									= 1;
 			}
 		}
 		
@@ -155,32 +165,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print("POST request sent successfully. Response: " + responseContent);
 						
 		                dynamic parsedResponse = Newtonsoft.Json.JsonConvert.DeserializeObject(responseContent);
-		                string action = parsedResponse.action;
-		                int amount = parsedResponse.amount;
+		                double prediction = parsedResponse.prediction;
 						
-		                switch (action)
-		                {
-		                    case "LONG":
-								ExitPosition();
-		                        EnterLong(amount);
-		                        Print("Entered a long position with amount: " + amount);
-		                        break;
-		                    case "SHORT":
-								ExitPosition();
-		                        EnterShort(amount);
-		                        Print("Entered a short position with amount: " + amount);
-		                        break;
-		                    case "STAY":
-		                        Print("No action taken. Stay in current position.");
-		                        break;
-		                    case "EXIT":
-		                        ExitPosition();
-		                        break;
-		                    default:
-		                        Print("Invalid action received from the response.");
-								ExitPosition();
-		                        break;
-		                }
+						ExitPosition();
+						if (prediction > 0)
+						{
+							EnterLong(tradeAmount);
+							Print("Entered a long position with amount: " + tradeAmount);
+						}
+						else if (prediction < 0)
+						{
+							EnterShort(tradeAmount);
+							Print("Entered a short position with amount: " + tradeAmount);
+						}
+						else
+						{
+							Print("No action taken.");
+						}
                     }
                     else
                     {
@@ -202,11 +203,5 @@ namespace NinjaTrader.NinjaScript.Strategies
 			ExitShort();
 			Print("Exited all positions.");
 		}
-		
-		#region Properties
-
-
-
-		#endregion
 	}
 }

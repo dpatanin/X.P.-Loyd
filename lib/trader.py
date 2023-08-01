@@ -148,4 +148,4 @@ class FreeLaborTrader:
         self.target_model.set_weights(self.model.get_weights())
 
     def __transform_states(self, states: list["State"]):
-        return np.array([s.to_numpy() for s in states])
+        return np.array([s.data.to_numpy() for s in states])

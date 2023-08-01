@@ -94,7 +94,6 @@ This will start two containers:
 
 You can then send a POST request to `http://localhost:8000/predict` with the required data as a `Json` body.
 The required data must be of the same dimension and semantic nature as the model was trained on.
-More specifically it consists of the price data, as well as the 'state specific' data (e.g. `balance`, `entryPrice` & `contracts`).
 
 For the current configuration the request might look like this:
 
@@ -107,18 +106,10 @@ For the current configuration the request might look like this:
   "high": [12.5, 50, 25, 12.5, -75, 0, -50, 12.5, 275, 250],
   "low": [-25, 0, -50, 0, -200, -50, -200, 0, 200, 100],
   "close": [25, 0, 12.5, -100, -25, -50, 0, 250, 200, 500],
-  "volume": [788, 122, 850, 657, 234, 888, 1453, 456, 654, 453],
-  "contracts": 5,
-  "entryPrice": 3500,
-  "balance": 10000,
-  "tick_size": 0.25,
-  "tick_value": 12.5
+  "volume": [788, 122, 850, 657, 234, 888, 1453, 456, 654, 453]
 }
 ```
 
-Note that the state specific data is not in array form. This is because during training,
-this data is always one singular state and is only converted to a sequence/array of one value to fullfil the dimensionality.
-Though, this depends on the particular training setup and how the state works.
 It is generally advised to reuse the same methods & classes to processing & modelling the data for handling the requests as for the training.
 
 ### Response
@@ -126,10 +117,10 @@ It is generally advised to reuse the same methods & classes to processing & mode
 The response will be a json and look like this:
 
 ```json
-{ "action": "SHORT", "amount": 50 }
+{ "prediction": -0.8 }
 ```
 
-Possible `action` are defined in the `/lib/constants.py`.
+Possible predictions are in the range -1 to 1, where positive values represent long & negative short trend predictions.
 
 ## NinjaTrader
 

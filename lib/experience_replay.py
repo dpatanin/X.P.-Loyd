@@ -68,6 +68,7 @@ class ExperienceReplayBuffer:
     def __len__(self) -> int:
         return len(self.buffer)
 
+
 class HERBuffer(ExperienceReplayBuffer):
     """
     An extended experience replay using the principle of hindsight replay.\n
@@ -86,5 +87,5 @@ class HERBuffer(ExperienceReplayBuffer):
         if random.random() < self.ratio:
             alt_xp = experience.copy()
             alt_xp.reward *= -1
-            alt_xp.outcome.contracts *= -1
+            alt_xp.outcome.position *= -1
             super().add(alt_xp)
