@@ -33,7 +33,14 @@ class State:
         self.position = position
 
     def exit_position(self) -> float:
-        profit = (self.data["close"].iloc[-1] - self.entry_price) * self.position
+        if self.position < 0:
+            sign = -1
+        elif self.position > 0:
+            sign = 1
+        else:
+            sign = 0
+
+        profit = (self.data["close"].iloc[-1] - self.entry_price) * sign
         self.balance += profit
         self.entry_price = 0
         self.position = 0
