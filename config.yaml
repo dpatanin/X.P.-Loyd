@@ -33,6 +33,3 @@
     epsilon_final: 0.02
     epsilon_decay: 0.995
     learning_rate: 0.16
-  reward_factors:
-    session_total: 2
-    intrinsic: 1

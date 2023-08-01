@@ -83,5 +83,15 @@ class State:
             contracts > 0
         ), f"Invalid amount of contracts provided. Received: {contracts}."
 
+    def copy(self):
+        return State(
+            data=self.data,
+            tick_size=self.tick_size,
+            tick_value=self.tick_value,
+            balance=self.balance,
+            entry_price=self.entry_price,
+            contracts=self.contracts,
+        )
+
     def __str__(self):
         return self.to_df().__str__()

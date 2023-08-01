@@ -10,6 +10,7 @@ from yaml.loader import FullLoader
 
 from lib.action_space import ActionSpace
 from lib.data_processor import DataProcessor
+from lib.experience_replay import Memory
 from lib.progress_bar import ProgressBar
 from lib.state import State
 from lib.trader import FreeLaborTrader
@@ -25,17 +26,6 @@ def num_features() -> int:
 def empty_sequence() -> pd.DataFrame:
     empty = np.zeros((config["sequence_length"], len(config["data_headers"])))
     return pd.DataFrame(empty, columns=config["data_headers"])
-
-
-def calc_terminal_reward(reward: float, state: "State") -> float:
-    if state.contracts != 0:
-        reward += state.exit_position()
-    if state.balance < 0:
-        return -10000000000000000000000000
-    else:
-        return (reward + state.balance - config["initial_balance"]) * config[
-            "reward_factors"
-        ]["session_total"]
 
 
 def rem_time(times: list[int], it_left: int):
@@ -68,7 +58,6 @@ def init_states(amount: int) -> list[State]:
 action_space = ActionSpace(
     threshold=config["action_space"]["threshold"],
     limit=config["action_space"]["trade_limit"],
-    intrinsic_fac=config["reward_factors"]["intrinsic"],
 )
 
 dp = DataProcessor(
@@ -110,23 +99,23 @@ for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
         batch = dp.load_batch(i)
         states = init_states(len(batch[0]))
+        memories = [Memory() for _ in states]
 
         for idx, sequences in enumerate(batch):
-            for seq, state in zip(sequences, states):
+            done = idx == len(batch) - 1
+            for seq, state, memory in zip(sequences, states, memories):
                 state.data = seq
-            snapshot = states.copy()  # States before action; For experiences
+                memory.outcome = state.copy()
 
             q_values = trader.predict(states)
-            rewards = [
-                action_space.take_action(q, s)[0] for q, s in zip(q_values, states)
-            ]
+            for q, s, m in zip(q_values, states, memories):
+                m.reward = action_space.take_action(q, s)[0]
+                m.done = done
 
-            done = idx == len(batch) - 1
-            if done:
-                rewards = [calc_terminal_reward(r, s) for r, s in zip(rewards, states)]
-
-            for snap, reward, state in zip(snapshot, rewards, states.copy()):
-                trader.memory.add((snap, reward, state, done))
+                if m.is_complete():  # This is mainly a check for first iteration
+                    trader.memory.add(m.copy())
+                m.origin = m.outcome
+                m.outcome = None
 
             if len(trader.memory) > config["batch_size"]:
                 trader.batch_train()

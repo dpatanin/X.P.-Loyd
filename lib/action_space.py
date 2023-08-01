@@ -4,22 +4,19 @@ from lib.state import State
 
 class ActionSpace:
     """
-    Responsible for taking the action, this class defines the trading strategy and returns the respective rewards.
+    Interprets the agent's prediction (q-values) and performs an action on a state (inplace).
 
     |`threshold`: The threshold of the prediction/value to act. (0 - 1); 0: Always act; 1: Never act.
-    |`price_per_contract`: The price of a single contract (or item in general).
     |`limit`: Absolute trading limit per single trade.
-    |`intrinsic_fac`: Weight for intrinsic rewards.
 
     Strategy:\n
     If under threshold, do nothing unless prediction opposes current position, in that case be careful and exit position.
     If above threshold, enter the predicted position. If already in that position, keep your contracts and reenter.
     """
 
-    def __init__(self, threshold: float, limit: int, intrinsic_fac=1):
+    def __init__(self, threshold: float, limit: int):
         self.threshold = threshold
         self.limit = limit
-        self.intrinsic_fac = intrinsic_fac
 
     def calc_trade_amount(self, q: float, state: "State") -> int:
         """
@@ -35,16 +32,16 @@ class ActionSpace:
     def take_action(self, q: float, state: "State"):
         """
         Takes action on a state inplace.
-        Returns tuple with reward and taken action.
+        Returns tuple with profit and taken action.
         """
         action = ACTION_STAY
-        reward = 0.00
+        profit = 0.00
         abs_q = abs(q)
         amount = self.calc_trade_amount(q, state)
 
         if abs_q > self.threshold:
             if state.contracts != 0:
-                reward = state.exit_position()
+                profit = state.exit_position()
 
             if q > 0:
                 state.enter_long(amount)
@@ -54,10 +51,10 @@ class ActionSpace:
                 action = ACTION_SHORT
 
         elif abs_q < self.threshold and self.is_opposite_direction(q, state):
-            reward = state.exit_position()
+            profit = state.exit_position()
             action = ACTION_EXIT
 
-        return (reward * self.intrinsic_fac, action)
+        return (profit, action)
 
     def is_opposite_direction(self, q: float, state: State) -> bool:
         return (q > 0 and state.contracts < 0) or (q < 0 and state.contracts > 0)

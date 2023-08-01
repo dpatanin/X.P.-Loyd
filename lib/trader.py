@@ -9,7 +9,7 @@ from lib.state import State
 
 class FreeLaborTrader:
     """
-    The trader defines the network and maintains a record of the transitions of size `memory_size`.
+    The trader defines the network and maintains a record of the transitions.
     It's purpose is to represent the actor/agent in the environment, providing predictions, memorizing the outcomes
     and lastly training on those observations to improve the predictions.\n
     The trader uses two networks, one primary network is used to make the predictions,
@@ -21,6 +21,7 @@ class FreeLaborTrader:
     |`gamma`: Weight inside the loss functions.
     |`epsilon`, `epsilon_final`, `epsilon_decay`: Exploration parameters.
     """
+
     def __init__(
         self,
         sequence_length: int,
@@ -65,6 +66,7 @@ class FreeLaborTrader:
         # Single continuous output in range (-1, 1)
         model.add(tf.keras.layers.Dense(units=1, activation="tanh"))
         model.compile(loss="mean_squared_error", optimizer=self.optimizer)
+        model.trainable = True
 
         return model
 
@@ -92,27 +94,42 @@ class FreeLaborTrader:
     def batch_train(self):
         self.target_update_cd -= 1
 
-        (states, rewards, next_states, dones) = self.memory.sample(self.batch_size)
+        memories = self.memory.sample(self.batch_size)
+        states = [m.origin for m in memories]
+        rewards = [m.reward for m in memories]
+        next_states = [m.outcome for m in memories]
+        dones = [m.done for m in memories]
+
         # Convert the dones list to a binary mask; (1 for not done, 0 for done)
         masks = tf.cast(tf.logical_not(dones), dtype=tf.float32)
 
         # Update the model parameters
         with tf.GradientTape() as tape:
-            # Access q values manually for GradientTape to record for backpropagation
-            q_values = self.model(self.__transform_states(states))[:, 0]
-            target_q_values = self.target_model(self.__transform_states(next_states))[
-                :, 0
-            ]
-
-            # Compute the target Q-values following the bellmann equation
-            target_q_values = (
-                rewards + self.gamma * tf.reduce_max(target_q_values) * masks
+            # Compute Q-values for the next states using the target model
+            q_values_next = self.target_model(
+                tf.convert_to_tensor(self.__transform_states(next_states))
             )
 
-            loss = tf.reduce_mean(tf.square(q_values - target_q_values))
+            # Compute the target Q-values based on the Bellman equation
+            # Q(s, a) = r + gamma * max(Q(s', a')) if the episode is not done
+            # Q(s, a) = r if the episode is done (no future rewards)
+            target_q_values = (
+                rewards + self.gamma * tf.reduce_max(q_values_next, axis=1) * masks
+            )
+
+            # Compute the Q-values that were used to take the actions (stored in q_values)
+            # These values are used as targets for the Q-values for the corresponding states
+            target_q_values_for_actions = self.model(tf.convert_to_tensor(self.__transform_states(states)))
+
+            # Calculate the Mean Squared Error (MSE) loss between the target Q-values and the predicted Q-values
+            loss = tf.reduce_mean(
+                tf.square(target_q_values_for_actions - target_q_values)
+            )
+
+            # Compute gradients of the loss with respect to the model parameters
             gradients = tape.gradient(loss, self.model.trainable_variables)
 
-            # Apply the gradients to update the model parameters
+            # Apply gradients to update the model parameters
             self.optimizer.apply_gradients(
                 zip(gradients, self.model.trainable_variables)
             )
