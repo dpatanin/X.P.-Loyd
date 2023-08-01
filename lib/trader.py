@@ -3,7 +3,7 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from lib.experience_replay import ExperienceReplayBuffer
+from lib.experience_replay import HERBuffer
 from lib.state import State
 
 
@@ -35,7 +35,7 @@ class FreeLaborTrader:
         learning_rate=0.01,
     ):
         self.batch_size = batch_size
-        self.memory = ExperienceReplayBuffer(batch_size * 5)
+        self.memory = HERBuffer(batch_size * 5, epsilon)
 
         self.gamma = gamma
         self.epsilon = epsilon
@@ -119,7 +119,9 @@ class FreeLaborTrader:
 
             # Compute the Q-values that were used to take the actions (stored in q_values)
             # These values are used as targets for the Q-values for the corresponding states
-            target_q_values_for_actions = self.model(tf.convert_to_tensor(self.__transform_states(states)))
+            target_q_values_for_actions = self.model(
+                tf.convert_to_tensor(self.__transform_states(states))
+            )
 
             # Calculate the Mean Squared Error (MSE) loss between the target Q-values and the predicted Q-values
             loss = tf.reduce_mean(
@@ -136,6 +138,7 @@ class FreeLaborTrader:
 
         if self.epsilon > self.epsilon_final:
             self.epsilon *= self.epsilon_decay
+            self.memory.ratio = self.epsilon
 
         if self.target_update_cd == 0:
             self.update_target_model()

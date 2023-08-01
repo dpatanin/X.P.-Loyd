@@ -122,9 +122,6 @@ for e in range(1, config["episodes"] + 1):
 
             pbar.update()
 
-        # TODO: Create hindsight experiences
-        # trader.memory.analyze_missed_opportunities(action_space)
-
     if e < config["episodes"]:
         trader.model.save(
             f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
