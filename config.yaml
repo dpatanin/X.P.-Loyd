@@ -1,5 +1,5 @@
 ---
-  model_name: after-stat-tests
+  model_name: rework-actions
   model_directory: models # Be aware of the location for serving
   data_training: data/training # Trading sessions are expected as individual files
   data_validation: data/validation
@@ -15,12 +15,10 @@
     - low
     - close
     - volume
-  tick_size: 0.25 # Currently not in use
-  tick_value: 12.50 # Represents price per contract
   initial_balance: 10000.00
   
   # Hyperparameter
-  episodes: 75
+  episodes: 100
   batch_size: 512
   sequence_length: 15
   agent:
