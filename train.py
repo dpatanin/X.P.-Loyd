@@ -122,9 +122,10 @@ for e in range(1, config["episodes"] + 1):
         pbar.suffix = rem_time(times_per_batch, rem_batches)
 
     if e < config["episodes"]:
-        trader.model.save(
-            f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
-        )
+        if e % 10 == 0:
+            trader.model.save(
+                f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
+            )
     else:
         trader.model.save(
             f"{config['model_directory']}/{config['model_name']}_terminal_{now}.h5"
@@ -146,7 +147,7 @@ def validate(label: str, writer: pd.ExcelWriter):
     init_balances = [[config["initial_balance"]] * len(column_headers)] * (
         sequences_per_batch
     )
-    init_actions = [["STAY"] * len(column_headers)] * (sequences_per_batch)
+    init_actions = [["INIT"] * len(column_headers)] * (sequences_per_batch)
 
     balance_list = pd.DataFrame(init_balances, columns=column_headers)
     action_list = pd.DataFrame(init_actions, columns=column_headers)
