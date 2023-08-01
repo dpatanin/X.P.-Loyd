@@ -125,8 +125,8 @@ class FreeLaborTrader:
                 zip(gradients, self.model.trainable_variables)
             )
 
-            self.metrics_board.losses.append(loss.numpy())
-            self.metrics_board.rewards.append(rewards)
+            self.metrics_board.losses.extend(loss.numpy())
+            self.metrics_board.rewards.extend(rewards)
             self.metrics_board.append_entropy(online_q_values)
             self.metrics_board.append_target_values(q_values_next)
 
