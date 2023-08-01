@@ -29,6 +29,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class TradingAgent : Strategy
 	{	
+		#region Properties
+
+		[NinjaScriptProperty]
+		[Display(Name = "Trade Amount", GroupName = "Trading Agent Parameters", Order = 2)]
+		public int tradeAmount
+		{ get; set; }
+
+		#endregion
+
 		private int numBar;
 		private int sequenceLength = 10;
 		private int totalBarsInSession = 1380;
@@ -77,6 +86,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
 				BarsRequiredToTrade							= 0;
 				IsInstantiatedOnEachOptimizationIteration	= true;
+				tradeAmount									= 1;
 			}
 		}
 		
@@ -160,13 +170,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 						ExitPosition();
 						if (prediction > 0)
 						{
-							EnterLong(1);
-							Print("Entered a long position with amount: " + 1);
+							EnterLong(tradeAmount);
+							Print("Entered a long position with amount: " + tradeAmount);
 						}
 						else if (prediction < 0)
 						{
-							EnterShort(1);
-							Print("Entered a short position with amount: " + 1);
+							EnterShort(tradeAmount);
+							Print("Entered a short position with amount: " + tradeAmount);
 						}
 						else
 						{
@@ -193,11 +203,5 @@ namespace NinjaTrader.NinjaScript.Strategies
 			ExitShort();
 			Print("Exited all positions.");
 		}
-		
-		#region Properties
-
-
-
-		#endregion
 	}
 }
