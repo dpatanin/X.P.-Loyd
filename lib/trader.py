@@ -141,11 +141,14 @@ class FreeLaborTrader:
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
 
-    def log_metrics(self):
+    def log_metrics(self, batch: int):
         self.metrics_board.log_metrics(
+            batch=batch,
             exploration_rate=self.epsilon,
             learning_rate=self.self.optimizer.learning_rate.numpy(),
         )
+
+        self.metrics_board.clear()
 
     def __transform_states(self, states: list["State"]):
         return np.array([s.data.to_numpy() for s in states])

@@ -112,6 +112,8 @@ for e in range(1, config["episodes"] + 1):
                 trader.batch_train()
 
             pbar.update()
+            
+        trader.log_metrics(i)
 
     if e < config["episodes"]:
         if e % 10 == 0:

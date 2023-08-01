@@ -28,9 +28,9 @@ class MetricsBoard:
     def append_gradients(self, logits: tf.Tensor) -> None:
         self.gradient_norms.extend([tf.norm(lg).numpy() for lg in logits])
 
-    def log_metrics(self, exploration_rate: float, learning_rate: float):
-        self.tensor_board.on_epoch_end(
-            0,
+    def log_metrics(self, batch: int, exploration_rate: float, learning_rate: float):
+        self.tensor_board.on_train_batch_end(
+            batch,
             {
                 "avg_loss": np.mean(self.losses),
                 "avg_reward": np.mean(self.rewards),
