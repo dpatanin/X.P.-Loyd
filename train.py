@@ -57,11 +57,12 @@ dp = DataProcessor(
 )
 sequences_per_batch = len(dp.load_batch(0))
 
-tb = MetricsBoard(log_dir=config["log_dir"])
+metrics_board = MetricsBoard(log_dir=config["log_dir"])
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
     num_features=len(config["data_headers"]),
+    metrics_board=metrics_board,
     update_freq=config["agent"]["update_frequency"],
     gamma=config["agent"]["gamma"],
     epsilon=config["agent"]["epsilon"],
@@ -112,7 +113,7 @@ for e in range(1, config["episodes"] + 1):
                 trader.batch_train()
 
             pbar.update()
-            
+
         trader.log_metrics(i)
 
     if e < config["episodes"]:

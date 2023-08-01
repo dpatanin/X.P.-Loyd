@@ -2,7 +2,6 @@ import random
 
 import numpy as np
 import tensorflow as tf
-from keras.callbacks import TensorBoard
 
 from lib.experience_replay import HERBuffer
 from lib.metrics_board import MetricsBoard
@@ -125,7 +124,7 @@ class FreeLaborTrader:
                 zip(gradients, self.model.trainable_variables)
             )
 
-            self.metrics_board.losses.extend(loss.numpy())
+            self.metrics_board.append_loss(loss)
             self.metrics_board.rewards.extend(rewards)
             self.metrics_board.append_entropy(online_q_values)
             self.metrics_board.append_target_values(q_values_next)
@@ -145,7 +144,7 @@ class FreeLaborTrader:
         self.metrics_board.log_metrics(
             batch=batch,
             exploration_rate=self.epsilon,
-            learning_rate=self.self.optimizer.learning_rate.numpy(),
+            learning_rate=self.optimizer.learning_rate.numpy(),
         )
 
         self.metrics_board.clear()
