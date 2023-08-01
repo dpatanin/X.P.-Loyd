@@ -1,6 +1,5 @@
 import math
 import os
-import time
 from datetime import datetime
 
 import numpy as np
@@ -81,16 +80,11 @@ pbar = ProgressBar(
     batches=len(dp.batched_dir),
     sequences_per_batch=sequences_per_batch,
     prefix="Training",
-    suffix="Remaining time: ???",
     leave=True,
 )
 
-rem_batches = config["episodes"] * len(dp.batched_dir)
-times_per_batch = []
-
 for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
-        t = time.time()
         batch = dp.load_batch(i)
         states = init_states(len(batch[0]))
         memories = [Memory() for _ in states]
@@ -115,11 +109,7 @@ for e in range(1, config["episodes"] + 1):
             if len(trader.memory) > config["batch_size"]:
                 trader.batch_train()
 
-            pbar.update(e, i + 1, idx + 1)
-
-        rem_batches -= 1
-        times_per_batch.append((time.time() - t))
-        pbar.suffix = rem_time(times_per_batch, rem_batches)
+            pbar.update()
 
     if e < config["episodes"]:
         if e % 10 == 0:
@@ -156,16 +146,11 @@ def validate(label: str, writer: pd.ExcelWriter):
         episodes=1,
         batches=len(dp.batched_dir),
         sequences_per_batch=sequences_per_batch,
-        prefix=f"Validation {label}",
-        suffix="Remaining time: ???",
+        prefix=f"Validation: {label}",
         leave=True,
     )
 
-    rem_batches = len(dp.batched_dir)
-    times_per_batch = []
-
     for i in range(len(dp.batched_dir)):
-        t = time.time()
         batch = dp.load_batch(i)
         states = init_states(len(batch[0]))
 
@@ -180,11 +165,7 @@ def validate(label: str, writer: pd.ExcelWriter):
                 action_list[f"b{i}s{ids}"].iloc[idx] = "LONG" if qs[0] > 0 else "SHORT"
                 balance_list[f"b{i}s{ids}"].iloc[idx] = qs[1].balance
 
-            pbar.update(batch=i + 1, seq=idx + 1)
-
-        rem_batches -= 1
-        times_per_batch.append((time.time() - t))
-        pbar.suffix = rem_time(times_per_batch, rem_batches)
+            pbar.update()
 
     pbar.close()
 
@@ -199,10 +180,10 @@ writer = pd.ExcelWriter(
     engine="xlsxwriter",
 )
 
-validate("Training", writer)
+validate("Training data", writer)
 # Loading validation dataset
 dp.dir = config["data_validation"]
 dp.batched_dir = dp.batch_dir()
-validate("Validation", writer)
+validate("Validation data", writer)
 
 writer.close()
