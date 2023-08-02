@@ -4,13 +4,15 @@ This project investigates the patterns behind profitable futures daytrading with
 
 ## Installation
 
-Since we use `tensorflow-gpu 2.10.1`, make sure to install the respective versions for:
+Since we use `tensorflow==2.13.*`, make sure to install the respective versions for:
 
 - [Python](https://www.python.org/downloads/)
 - [CUDA](https://developer.nvidia.com/cuda-toolkit-archive)
 - [cuDNN](https://developer.nvidia.com/cudnn)
 
 You can find an overview table for your OS [here](https://www.tensorflow.org/install).
+Below you will find instructions for CUDA and cuDNN, but in order to utilize the GPU on Windows systems make sure to follow the
+official guide on [how to install tensorflow on Windows with wsl2](https://www.tensorflow.org/install/pip#windows-wsl2_1).
 
 ### CUDA
 
@@ -38,7 +40,7 @@ After this is done you might want to restart your computer, though this might no
 
 ### Dependencies
 
-Once the above steps are done, from the root directory run:
+Once the above steps are done, from the root directory run (inside the wsl tf environment):
 
 ```console
     pip install -r requirements.txt
@@ -47,8 +49,7 @@ Once the above steps are done, from the root directory run:
 Tensorflow uses by default the GPU. If you want to manually check whether GPU is detected/utilized you can run:
 
 ```console
-    print(tf.config.list_physical_devices('GPU')) // To see number of GPUs detected
-    print(device_lib.list_local_devices()) // To see full list of devices
+    python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
 
 ## Training
@@ -76,7 +77,7 @@ Most of those variables are simply forwarded in the `train.py`.
 
 ### Run
 
-Run: `python train.py`
+From root in the wsl tf environment run: `python train.py`
 
 The `train.py` will start and train a model as specified.
 It also includes a validation on the trained data as well as validation on a separate dataset.
