@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from keras.callbacks import TensorBoard
 
 
 class MetricsBoard:
@@ -10,7 +9,7 @@ class MetricsBoard:
     """
 
     def __init__(self, log_dir: str) -> None:
-        self.tensor_board = TensorBoard(log_dir=log_dir, write_graph=True)
+        self.train_summary_writer = tf.summary.create_file_writer(log_dir)
         self.rewards = []
         self.losses = np.ndarray([])
         self.entropies = np.ndarray([])
@@ -34,18 +33,16 @@ class MetricsBoard:
         self.losses = np.append(self.losses, logits.numpy())
 
     def log_metrics(self, batch: int, exploration_rate: float, learning_rate: float):
-        self.tensor_board.on_batch_end(
-            batch,
-            {
-                "avg_loss": self.losses.mean(),
-                "avg_reward": np.mean(self.rewards),
-                "avg_entropy": self.entropies.mean(),
-                "avg_state_value": self.target_values.mean(),
-                "avg_gradient_norm": self.gradient_norms.mean(),
-                "exploration_rate": exploration_rate,
-                "learning_rate": learning_rate,
-            },
-        )
+        with self.train_summary_writer.as_default():
+            tf.summary.scalar("avg_loss", self.losses.mean(), step=batch)
+            tf.summary.scalar("avg_reward", np.mean(self.rewards), step=batch)
+            tf.summary.scalar("avg_entropy", self.entropies.mean(), step=batch)
+            tf.summary.scalar("avg_state_value", self.target_values.mean(), step=batch)
+            tf.summary.scalar(
+                "avg_gradient_norm", self.gradient_norms.mean(), step=batch
+            )
+            tf.summary.scalar("exploration_rate", exploration_rate, step=batch)
+            tf.summary.scalar("learning_rate", learning_rate, step=batch)
 
     def clear(self):
         self.rewards = []
