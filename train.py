@@ -1,4 +1,5 @@
 import math
+import os
 from datetime import datetime
 
 import numpy as np
@@ -76,6 +77,7 @@ pbar = ProgressBar(
     prefix="Training",
     leave=True,
 )
+model_dir = f"{config['model_directory']}/{config['model_name']}_{now}/"
 
 for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
@@ -106,10 +108,9 @@ for e in range(1, config["episodes"] + 1):
             pbar.update()
 
     trader.log_metrics(e)
-    trader.model.save(
-        f"{config['model_directory']}/{config['model_name']}_{now}/", save_format="tf"
-    )
+    trader.model.save(model_dir, save_format="tf")
 
+os.popen(f"cp config.yaml '{model_dir}config.yaml'")
 pbar.close()
 
 
