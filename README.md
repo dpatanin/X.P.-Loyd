@@ -13,6 +13,7 @@ Since we use `tensorflow==2.13.*`, make sure to install the respective versions 
 You can find an overview table for your OS [here](https://www.tensorflow.org/install).
 Below you will find instructions for CUDA and cuDNN, but in order to utilize the GPU on Windows systems make sure to follow the
 official guide on [how to install tensorflow on Windows with wsl2](https://www.tensorflow.org/install/pip#windows-wsl2_1).
+Keep in mind that the rest of this guide assumes the name of your conda environment to be 'tf'.
 
 ### CUDA
 
@@ -77,7 +78,9 @@ Most of those variables are simply forwarded in the `train.py`.
 
 ### Run
 
-From root in the wsl tf environment run: `python train.py`
+Enter wsl: `wsl.exe`
+Activate conda environment: `conda activate tf`
+Run: `python train.py`
 
 The `train.py` will start and train a model as specified.
 It also includes a validation on the trained data as well as validation on a separate dataset.
