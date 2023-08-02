@@ -1,5 +1,5 @@
 import math
-import os
+import shutil
 from datetime import datetime
 
 import numpy as np
@@ -110,7 +110,7 @@ for e in range(1, config["episodes"] + 1):
     trader.log_metrics(e)
     trader.model.save(model_dir, save_format="tf")
 
-os.popen(f"cp config.yaml '{model_dir}config.yaml'")
+shutil.copy2("config.yaml", model_dir)
 pbar.close()
 
 
