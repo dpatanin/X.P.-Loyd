@@ -29,16 +29,6 @@ def rem_time(times: list[int], it_left: int):
     return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
 
 
-def saved_model():
-    versions = []
-    versions.extend(int(item) for item in os.listdir("./models/") if (item.isdigit()))
-
-    tf.saved_model.save(
-        trader.model,
-        f'./{config["model_directory"]}/{max(versions) + 1 if versions else 1}',
-    )
-
-
 def init_states(amount: int) -> list[State]:
     return [
         State(
@@ -49,6 +39,8 @@ def init_states(amount: int) -> list[State]:
     ]
 
 
+now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
+
 dp = DataProcessor(
     headers=config["data_headers"],
     sequence_length=config["sequence_length"],
@@ -57,7 +49,9 @@ dp = DataProcessor(
 )
 sequences_per_batch = len(dp.load_batch(0))
 
-metrics_board = MetricsBoard(log_dir=config["log_dir"])
+metrics_board = MetricsBoard(
+    log_dir=f'{config["log_dir"]}/{config["model_name"]}-{now}'
+)
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
@@ -72,7 +66,6 @@ trader = FreeLaborTrader(
 )
 trader.model.summary()
 
-now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 
 ########################### Training ###########################
 
@@ -114,18 +107,10 @@ for e in range(1, config["episodes"] + 1):
 
             pbar.update()
 
-        trader.log_metrics(i)
-
-    if e < config["episodes"]:
-        if e % 10 == 0:
-            trader.model.save(
-                f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
-            )
-    else:
-        trader.model.save(
-            f"{config['model_directory']}/{config['model_name']}_terminal_{now}.h5"
-        )
-        saved_model()  # Save the model for tensorflow-serving
+    trader.log_metrics(e)
+    trader.model.save(
+        f"{config['model_directory']}/{config['model_name']}_{now}/", save_format="tf"
+    )
 
 pbar.close()
 

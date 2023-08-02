@@ -140,9 +140,9 @@ class FreeLaborTrader:
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
 
-    def log_metrics(self, batch: int):
+    def log_metrics(self, ep: int):
         self.metrics_board.log_metrics(
-            batch=batch,
+            ep=ep,
             exploration_rate=self.epsilon,
             learning_rate=self.optimizer.learning_rate.numpy(),
         )

@@ -32,17 +32,15 @@ class MetricsBoard:
     def append_loss(self, logits: tf.Tensor) -> None:
         self.losses = np.append(self.losses, logits.numpy())
 
-    def log_metrics(self, batch: int, exploration_rate: float, learning_rate: float):
+    def log_metrics(self, ep: int, exploration_rate: float, learning_rate: float):
         with self.train_summary_writer.as_default():
-            tf.summary.scalar("avg_loss", self.losses.mean(), step=batch)
-            tf.summary.scalar("avg_reward", np.mean(self.rewards), step=batch)
-            tf.summary.scalar("avg_entropy", self.entropies.mean(), step=batch)
-            tf.summary.scalar("avg_state_value", self.target_values.mean(), step=batch)
-            tf.summary.scalar(
-                "avg_gradient_norm", self.gradient_norms.mean(), step=batch
-            )
-            tf.summary.scalar("exploration_rate", exploration_rate, step=batch)
-            tf.summary.scalar("learning_rate", learning_rate, step=batch)
+            tf.summary.scalar("avg_loss", self.losses.mean(), step=ep)
+            tf.summary.scalar("avg_reward", np.mean(self.rewards), step=ep)
+            tf.summary.scalar("avg_entropy", self.entropies.mean(), step=ep)
+            tf.summary.scalar("avg_state_value", self.target_values.mean(), step=ep)
+            tf.summary.scalar("avg_gradient_norm", self.gradient_norms.mean(), step=ep)
+            tf.summary.scalar("exploration_rate", exploration_rate, step=ep)
+            tf.summary.scalar("learning_rate", learning_rate, step=ep)
 
     def clear(self):
         self.rewards = []
