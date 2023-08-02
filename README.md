@@ -80,6 +80,8 @@ Run: `python train.py`
 
 The `train.py` will start and train a model as specified.
 
+Tip: When you're finished playing around in wsl, you can shutdown all wsl instances with `wsl --shutdown`, which also kills docker-desktop.
+
 ### Metrics
 
 During the training metrics are recorded and saved to log files inside the specified location.
