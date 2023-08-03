@@ -1,5 +1,5 @@
 ---
-  model_name: metrics-with-HER
+  model_name: metrics-no-HER
   model_directory: models # Be aware of the location for serving
   data_training: data/training # Trading sessions are expected as individual files
   data_validation: data/validation

@@ -141,7 +141,7 @@ def validate(label: str, writer: pd.ExcelWriter):
 
     for i in range(len(dp.batched_dir)):
         batch = dp.load_batch(i)
-        states = init_states(len(batch[0]))
+        states = (len(batch[0]))
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
