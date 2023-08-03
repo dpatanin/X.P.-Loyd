@@ -4,13 +4,16 @@ This project investigates the patterns behind profitable futures daytrading with
 
 ## Installation
 
-Since we use `tensorflow-gpu 2.10.1`, make sure to install the respective versions for:
+Since we use `tensorflow==2.13.*`, make sure to install the respective versions for:
 
 - [Python](https://www.python.org/downloads/)
 - [CUDA](https://developer.nvidia.com/cuda-toolkit-archive)
 - [cuDNN](https://developer.nvidia.com/cudnn)
 
 You can find an overview table for your OS [here](https://www.tensorflow.org/install).
+Below you will find instructions for CUDA and cuDNN, but in order to utilize the GPU on Windows systems make sure to follow the
+official guide on [how to install tensorflow on Windows with wsl2](https://www.tensorflow.org/install/pip#windows-wsl2_1).
+Keep in mind that the rest of this guide assumes the name of your conda environment to be 'tf'.
 
 ### CUDA
 
@@ -38,7 +41,7 @@ After this is done you might want to restart your computer, though this might no
 
 ### Dependencies
 
-Once the above steps are done, from the root directory run:
+Once the above steps are done, from the root directory run (inside the wsl tf environment):
 
 ```console
     pip install -r requirements.txt
@@ -47,21 +50,17 @@ Once the above steps are done, from the root directory run:
 Tensorflow uses by default the GPU. If you want to manually check whether GPU is detected/utilized you can run:
 
 ```console
-    print(tf.config.list_physical_devices('GPU')) // To see number of GPUs detected
-    print(device_lib.list_local_devices()) // To see full list of devices
+    python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
 
 ## Training
 
 The main file for the training is `train.py` and the majority of classes are put into `/lib`.
+All directory locations are specified inside the `config.yaml` and thus not further mentioned.
 
 ### Data
 
-The data is not provided as we use bought data. But once have acquired your own data, we recommend to create a `/data` directory
-at the root of this project. Within you will want a subfolder `/training` for the dataset used for training and `/validation`
-for the dataset used for a separate validation step.
-
-You can of course organize however you wish, simply adjust the `config.yaml` file accordingly.
+The data for the training & validation should be separate datasets.
 The project expects the data to represent each trading session by a separate `.csv` file and be of **exactly the same size**.
 `preprocess.py` is designed for our data. You can ignore it if you preprocess your data elsewhere.
 If using the provided script, you should adjust the preprocess script to fit your specific needs.
@@ -71,15 +70,32 @@ Keep in mind to include the data headers inside the `config.yaml` as all which a
 ### Config / Hyperparameter
 
 All project parameters and hyperparameter are defined inside the `config.yaml`.
-It is intended to make changes simpler and provide an overview, rather than serving actual, project wide setting.
-Most of those variables are simply forwarded in the `train.py`.
+Further, the config specifies directory paths in case you want to store your data & models elsewhere.
 
 ### Run
 
+Enter wsl: `wsl.exe`
+Activate conda environment: `conda activate tf`
 Run: `python train.py`
 
 The `train.py` will start and train a model as specified.
-It also includes a validation on the trained data as well as validation on a separate dataset.
+
+Tip: When you're finished playing around in wsl, you can shutdown all wsl instances with `wsl --shutdown`, which also kills docker-desktop.
+
+### Metrics
+
+During the training metrics are recorded and saved to log files inside the specified location.
+These logs are used by Tensorboard to display the metrics.
+
+To access Tensorboard run: `tensorboard --logdir=logs` (this must not be in the conda environment)
+Then navigate to `http://localhost:6006/`.
+
+### Validation
+
+After the training concludes, a local validation is simulated.
+The trained model will first simulate the trading with the entire training data set,
+followed by the validation dataset. The validation data of both trials will then be written as an excel file.
+The performance can then be evaluated manually.
 
 ## Server
 
@@ -90,12 +106,15 @@ This will start two containers:
 - One hosting a python server to handle & process the client requests & model responses
 - One serving the model via tensorflow-serving
 
+The model to be served must be inside `models/1/`. To be more precise: the `saved_model.pb` and `variables/` & `assets/` directories.
+In that sense, you can simply rename the desired folder of the saved model after training concludes.
+
 ### Request
 
 You can then send a POST request to `http://localhost:8000/predict` with the required data as a `Json` body.
 The required data must be of the same dimension and semantic nature as the model was trained on.
 
-For the current configuration the request might look like this:
+A request for the sequence length of 10 might look like this:
 
 ```json
 {

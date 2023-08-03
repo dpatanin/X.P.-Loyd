@@ -3,7 +3,7 @@ services:
   tensorflow-serve:
     image: tensorflow/serving:latest-gpu
     volumes:
-      - ./models:/models
+      - ./models/1:/models/1
     command: --model_base_path=/models --rest_api_port=8501 --model_name=model
     networks:
       - trading

@@ -1,15 +1,15 @@
 import math
-import os
+import shutil
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 import yaml
 from yaml.loader import FullLoader
 
 from lib.data_processor import DataProcessor
 from lib.experience_replay import Memory
+from lib.metrics_board import MetricsBoard
 from lib.progress_bar import ProgressBar
 from lib.state import State
 from lib.trader import FreeLaborTrader
@@ -28,16 +28,6 @@ def rem_time(times: list[int], it_left: int):
     return f"Remaining time: {math.floor(rem_time_sec / 3600)} h {math.floor(rem_time_sec / 60) % 60} min"
 
 
-def saved_model():
-    versions = []
-    versions.extend(int(item) for item in os.listdir("./models/") if (item.isdigit()))
-
-    tf.saved_model.save(
-        trader.model,
-        f'./{config["model_directory"]}/{max(versions) + 1 if versions else 1}',
-    )
-
-
 def init_states(amount: int) -> list[State]:
     return [
         State(
@@ -48,6 +38,8 @@ def init_states(amount: int) -> list[State]:
     ]
 
 
+now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
+
 dp = DataProcessor(
     headers=config["data_headers"],
     sequence_length=config["sequence_length"],
@@ -56,10 +48,14 @@ dp = DataProcessor(
 )
 sequences_per_batch = len(dp.load_batch(0))
 
+metrics_board = MetricsBoard(
+    log_dir=f'{config["log_dir"]}/{config["model_name"]}-{now}'
+)
 trader = FreeLaborTrader(
     sequence_length=config["sequence_length"],
     batch_size=config["batch_size"],
     num_features=len(config["data_headers"]),
+    metrics_board=metrics_board,
     update_freq=config["agent"]["update_frequency"],
     gamma=config["agent"]["gamma"],
     epsilon=config["agent"]["epsilon"],
@@ -69,7 +65,6 @@ trader = FreeLaborTrader(
 )
 trader.model.summary()
 
-now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 
 ########################### Training ###########################
 
@@ -82,6 +77,7 @@ pbar = ProgressBar(
     prefix="Training",
     leave=True,
 )
+model_dir = f"{config['model_directory']}/{config['model_name']}_{now}/"
 
 for e in range(1, config["episodes"] + 1):
     for i in range(len(dp.batched_dir)):
@@ -111,17 +107,10 @@ for e in range(1, config["episodes"] + 1):
 
             pbar.update()
 
-    if e < config["episodes"]:
-        if e % 10 == 0:
-            trader.model.save(
-                f"{config['model_directory']}/{config['model_name']}_ep{e}_{now}.h5"
-            )
-    else:
-        trader.model.save(
-            f"{config['model_directory']}/{config['model_name']}_terminal_{now}.h5"
-        )
-        saved_model()  # Save the model for tensorflow-serving
+    trader.log_metrics(e)
+    trader.model.save(model_dir, save_format="tf")
 
+shutil.copy2("config.yaml", model_dir)
 pbar.close()
 
 
@@ -152,7 +141,7 @@ def validate(label: str, writer: pd.ExcelWriter):
 
     for i in range(len(dp.batched_dir)):
         batch = dp.load_batch(i)
-        states = init_states(len(batch[0]))
+        states = (len(batch[0]))
 
         for idx, sequences in enumerate(batch):
             for seq, state in zip(sequences, states):
