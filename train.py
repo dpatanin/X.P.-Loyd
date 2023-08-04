@@ -5,7 +5,7 @@ import tensorflow as tf
 import yaml
 from yaml.loader import FullLoader
 
-from lib.autoregresssive import Autoregressive
+from lib.autoregressive import Autoregressive
 from lib.data_processor import DataProcessor
 from lib.window_generator import WindowGenerator
 
@@ -22,7 +22,7 @@ wg = WindowGenerator(
     batch_size=config["batch_size"],
 )
 
-model_dir = f"{config['model_directory']}/{config['model_name']}_{now}/"
+model_dir = f"{config['model_directory']}/{config['description']}_{now}/"
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=config["log_dir"], update_freq=100)
 early_stopping = tf.keras.callbacks.EarlyStopping(
     monitor="val_loss", patience=2, mode="min"
@@ -32,6 +32,9 @@ loss = tf.keras.losses.MeanSquaredError()
 metrics = [tf.keras.metrics.MeanAbsoluteError()]
 
 # Autoregressive time series forecast
+tb_callback.log_dir = (
+    f"{config['log_dir']}/{config['description']}_{now}/autoregressive_{now}"
+)
 ar_model = Autoregressive(64, config["prediction_length"], dp.num_features)
 ar_model.compile(
     loss=loss,

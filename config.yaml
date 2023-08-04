@@ -1,5 +1,5 @@
 ---
-  model_name: metrics-with-HER
+  description: metrics-with-HER
   model_directory: models # Be aware of the location for serving
   data_src: https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM
   validation_dir: data # The foldername where validation summaries are saved
