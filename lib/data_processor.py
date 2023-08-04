@@ -18,6 +18,8 @@ class DataProcessor:
         else:
             df = pd.read_csv(wget.download(src))
 
+        # close of t1 == open of t2 -> redundant inputs
+        df.drop("open")
         # Transform datetime to sin & cos
         date_time = pd.to_datetime(df.pop("dateTime"), format="%Y-%m-%d %H:%M:%S")
         timestamp_s = date_time.map(pd.Timestamp.timestamp)
