@@ -1,8 +1,7 @@
 ---
   model_name: metrics-with-HER
   model_directory: models # Be aware of the location for serving
-  # data_src: https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM
-  data_src: data/source.csv
+  data_src: https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM
   validation_dir: data # The foldername where validation summaries are saved
   log_dir: logs
 
@@ -19,7 +18,7 @@
   initial_balance: 10000.00
   
   # Hyperparameter
-  episodes: 100
+  episodes: 10
   batch_size: 512
   sequence_length: 30
   prediction_length: 15
