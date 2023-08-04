@@ -24,23 +24,25 @@ wg = WindowGenerator(
 
 model_dir = f"{config['model_directory']}/{config['model_name']}_{now}/"
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=config["log_dir"], update_freq=100)
-
-# Autoregressive
-
-ar_stopping = tf.keras.callbacks.EarlyStopping(
+early_stopping = tf.keras.callbacks.EarlyStopping(
     monitor="val_loss", patience=2, mode="min"
 )
-ar_model = AutoRegressive(64, config["prediction_length"], dp.num_features)
+optimizer = tf.keras.optimizers.Adamax()
+loss = tf.keras.losses.MeanSquaredError()
+metrics = [tf.keras.metrics.MeanAbsoluteError()]
+
+# Autoregressive time series forecast
+ar_model = Autoregressive(64, config["prediction_length"], dp.num_features)
 ar_model.compile(
-    loss=tf.keras.losses.MeanSquaredError(),
-    optimizer=tf.keras.optimizers.Adam(),
-    metrics=[tf.keras.metrics.MeanAbsoluteError()],
+    loss=loss,
+    optimizer=optimizer,
+    metrics=metrics,
 )
 ar_model.fit(
     wg.make_dataset(dp.train_df),
     epochs=config["episodes"],
     validation_data=wg.make_dataset(dp.val_df),
-    callbacks=[tb_callback],
+    callbacks=[tb_callback, early_stopping],
 )
 ar_model.evaluate(wg.make_dataset(dp.test_df), verbose=0, callbacks=[tb_callback])
 
