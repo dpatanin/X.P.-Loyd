@@ -1,5 +1,4 @@
 .vscode
 .vs
-data/source.csv
 env
 __pycache__
