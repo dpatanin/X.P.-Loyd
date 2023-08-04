@@ -5,7 +5,7 @@ import tensorflow as tf
 import yaml
 from yaml.loader import FullLoader
 
-from lib.auto_regresssive import AutoRegressive
+from lib.autoregresssive import Autoregressive
 from lib.data_processor import DataProcessor
 from lib.window_generator import WindowGenerator
 
@@ -24,6 +24,8 @@ wg = WindowGenerator(
 
 model_dir = f"{config['model_directory']}/{config['model_name']}_{now}/"
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=config["log_dir"], update_freq=100)
+
+# Autoregressive
 
 ar_stopping = tf.keras.callbacks.EarlyStopping(
     monitor="val_loss", patience=2, mode="min"

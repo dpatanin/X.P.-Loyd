@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-class AutoRegressive(tf.keras.Model):
+class Autoregressive(tf.keras.Model):
     def __init__(self, units, out_steps, num_features):
         super().__init__()
         self.out_steps = out_steps
