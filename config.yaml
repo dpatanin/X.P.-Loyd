@@ -1,8 +1,8 @@
 ---
   model_name: metrics-with-HER
   model_directory: models # Be aware of the location for serving
-  data_training: data/training # Trading sessions are expected as individual files
-  data_validation: data/validation
+  # data_src: https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM
+  data_src: data/source.csv
   validation_dir: data # The foldername where validation summaries are saved
   log_dir: logs
 
@@ -21,7 +21,8 @@
   # Hyperparameter
   episodes: 100
   batch_size: 512
-  sequence_length: 15
+  sequence_length: 30
+  prediction_length: 15
   agent:
     update_frequency: 5 # Target network
     gamma: 0.95

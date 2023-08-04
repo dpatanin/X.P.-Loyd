@@ -1,75 +1,46 @@
-import os
+from os.path import exists
+from urllib.parse import urlparse
 
+import numpy as np
 import pandas as pd
+import wget
 
 
 class DataProcessor:
     """
-    Loads, processes and serves the data.\n
-    It divides the sessions inside `dir` into batches of `batch_size` for parallel processing.
-    If fewer than `batch_size` files are left over, that batch will be smaller.
-    When loading a batch, the time sequenced data is split into `sequence_length` long sequences. (Leftover sequences are disregarded)
-
-    |`headers`: Specifies column header of csv files. Unspecified columns are dropped.
+    Loads data from file & processes it.
+    Splits into train (70%), validation (20%) & test (10%) datasets.
     """
 
-    def __init__(
-        self,
-        headers: list[str],
-        sequence_length: int,
-        batch_size: int,
-        step_size: int = None,
-        dir: str = None,
-    ):
-        self.dir = dir
-        self.column_headers = headers
-        self.sequence_length = sequence_length
-        self.step_size = step_size or sequence_length
-        self.batch_size = batch_size
-        self.batched_dir: list[list[str]] = self.batch_dir() if dir else [[]]
+    def __init__(self, src: str) -> None:
+        if self.is_local(src):
+            df = pd.read_csv(src)
+        else:
+            df = pd.read_csv(wget.download(src))
 
-    def load_file(self, file_path: str) -> pd.DataFrame:
-        # sourcery skip: pandas-avoid-inplace
-        data = pd.read_csv(file_path)
+        # Transform datetime to sin & cos
+        date_time = pd.to_datetime(df.pop("dateTime"), format="%Y-%m-%d %H:%M:%S")
+        timestamp_s = date_time.map(pd.Timestamp.timestamp)
 
-        self.assert_columns(data)
-        data.drop(set(data.columns) - set(self.column_headers), axis=1, inplace=True)
+        df["Day sin"] = np.sin(timestamp_s * (2 * np.pi / 60))
+        df["Day cos"] = np.cos(timestamp_s * (2 * np.pi / 60))
 
-        return data
+        # Split data
+        n = len(df)
+        train_df = df[: int(n * 0.7)]
+        val_df = df[int(n * 0.7) : int(n * 0.9)]
+        test_df = df[int(n * 0.9) :]
 
-    def load_batch(self, batch_index: int):
-        seq_files = [
-            self.sequence(self.load_file(f"{self.dir}/{path}"))
-            for path in self.batched_dir[batch_index]
-        ]
+        self.num_features = df.shape[1]
 
-        return [list(s) for s in zip(*seq_files)]
+        # Standardization; EMA used during training for further normalization
+        train_mean = train_df.mean()
+        train_std = train_df.std()
 
-    def sequence(self, data: pd.DataFrame) -> list[pd.DataFrame]:
-        self.assert_columns(data)
-        return [
-            data.iloc[i : i + self.sequence_length]
-            for i in range(0, len(data), self.step_size)
-            if len(data.iloc[i : i + self.sequence_length]) == self.sequence_length
-        ]
+        self.train_df = (train_df - train_mean) / train_std
+        self.val_df = (val_df - train_mean) / train_std
+        self.test_df = (test_df - train_mean) / train_std
 
-    def assert_columns(self, data: pd.DataFrame):
-        if missing_columns := set(self.column_headers) - set(data.columns):
-            raise ValueError(
-                f"DataFrame is missing required columns: {missing_columns}"
-            )
-
-    def batch_dir(self):
-        assert os.path.exists(self.dir), f"{self.dir} does not exist."
-        ls = os.listdir(self.dir)
-        num_batches = len(ls) // self.batch_size
-        remaining_paths = len(ls) % self.batch_size
-
-        batches = [
-            ls[i : i + self.batch_size]
-            for i in range(0, num_batches * self.batch_size, self.batch_size)
-        ]
-        if remaining_paths:
-            batches.append(ls[-remaining_paths:])
-
-        return batches
+    def is_local(self, url):
+        url_parsed = urlparse(url)
+        return exists(url_parsed.path) if url_parsed.scheme in ("file", "") else False
