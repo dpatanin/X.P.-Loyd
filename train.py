@@ -1,3 +1,4 @@
+import shutil
 from datetime import datetime
 
 import tensorflow as tf
@@ -21,6 +22,7 @@ wg = WindowGenerator(
     batch_size=config["batch_size"],
 )
 
+model_dir = f"{config['model_directory']}/{config['model_name']}_{now}/"
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=config["log_dir"])
 trader = PredictionModel(
     sequence_length=config["sequence_length"],
@@ -41,3 +43,6 @@ trader.evaluate(wg.make_dataset(dp.val_df), callbacks=[tensorboard_callback])
 trader.evaluate(
     wg.make_dataset(dp.test_df), verbose=0, callbacks=[tensorboard_callback]
 )
+
+trader.save(model_dir, save_format="tf")
+shutil.copy2("config.yaml", model_dir)
