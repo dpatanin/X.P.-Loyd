@@ -25,12 +25,10 @@ wg = WindowGenerator(
 model_dir = f"{config['model_directory']}/{config['model_name']}_{now}/"
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=config["log_dir"])
 trader = PredictionModel(
-    sequence_length=config["sequence_length"],
-    num_features=dp.num_features,
+    input_shape=(config["sequence_length"], dp.num_features),
     learning_rate=config["agent"]["learning_rate"],
     num_output=config["prediction_length"],
 )
-trader.summary()
 
 trader.fit(
     wg.make_dataset(dp.train_df),
