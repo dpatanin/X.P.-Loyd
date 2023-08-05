@@ -1,24 +1,11 @@
 ---
-  description: metrics-with-HER
+  description: rework
   model_directory: models # Be aware of the location for serving
   data_src: https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM
-  validation_dir: data # The foldername where validation summaries are saved
   log_dir: logs
-
-  # General config
-  #! close & volume headers are required; have to match the constants in `lib/constants.py` 
-  # Not listed headers will be dropped _after_ preprocessing
-  data_headers:
-    - progress
-    - open
-    - high
-    - low
-    - close
-    - volume
-  initial_balance: 10000.00
   
   # Hyperparameter
-  episodes: 10
+  episodes: 5
   batch_size: 512
   sequence_length: 30
   prediction_length: 15
