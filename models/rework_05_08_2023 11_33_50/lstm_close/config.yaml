@@ -1,0 +1,18 @@
+---
+  description: rework
+  model_directory: models # Be aware of the location for serving
+  data_src: https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM
+  log_dir: logs
+  
+  # Hyperparameter
+  episodes: 5
+  batch_size: 512
+  sequence_length: 30
+  prediction_length: 15
+  agent:
+    update_frequency: 5 # Target network
+    gamma: 0.95
+    epsilon: 1.0
+    epsilon_final: 0.02
+    epsilon_decay: 0.995
+    learning_rate: 0.16
