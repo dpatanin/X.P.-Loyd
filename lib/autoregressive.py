@@ -2,14 +2,14 @@ import tensorflow as tf
 
 
 class Autoregressive(tf.keras.Model):
-    def __init__(self, units, out_steps, num_features):
+    def __init__(self, units: int, out_steps: int):
         super().__init__()
         self.out_steps = out_steps
         self.units = units
         self.lstm_cell = tf.keras.layers.LSTMCell(units)
         # Also wrap the LSTMCell in an RNN to simplify the `warmup` method.
         self.lstm_rnn = tf.keras.layers.RNN(self.lstm_cell, return_state=True)
-        self.dense = tf.keras.layers.Dense(num_features)
+        self.dense = tf.keras.layers.Dense(1)
 
     def warmup(self, inputs):
         # inputs.shape => (batch, time, features)
