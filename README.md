@@ -58,20 +58,6 @@ Tensorflow uses by default the GPU. If you want to manually check whether GPU is
 The main file for the training is `train.py` and the majority of classes are put into `/lib`.
 All directory locations are specified inside the `config.yaml` and thus not further mentioned.
 
-### Data
-
-The data for the training & validation should be separate datasets.
-The project expects the data to represent each trading session by a separate `.csv` file and be of **exactly the same size**.
-`preprocess.py` is designed for our data. You can ignore it if you preprocess your data elsewhere.
-If using the provided script, you should adjust the preprocess script to fit your specific needs.
-
-Keep in mind to include the data headers inside the `config.yaml` as all which are not specified will be dropped.
-
-### Config / Hyperparameter
-
-All project parameters and hyperparameter are defined inside the `config.yaml`.
-Further, the config specifies directory paths in case you want to store your data & models elsewhere.
-
 ### Run
 
 Enter wsl: `wsl.exe`
@@ -90,14 +76,9 @@ These logs are used by Tensorboard to display the metrics.
 To access Tensorboard run: `tensorboard --logdir=logs` (this must not be in the conda environment)
 Then navigate to `http://localhost:6006/`.
 
-### Validation
-
-After the training concludes, a local validation is simulated.
-The trained model will first simulate the trading with the entire training data set,
-followed by the validation dataset. The validation data of both trials will then be written as an excel file.
-The performance can then be evaluated manually.
-
 ## Server
+
+<!-- TODO: Multiple Models -->
 
 To serve the model you need to install [Docker](https://www.docker.com/products/docker-desktop/) first.
 To start the server run `docker-compose up --build` from the root directory.
