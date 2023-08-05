@@ -1,3 +1,4 @@
+import os
 from os.path import exists
 from urllib.parse import urlparse
 
@@ -16,11 +17,10 @@ class DataProcessor:
         if self.is_local(src):
             df = pd.read_csv(src)
         else:
-            df = pd.read_csv(wget.download(src))
+            file_path = wget.download(src)
+            df = pd.read_csv(file_path)
+            os.remove(file_path)
 
-        # close of t1 == open of t2 -> redundant inputs
-        df.drop("open")
-        # Transform datetime to sin & cos
         date_time = pd.to_datetime(df.pop("dateTime"), format="%Y-%m-%d %H:%M:%S")
         timestamp_s = date_time.map(pd.Timestamp.timestamp)
 
