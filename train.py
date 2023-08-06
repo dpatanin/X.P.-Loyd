@@ -2,7 +2,6 @@ import shutil
 from datetime import datetime
 
 import keras
-import pandas as pd
 import yaml
 from yaml.loader import FullLoader
 
