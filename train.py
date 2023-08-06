@@ -15,8 +15,7 @@ with open("config.yaml") as f:
 
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 model_dir = f"{config['model_directory']}/{config['description']}_{now}/"
-
-dp = DataProcessor(config["data_src"])
+dp = DataProcessor(config["src_data"])
 
 
 def compile_and_fit(model, name: str, train, val, test):
@@ -109,4 +108,30 @@ compile_and_fit(
     train=wg_ar.make_dataset(dp.train_df[["close"]]),
     val=wg_ar.make_dataset(dp.val_df[["close"]]),
     test=wg_ar.make_dataset(dp.test_df[["close"]]),
+)
+
+print("--------- GRU Sentiment ---------")
+dp_sentiment = DataProcessor(config["sentiment_data"])
+wg_gru = WindowGenerator(
+    input_width=config["sequence_length"],
+    label_width=config["prediction_length"],
+    data_columns=dp.train_df[["close", "sentiment"]].columns,
+    batch_size=config["batch_size"],
+    label_columns=["close"]
+)
+gru_model = keras.Sequential(
+    [
+        keras.layers.GRU(32, return_sequences=False),
+        keras.layers.Dense(
+            config["prediction_length"],
+            kernel_initializer=keras.initializers.zeros(),
+        ),
+    ]
+)
+compile_and_fit(
+    model=gru_model,
+    name="gru_sentiment",
+    train=wg_ar.make_dataset(dp_sentiment.train_df[["close", "sentiment"]]),
+    val=wg_ar.make_dataset(dp_sentiment.val_df[["close", "sentiment"]]),
+    test=wg_ar.make_dataset(dp_sentiment.test_df[["close", "sentiment"]]),
 )
