@@ -114,9 +114,9 @@ dp_sentiment = DataProcessor(config["sentiment_data"])
 wg_gru = WindowGenerator(
     input_width=config["sequence_length"],
     label_width=config["prediction_length"],
-    data_columns=dp.train_df[["close", "sentiment"]].columns,
+    data_columns=dp_sentiment.train_df[["close", "sentiment"]].columns,
     batch_size=config["batch_size"],
-    label_columns=["close"]
+    label_columns=["close"],
 )
 gru_model = keras.Sequential(
     [
@@ -130,7 +130,7 @@ gru_model = keras.Sequential(
 compile_and_fit(
     model=gru_model,
     name="gru_sentiment",
-    train=wg_ar.make_dataset(dp_sentiment.train_df[["close", "sentiment"]]),
-    val=wg_ar.make_dataset(dp_sentiment.val_df[["close", "sentiment"]]),
-    test=wg_ar.make_dataset(dp_sentiment.test_df[["close", "sentiment"]]),
+    train=wg_gru.make_dataset(dp_sentiment.train_df[["close", "sentiment"]]),
+    val=wg_gru.make_dataset(dp_sentiment.val_df[["close", "sentiment"]]),
+    test=wg_gru.make_dataset(dp_sentiment.test_df[["close", "sentiment"]]),
 )
