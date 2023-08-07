@@ -58,7 +58,7 @@ def single_shot():
     )
 
 
-print("--------- Close LSTM ---------")
+print("\n--------------------------- Close LSTM ---------------------------")
 wg_close = WindowGenerator(
     input_width=config["sequence_length"],
     label_width=config["prediction_length"],
@@ -75,7 +75,7 @@ compile_and_fit(
     test=wg_close.make_dataset(dp.test_df),
 )
 
-print("--------- Open LSTM ---------")
+print("\n--------------------------- Open LSTM ---------------------------")
 wg_open = WindowGenerator(
     input_width=config["sequence_length"],
     label_width=config["prediction_length"],
@@ -93,7 +93,7 @@ compile_and_fit(
     test=wg_open.make_dataset(dp.test_df),
 )
 
-print("--------- Autoregressive ---------")
+print("\n--------------------------- Autoregressive ---------------------------")
 wg_ar = WindowGenerator(
     input_width=config["sequence_length"],
     label_width=config["prediction_length"],
@@ -109,7 +109,7 @@ compile_and_fit(
     test=wg_ar.make_dataset(dp.test_df[["close"]]),
 )
 
-print("--------- GRU Sentiment ---------")
+print("\n--------------------------- GRU Sentiment ---------------------------")
 dp_sentiment = DataProcessor(config["sentiment_data"])
 wg_gru = WindowGenerator(
     input_width=config["sequence_length"],
