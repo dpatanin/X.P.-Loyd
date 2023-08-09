@@ -13,7 +13,7 @@ class DataProcessor:
     Splits into train (70%), validation (20%) & test (10%) datasets.
     """
 
-    def __init__(self, src: str) -> None:
+    def __init__(self, src: str, ema_period: int) -> None:
         if self.is_local(src):
             df = pd.read_csv(src)
         else:
@@ -21,9 +21,10 @@ class DataProcessor:
             df = pd.read_csv(file_path)
             os.remove(file_path)
 
+        print("Processing data...")
         self.num_features = df.shape[1]
 
-        # Transform periodic frequencies
+        # Transform dateTime into periodic frequencies
         date_time = pd.to_datetime(df.pop("dateTime"), format="%Y-%m-%d %H:%M:%S")
         timestamp_s = date_time.map(pd.Timestamp.timestamp)
         day = 24 * 60 * 60
@@ -31,9 +32,16 @@ class DataProcessor:
         df["day_sin"] = np.sin(timestamp_s * (2 * np.pi / day))
         df["day_cos"] = np.cos(timestamp_s * (2 * np.pi / day))
 
-        # Standardize price data as returns
-        for col in ["high", "low", "open", "close"]:
-            df[col] = df[col].pct_change()
+        # Preprocess price data
+        for col in ["high", "low"]:
+            df[col] = (df[col] - df["close"]).abs()
+
+        for col in ["open", "close"]:
+            series = df.pop(col)
+            df[f"{col}_pct"] = series.pct_change()
+            df[f"{col}_ema"] = series.ewm(span=ema_period, adjust=False).mean()
+
+        df.fillna(0, inplace=True)
 
         # Split data
         n = len(df)

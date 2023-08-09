@@ -10,6 +10,7 @@
   batch_size: 512
   sequence_length: 30
   prediction_length: 15
+  ema_period: 20
   agent:
     update_frequency: 5 # Target network
     gamma: 0.95

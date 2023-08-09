@@ -14,12 +14,12 @@ with open("config.yaml") as f:
 
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 model_dir = f"{config['model_directory']}/{config['description']}_{now}/"
-dp = DataProcessor(config["src_data"])
+dp = DataProcessor(src=config["src_data"], ema_period=config["ema_period"])
 
 
 def compile_and_fit(model, name: str, train, val, test):
     tb_callback = keras.callbacks.TensorBoard(
-        log_dir=f"{config['log_dir']}/{config['description']}_{now}/{name}_{now}",
+        log_dir=f"{config['log_dir']}/{config['description']}_{now}/{name}",
         update_freq=100,
     )
     early_stopping = keras.callbacks.EarlyStopping(
@@ -59,11 +59,12 @@ def single_shot():
 
 
 print("\n--------------------------- Close LSTM ---------------------------")
+columns = ["day_sin", "day_cos", "high", "low", "close_pct", "close_ema", "volume"]
 wg_close = WindowGenerator(
     input_width=config["sequence_length"],
     label_width=config["prediction_length"],
-    data_columns=dp.train_df.columns,
-    label_columns=["close"],
+    data_columns=columns,
+    label_columns=["close_pct"],
     batch_size=config["batch_size"],
 )
 lstm_close = single_shot()
@@ -76,13 +77,14 @@ compile_and_fit(
 )
 
 print("\n--------------------------- Open LSTM ---------------------------")
+columns = ["day_sin", "day_cos", "high", "low", "open_pct", "open_ema", "volume"]
 wg_open = WindowGenerator(
     input_width=config["sequence_length"],
     label_width=config["prediction_length"],
-    data_columns=dp.train_df.columns,
+    data_columns=columns,
     batch_size=config["batch_size"],
     shift=config["prediction_length"] + 1,
-    label_columns=["open"],
+    label_columns=["open_pct"],
 )
 lstm_open = single_shot()
 compile_and_fit(
@@ -94,29 +96,33 @@ compile_and_fit(
 )
 
 print("\n--------------------------- Autoregressive ---------------------------")
+columns = ["open_ema"]
 wg_ar = WindowGenerator(
     input_width=config["sequence_length"],
     label_width=config["prediction_length"],
-    data_columns=dp.train_df[["close"]].columns,
+    data_columns=columns,
     batch_size=config["batch_size"],
 )
-ar_model = Autoregressive(32, config["prediction_length"])
+ar_model = Autoregressive(32, config["prediction_length"], len(columns))
 compile_and_fit(
     model=ar_model,
     name="autoregressive",
-    train=wg_ar.make_dataset(dp.train_df[["close"]]),
-    val=wg_ar.make_dataset(dp.val_df[["close"]]),
-    test=wg_ar.make_dataset(dp.test_df[["close"]]),
+    train=wg_ar.make_dataset(dp.train_df[["close_ema"]]),
+    val=wg_ar.make_dataset(dp.val_df[["close_ema"]]),
+    test=wg_ar.make_dataset(dp.test_df[["close_ema"]]),
 )
 
 print("\n--------------------------- GRU Sentiment ---------------------------")
-dp_sentiment = DataProcessor(config["sentiment_data"])
+columns = ["open_ema", "sentiment"]
+dp_sentiment = DataProcessor(
+    src=config["sentiment_data"], ema_period=config["ema_period"]
+)
 wg_gru = WindowGenerator(
     input_width=config["sequence_length"],
     label_width=config["prediction_length"],
-    data_columns=dp_sentiment.train_df[["close", "sentiment"]].columns,
+    data_columns=columns,
     batch_size=config["batch_size"],
-    label_columns=["close"],
+    label_columns=["close_ema"],
 )
 gru_model = keras.Sequential(
     [
