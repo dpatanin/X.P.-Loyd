@@ -27,7 +27,7 @@ def compile_and_fit(model, name: str, train, val, test):
     early_stopping = keras.callbacks.EarlyStopping(
         monitor="val_loss", patience=2, mode="min"
     )
-    optimizer = keras.optimizers.Adamax()
+    optimizer = keras.optimizers.Nadam()
     loss = keras.losses.MeanSquaredError()
     metrics = [keras.metrics.MeanAbsoluteError()]
 
