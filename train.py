@@ -10,7 +10,7 @@ SRC_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&a
 SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21293628&authkey=!ANbFvs1RrC9WQ3c"
 
 DESC = "EMA-Implementation"
-EPOCHS = 5
+EPOCHS = 10
 SEQ_LENGTH = 30
 PRED_LENGTH = 15
 BATCH_SIZE = 512
@@ -67,9 +67,9 @@ lstm_close = single_shot()
 compile_and_fit(
     model=lstm_close,
     name="lstm_close",
-    train=wg_close.make_dataset(dp.train_df),
-    val=wg_close.make_dataset(dp.val_df),
-    test=wg_close.make_dataset(dp.test_df),
+    train=wg_close.make_dataset(dp.train_df[columns]),
+    val=wg_close.make_dataset(dp.val_df[columns]),
+    test=wg_close.make_dataset(dp.test_df[columns]),
 )
 
 print("\n--------------------------- Open LSTM ---------------------------")
@@ -86,9 +86,9 @@ lstm_open = single_shot()
 compile_and_fit(
     model=lstm_open,
     name="lstm_open",
-    train=wg_open.make_dataset(dp.train_df),
-    val=wg_open.make_dataset(dp.val_df),
-    test=wg_open.make_dataset(dp.test_df),
+    train=wg_open.make_dataset(dp.train_df[columns]),
+    val=wg_open.make_dataset(dp.val_df[columns]),
+    test=wg_open.make_dataset(dp.test_df[columns]),
 )
 
 print("\n--------------------------- Autoregressive ---------------------------")
@@ -103,9 +103,9 @@ ar_model = Autoregressive(32, PRED_LENGTH, len(columns))
 compile_and_fit(
     model=ar_model,
     name="autoregressive",
-    train=wg_ar.make_dataset(dp.train_df[["close_ema"]]),
-    val=wg_ar.make_dataset(dp.val_df[["close_ema"]]),
-    test=wg_ar.make_dataset(dp.test_df[["close_ema"]]),
+    train=wg_ar.make_dataset(dp.train_df[columns]),
+    val=wg_ar.make_dataset(dp.val_df[columns]),
+    test=wg_ar.make_dataset(dp.test_df[columns]),
 )
 
 print("\n--------------------------- GRU Sentiment ---------------------------")
@@ -127,7 +127,7 @@ gru_model = keras.Sequential(
 compile_and_fit(
     model=gru_model,
     name="gru_sentiment",
-    train=wg_gru.make_dataset(dp_sentiment.train_df[["close", "sentiment"]]),
-    val=wg_gru.make_dataset(dp_sentiment.val_df[["close", "sentiment"]]),
-    test=wg_gru.make_dataset(dp_sentiment.test_df[["close", "sentiment"]]),
+    train=wg_gru.make_dataset(dp_sentiment.train_df[columns]),
+    val=wg_gru.make_dataset(dp_sentiment.val_df[columns]),
+    test=wg_gru.make_dataset(dp_sentiment.test_df[columns]),
 )
