@@ -21,11 +21,16 @@ class DataProcessor:
             df = pd.read_csv(file_path)
             os.remove(file_path)
 
+        # Transform periodic frequencies
         date_time = pd.to_datetime(df.pop("dateTime"), format="%Y-%m-%d %H:%M:%S")
         timestamp_s = date_time.map(pd.Timestamp.timestamp)
 
-        df["Day sin"] = np.sin(timestamp_s * (2 * np.pi / 60))
-        df["Day cos"] = np.cos(timestamp_s * (2 * np.pi / 60))
+        df["day_sin"] = np.sin(timestamp_s * (2 * np.pi / 60))
+        df["day_cos"] = np.cos(timestamp_s * (2 * np.pi / 60))
+
+        volumes = df.pop("volume")
+        df["volume_sin"] = np.sin(volumes * (2 * np.pi / 60))
+        df["volume_cos"] = np.cos(volumes * (2 * np.pi / 60))
 
         # Split data
         n = len(df)
