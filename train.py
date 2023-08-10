@@ -92,7 +92,7 @@ compile_and_fit(
 )
 
 print("\n--------------------------- Autoregressive ---------------------------")
-columns = ["open_ema"]
+columns = ["close_ema"]
 wg_ar = WindowGenerator(
     input_width=SEQ_LENGTH,
     label_width=PRED_LENGTH,
