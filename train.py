@@ -109,7 +109,7 @@ compile_and_fit(
 )
 
 print("\n--------------------------- GRU Sentiment ---------------------------")
-columns = ["open_ema", "sentiment"]
+columns = ["close_ema", "sentiment"]
 dp_sentiment = DataProcessor(src=SENTIMENT_DATA, ema_period=20)
 wg_gru = WindowGenerator(
     input_width=SEQ_LENGTH,
