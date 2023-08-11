@@ -31,15 +31,15 @@ class DataProcessor:
 
         df["day_sin"] = np.sin(timestamp_s * (2 * np.pi / day))
         df["day_cos"] = np.cos(timestamp_s * (2 * np.pi / day))
+        df.set_index(date_time, inplace=True)
 
         # Preprocess price data
         for col in ["high", "low"]:
-            df[col] = (df[col] - df["close"]).abs()
+            df[f"{col}_diff"] = (df[col] - df["close"]).abs()
 
         for col in ["open", "close"]:
-            series = df.pop(col)
-            df[f"{col}_pct"] = series.pct_change()
-            df[f"{col}_ema"] = series.ewm(span=ema_period, adjust=False).mean()
+            df[f"{col}_pct"] = df[col].pct_change()
+            df[f"{col}_ema"] = df[col].ewm(span=ema_period, adjust=False).mean()
 
         df.fillna(0, inplace=True)
 
