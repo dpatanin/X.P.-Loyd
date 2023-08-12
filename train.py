@@ -1,12 +1,13 @@
 from datetime import datetime
 
 import keras
-from ray.rllib.algorithms.r2d2 import r2d2
+from ray.rllib.algorithms.r2d2 import R2D2Config
+from ray.tune.logger import pretty_print
 from ray.tune.registry import register_env
 
 from lib.autoregressive import Autoregressive
 from lib.data_processor import DataProcessor
-from lib.ensemble import Ensemble
+from lib.ensemble import EnsembleConfig
 from lib.trading_env import TradingEnvironment
 from lib.window_generator import WindowGenerator
 
@@ -18,9 +19,11 @@ EPOCHS = 10
 SEQ_LENGTH = 30
 PRED_LENGTH = 15
 BATCH_SIZE = 512
+EMA_PERIOD = 20
 
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
-dp = DataProcessor(src=SRC_DATA, ema_period=20)
+dp = DataProcessor(SRC_DATA, EMA_PERIOD)
+dp_sentiment = DataProcessor(SENTIMENT_DATA, EMA_PERIOD)
 
 
 def compile_and_fit(model, name: str, train, val, test):
@@ -130,7 +133,6 @@ compile_and_fit(
 
 print("\n--------------------------- GRU Sentiment ---------------------------")
 gru_columns = ["close_ema", "sentiment"]
-dp_sentiment = DataProcessor(src=SENTIMENT_DATA, ema_period=20)
 wg_gru = WindowGenerator(
     input_width=SEQ_LENGTH,
     label_width=PRED_LENGTH,
@@ -154,46 +156,58 @@ compile_and_fit(
 
 print("\n--------------------------- R2D2 Trader ---------------------------")
 
-ensemble = Ensemble(
-    lstm_models_and_columns=[
-        (lstm_close, lstm_close_columns),
-        (lstm_open, lstm_open_columns),
+ensemble_config: EnsembleConfig = {
+    "lstm_model_paths_and_columns": [
+        (
+            "./models/EMA-Implementation__09_08_2023 22_55_55/lstm_close",
+            lstm_close_columns,
+        ),
+        (
+            "./models/EMA-Implementation__09_08_2023 22_55_55/lstm_open",
+            lstm_open_columns,
+        ),
     ],
-    ar_model=ar_model,
-    ar_columns=ar_columns,
-    gru_model=gru_model,
-    gru_columns=gru_columns,
-    window=SEQ_LENGTH,
-)
+    "ar_model_path": "./models/EMA-Implementation__09_08_2023 22_55_55/autoregressive",
+    "ar_columns": ar_columns,
+    "gru_model_path": "./models/EMA-Implementation__09_08_2023 22_55_55/gru_sentiment",
+    "gru_columns": gru_columns,
+    "lstm_window": SEQ_LENGTH,
+    "ar_window": SEQ_LENGTH,
+    "gru_window": SEQ_LENGTH,
+}
 
 
 def env_creator(env_config):
-    return TradingEnvironment(dp_sentiment.train_df, ensemble)
+    return TradingEnvironment(dp_sentiment.train_df, ensemble_config, PRED_LENGTH)
 
 
 register_env("trading_env", env_creator)
 
-r2d2.R2D2(env="trading_env")
+algo = (
+    R2D2Config()
+    .environment("trading_env")
+    .framework("tf")
+    .training(
+        model={
+            "fcnet_hiddens": [64],
+            "fcnet_activation": "linear",
+            "use_lstm": True,
+            "lstm_cell_size": 64,
+        }
+    )
+    .resources(num_gpus=1, num_learner_workers=0)
+    .build()
+)
 
-# config = (
-#     R2D2Config()
-#     .environment(TradingEnvironment)
-#     .framework("tf")
-#     .training(
-#         model={
-#             "fcnet_hiddens": [64],
-#             "fcnet_activation": "linear",
-#             "use_lstm": True,
-#             "lstm_cell_size": 64,
-#             "max_seq_len": SEQ_LENGTH,
-#         }
-#     )
-#     .exploration(explore=True, exploration_config={"epsilon_timesteps": 50000})
-# )
+for _ in range(EPOCHS):
+    result = algo.train()
+    print(pretty_print(result))
 
-# algo = config.build()
+    checkpoint_dir = algo.save(f"/models/{DESC}__{now}")
+    print(f"Checkpoint saved in directory {checkpoint_dir}")
 
-# for _ in range(5):
-#     print(algo.train())  # 3. train it,
 
-# algo.evaluate()  # 4. and evaluate it.
+# import matplotlib.pyplot as plt
+# plt.figure(figsize=(16, 6))
+# env.render_all()
+# plt.show()

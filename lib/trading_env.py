@@ -1,10 +1,10 @@
-import gym
+import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from gym import spaces
+from gymnasium import spaces
 
-from lib.ensemble import Ensemble
+from lib.ensemble import Ensemble, EnsembleConfig
 
 
 class TradingEnvironment(gym.Env):
@@ -13,7 +13,8 @@ class TradingEnvironment(gym.Env):
     def __init__(
         self,
         df: pd.DataFrame,
-        ensemble: Ensemble,
+        ensemble_config: EnsembleConfig,
+        forecast_length: int,
         balance=1000,
         tick_ratio=12.5 / 0.25,
         fees_per_contract=0,
@@ -22,8 +23,8 @@ class TradingEnvironment(gym.Env):
         super(TradingEnvironment, self).__init__()
 
         self.df = df
-        self.ensemble = ensemble
-        self.window_size = ensemble.max_window_size
+        self.ensemble = Ensemble(ensemble_config)
+        self.window_size = self.ensemble.max_window_size
         self.prices = df[["high", "low", "open", "close"]]
 
         self.tick_ratio = tick_ratio
@@ -37,19 +38,19 @@ class TradingEnvironment(gym.Env):
                 "lstm_forecast": spaces.Box(
                     low=-np.inf,
                     high=np.inf,
-                    shape=(ensemble.lstm_window,),
+                    shape=(forecast_length,),
                     dtype=np.float32,
                 ),
                 "ar_forecast": spaces.Box(
                     low=-np.inf,
                     high=np.inf,
-                    shape=(ensemble.ar_window,),
+                    shape=(forecast_length,),
                     dtype=np.float32,
                 ),
                 "gru_forecast": spaces.Box(
                     low=-np.inf,
                     high=np.inf,
-                    shape=(ensemble.gru_window),
+                    shape=(forecast_length,),
                     dtype=np.float32,
                 ),
                 "position": spaces.Discrete(3),
@@ -64,6 +65,7 @@ class TradingEnvironment(gym.Env):
         self._start_tick = self.window_size
         self._end_tick = len(self.df) - 1
         self._done = None
+        self._truncated = False
         self._current_tick = None
         self._entry_price = 0
         self._last_trade_tick = None
@@ -74,8 +76,9 @@ class TradingEnvironment(gym.Env):
         self._first_rendering = None
         self.history = None
 
-    def reset(self):
+    def reset(self, *, seed=None, options=None):
         self._done = False
+        self._truncated = False
         self._balance = self._init_balance
         self._current_tick = self._start_tick
         self._entry_price = 0
@@ -86,10 +89,11 @@ class TradingEnvironment(gym.Env):
         self._total_profit = 1.0  # unit
         self._first_rendering = True
         self.history = {}
-        return self._get_observation()
+        return self._get_observation(), {}
 
     def step(self, action):
         self._current_tick += 1
+        self._done = self._current_tick == self._end_tick
 
         price_diff = 0
         if action != self._position:
@@ -104,8 +108,7 @@ class TradingEnvironment(gym.Env):
         reward = self._calculate_reward(price_diff)
         self._total_reward += reward
         self._update_profit(price_diff)
-
-        self._done = self._balance <= 0 or self._current_tick == self._end_tick
+        self._truncated = self._balance <= 0
 
         self._position = action
         self._position_history.append(self._position)
@@ -113,11 +116,11 @@ class TradingEnvironment(gym.Env):
         info = dict(
             total_reward=self._total_reward,
             total_profit=self._total_profit,
-            position=self._position.value,
+            position=self._position,
         )
         self._update_history(info)
 
-        return observation, reward, self._done, info
+        return observation, reward, self._done, self._truncated, info
 
     def _get_observation(self):
         next_window = self.df[
@@ -130,7 +133,7 @@ class TradingEnvironment(gym.Env):
             "ar_forecast": forecast["ar"],
             "gru_forecast": forecast["gru"],
             "position": self._position,
-            "balance": self._balance,
+            "balance": [self._balance],
         }
 
     def _update_history(self, info):
@@ -142,15 +145,14 @@ class TradingEnvironment(gym.Env):
 
     def render(self, mode="human"):
         def _plot_position(position, tick):
-            match position:
-                case 0:
-                    color = "blue"
-                case 1:
-                    color = "green"
-                case 2:
-                    color = "red"
-                case _:
-                    color = None
+            if position == 0:
+                color = "blue"
+            elif position == 1:
+                color = "green"
+            elif position == 2:
+                color = "red"
+            else:
+                color = None
             if color:
                 plt.scatter(tick, self.prices[tick], color=color)
 
