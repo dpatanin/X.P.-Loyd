@@ -1,0 +1,16 @@
+{
+  "scaling_config": {
+    "_max_cpu_fraction_per_node": null,
+    "num_workers": 1,
+    "placement_strategy": "PACK",
+    "resources_per_worker": {
+      "CPU": 8,
+      "GPU": 1
+    },
+    "trainer_resources": null,
+    "use_gpu": true
+  },
+  "train_loop_config": {
+    "lr": 0.0002
+  }
+}

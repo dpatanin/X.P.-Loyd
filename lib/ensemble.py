@@ -48,16 +48,16 @@ class Ensemble:
 
         lstm_prediction = np.array(
             [
-                model([data[columns].iloc[-self.lstm_window :]])[0].cpu().numpy()
+                model([data[columns].iloc[-self.lstm_window :]])[0]
                 for model, columns in self.lstm_models_and_columns
             ]
         ).mean(0)
 
         ar_data = data[self.ar_columns].iloc[-self.ar_window :]
-        ar_prediction = self.ar_model([ar_data])[0].cpu().numpy().flatten()
+        ar_prediction = self.ar_model([ar_data])[0].numpy().flatten()
 
         gru_data = data[self.gru_columns].iloc[-self.gru_window :]
-        gru_prediction = self.gru_model([gru_data])[0].cpu().numpy()
+        gru_prediction = self.gru_model([gru_data])[0].numpy()
 
         return {"lstm": lstm_prediction, "ar": ar_prediction, "gru": gru_prediction}
 
