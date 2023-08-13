@@ -1,16 +1,9 @@
 from datetime import datetime
 
 import keras
-import ray
-import tensorflow as tf
-from ray import air
-from ray.air.config import ScalingConfig
-from ray.air.integrations.keras import ReportCheckpointCallback
 from ray.rllib.algorithms.r2d2 import R2D2Config
-from ray.train.tensorflow import TensorflowTrainer
 from ray.tune.logger import pretty_print
 from ray.tune.registry import register_env
-from ray.tune.tuner import TuneConfig, Tuner
 
 from lib.autoregressive import Autoregressive
 from lib.data_processor import DataProcessor
@@ -18,7 +11,6 @@ from lib.ensemble import EnsembleConfig
 from lib.trading_env import TradingEnvironment
 from lib.window_generator import WindowGenerator
 
-ray.init(num_gpus=1)
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 
 DESC = "Ray-Integration"
@@ -121,77 +113,55 @@ def ar():
     return Autoregressive(32, PRED_LENGTH, len(ar_columns))
 
 
-def train_func(config: dict):
-    strategy = tf.distribute.MultiWorkerMirroredStrategy()
-    with strategy.scope():
-        multi_worker_model = config["model"]()
-        multi_worker_model.compile(
-            optimizer=keras.optimizers.SGD(learning_rate=config["lr"]),
-            loss=keras.losses.MeanSquaredError(),
-            metrics=[keras.metrics.MeanSquaredError(name="loss")],
-        )
+def compile_and_fit(config: dict):
+    tb_callback = keras.callbacks.TensorBoard(
+        log_dir=f"logs/{DESC}__{now}/{config['name']}",
+        update_freq=100,
+    )
+    early_stopping = keras.callbacks.EarlyStopping(
+        monitor="val_loss", patience=2, mode="min"
+    )
+    optimizer = keras.optimizers.Nadam(learning_rate=0.0002)
+    loss = keras.losses.MeanSquaredError()
+    metrics = [keras.metrics.MeanAbsoluteError(name="loss")]
 
-    for _ in range(EPOCHS):
-        multi_worker_model.fit(
-            config["datasets"]["ds_train"](),
-            callbacks=[ReportCheckpointCallback()],
-            verbose=0,
-            validation_data=config["datasets"]["ds_val"](),
-        )
+    model = config["model"]()
+    model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+    model.fit(
+        config["datasets"]["ds_train"](),
+        epochs=EPOCHS,
+        validation_data=config["datasets"]["ds_val"](),
+        callbacks=[tb_callback, early_stopping],
+    )
+    model.evaluate(config["datasets"]["ds_test"](), verbose=0, callbacks=[tb_callback])
+
+    model.save(f"models/{DESC}__{now}/{config['name']}/", save_format="tf")
 
 
 lstm_close_config = {
     "name": "lstm_close",
     "model": single_shot,
-    "lr": 0.0002,
     "datasets": get_dataset_maker(wg_close, dp_full),
 }
 lstm_open_config = {
     "name": "lstm_open",
     "model": single_shot,
-    "lr": 0.0002,
     "datasets": get_dataset_maker(wg_open, dp_full),
 }
 ar_config = {
     "name": "autoregressive",
     "model": ar,
-    "lr": 0.0002,
     "datasets": get_dataset_maker(wg_ar, dp_full),
 }
 gru_config = {
     "name": "gru_sentiment",
     "model": gru,
-    "lr": 0.0002,
     "datasets": get_dataset_maker(wg_gru, dp_sentiment),
 }
 
-scaling_config = ScalingConfig(
-    num_workers=1,
-    use_gpu=True,
-    resources_per_worker={"CPU": 8, "GPU": 1},
-)
-
-param_space = {
-    "train_loop_config": {"lr": 0.0002},
-    "scaling_config": scaling_config,
-}
 
 for config in [lstm_close_config, lstm_open_config, ar_config, gru_config]:
-    trainer = TensorflowTrainer(
-        train_loop_per_worker=train_func,
-        train_loop_config=config,
-        scaling_config=scaling_config,
-    )
-
-    tuner = Tuner(
-        trainer,
-        param_space=param_space,
-        tune_config=TuneConfig(num_samples=1, metric="loss", mode="min"),
-        run_config=air.RunConfig(name=f"{DESC}_{config['name']}__{now}"),
-    )
-    result_grid = tuner.fit()
-    best_result = result_grid.get_best_result()
-    print("Best Result:", best_result)
+    compile_and_fit(config)
 
 
 ensemble_config: EnsembleConfig = {
