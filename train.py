@@ -3,9 +3,8 @@ from datetime import datetime
 import keras
 import ray
 import tensorflow as tf
-from ray import air, tune
-from ray.air import session
-from ray.air.config import RunConfig, ScalingConfig
+from ray import air
+from ray.air.config import ScalingConfig
 from ray.air.integrations.keras import ReportCheckpointCallback
 from ray.rllib.algorithms.r2d2 import R2D2Config
 from ray.train.tensorflow import TensorflowTrainer
@@ -26,12 +25,11 @@ DESC = "Ray-Integration"
 FULL_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM"  # No sentiment but ~15 years
 SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21293628&authkey=!ANbFvs1RrC9WQ3c"  # With sentiment but ~5 years
 
-
 EPOCHS = 1
 SEQ_LENGTH = 30
 PRED_LENGTH = 15
 BATCH_SIZE = 512
-EMA_PERIOD = 20
+EMA_PERIOD = 5
 
 dp_full = DataProcessor("source.csv", EMA_PERIOD)
 dp_sentiment = DataProcessor("source_sentiment_merge.csv", EMA_PERIOD)
@@ -188,7 +186,7 @@ for config in [lstm_close_config, lstm_open_config, ar_config, gru_config]:
     tuner = Tuner(
         trainer,
         param_space=param_space,
-        tune_config=TuneConfig(num_samples=5, metric="loss", mode="min"),
+        tune_config=TuneConfig(num_samples=1, metric="loss", mode="min"),
         run_config=air.RunConfig(name=f"{DESC}_{config['name']}__{now}"),
     )
     result_grid = tuner.fit()
@@ -196,57 +194,55 @@ for config in [lstm_close_config, lstm_open_config, ar_config, gru_config]:
     print("Best Result:", best_result)
 
 
-# print("\n--------------------------- R2D2 Trader ---------------------------")
-
-# ensemble_config: EnsembleConfig = {
-#     "lstm_model_paths_and_columns": [
-#         (
-#             "./models/EMA-Implementation__09_08_2023 22_55_55/lstm_close",
-#             lstm_close_columns,
-#         ),
-#         (
-#             "./models/EMA-Implementation__09_08_2023 22_55_55/lstm_open",
-#             lstm_open_columns,
-#         ),
-#     ],
-#     "ar_model_path": "./models/EMA-Implementation__09_08_2023 22_55_55/autoregressive",
-#     "ar_columns": ar_columns,
-#     "gru_model_path": "./models/EMA-Implementation__09_08_2023 22_55_55/gru_sentiment",
-#     "gru_columns": gru_columns,
-#     "lstm_window": SEQ_LENGTH,
-#     "ar_window": SEQ_LENGTH,
-#     "gru_window": SEQ_LENGTH,
-# }
+ensemble_config: EnsembleConfig = {
+    "lstm_model_paths_and_columns": [
+        (
+            "./models/Ray-Integration_lstm_close__13_08_2023 16_00_10/TensorflowTrainer_c5666_00000_0_2023-08-13_16-00-33/checkpoint_000000/dict_checkpoint.pkl",
+            lstm_close_columns,
+        ),
+        (
+            "./models/Ray-Integration_lstm_open__13_08_2023 16_00_10/TensorflowTrainer_59ce7_00000_0_2023-08-13_16-04-42/checkpoint_000000/dict_checkpoint.pkl",
+            lstm_open_columns,
+        ),
+    ],
+    "ar_model_path": "./models/Ray-Integration_autoregressive__13_08_2023 16_00_10/TensorflowTrainer_f81c2_00000_0_2023-08-13_16-09-08/checkpoint_000000/dict_checkpoint.pkl",
+    "ar_columns": ar_columns,
+    "gru_model_path": "./models/Ray-Integration_gru_sentiment__13_08_2023 16_00_10/TensorflowTrainer_cf104_00000_0_2023-08-13_16-29-27/checkpoint_000000/dict_checkpoint.pkl",
+    "gru_columns": gru_columns,
+    "lstm_window": SEQ_LENGTH,
+    "ar_window": SEQ_LENGTH,
+    "gru_window": SEQ_LENGTH,
+}
 
 
-# def env_creator(env_config):
-#     return TradingEnvironment(dp_sentiment.train_df, ensemble_config, PRED_LENGTH)
+def env_creator(env_config):
+    return TradingEnvironment(dp_sentiment.train_df, ensemble_config, PRED_LENGTH)
 
 
-# register_env("trading_env", env_creator)
+register_env("trading_env", env_creator)
 
-# algo = (
-#     R2D2Config()
-#     .environment("trading_env")
-#     .framework("tf")
-#     .training(
-#         model={
-#             "fcnet_hiddens": [64],
-#             "fcnet_activation": "linear",
-#             "use_lstm": True,
-#             "lstm_cell_size": 64,
-#         }
-#     )
-#     .resources(num_gpus=1, num_learner_workers=0)
-#     .build()
-# )
+algo = (
+    R2D2Config()
+    .environment("trading_env")
+    .framework("tf")
+    .training(
+        model={
+            "fcnet_hiddens": [64],
+            "fcnet_activation": "linear",
+            "use_lstm": True,
+            "lstm_cell_size": 64,
+        }
+    )
+    .resources(num_gpus=1, num_learner_workers=0)
+    .build()
+)
 
-# for _ in range(EPOCHS):
-#     result = algo.train()
-#     print(pretty_print(result))
+for _ in range(EPOCHS):
+    result = algo.train()
+    print(pretty_print(result))
 
-#     checkpoint_dir = algo.save(f"/models/{DESC}__{now}")
-#     print(f"Checkpoint saved in directory {checkpoint_dir}")
+    checkpoint_dir = algo.save(f"/models/{DESC}__{now}")
+    print(f"Checkpoint saved in directory {checkpoint_dir}")
 
 
 # import matplotlib.pyplot as plt

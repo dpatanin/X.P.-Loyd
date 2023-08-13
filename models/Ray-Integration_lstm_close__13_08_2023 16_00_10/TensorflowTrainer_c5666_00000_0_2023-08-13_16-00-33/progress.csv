@@ -1,0 +1,2 @@
+loss,val_loss,timestamp,time_this_iter_s,should_checkpoint,done,training_iteration,trial_id,date,time_total_s,pid,hostname,node_ip,time_since_restore,iterations_since_restore
+1.7323743861652474e-07,1.4859942609746213e-07,1691935480,242.49390268325806,True,False,1,c5666_00000,2023-08-13_16-04-40,242.49390268325806,54231,Genex,172.29.231.100,242.49390268325806,1
