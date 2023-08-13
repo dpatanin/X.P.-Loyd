@@ -21,7 +21,7 @@ class DataProcessor:
             df = pd.read_csv(file_path)
             os.remove(file_path)
 
-        print("\nProcessing data...")
+        print("Processing data...")
         self.num_features = df.shape[1]
 
         # Transform dateTime into periodic frequencies

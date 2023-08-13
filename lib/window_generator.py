@@ -65,8 +65,9 @@ class WindowGenerator:
         return inputs, labels
 
     def make_dataset(self, data: pd.DataFrame):
+        selected_data = data[list(self.column_indices.keys())]
         ds = tf.keras.utils.timeseries_dataset_from_array(
-            data=data.to_numpy(dtype=np.float32),
+            data=selected_data.to_numpy(dtype=np.float32),
             targets=None,
             sequence_length=self.total_window_size,
             sequence_stride=1,
