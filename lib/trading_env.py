@@ -1,10 +1,17 @@
+from typing import TypedDict
+
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from gymnasium import spaces
 
-from lib.ensemble import Ensemble, EnsembleConfig
+from lib.ensemble import Ensemble
+
+
+class TradingStats(TypedDict):
+    profit: float
+    fees: float
 
 
 class TradingEnvironment(gym.Env):
@@ -13,18 +20,19 @@ class TradingEnvironment(gym.Env):
     def __init__(
         self,
         df: pd.DataFrame,
-        ensemble_config: EnsembleConfig,
+        window_size: int,
+        forecast_cb: Ensemble.forecast,
         forecast_length: int,
-        balance=1000,
+        balance=1000.00,
         tick_ratio=12.5 / 0.25,
-        fees_per_contract=0,
+        fees_per_contract=0.00,
         trade_volume=1,
     ):
         super(TradingEnvironment, self).__init__()
 
         self.df = df
-        self.ensemble = Ensemble(ensemble_config)
-        self.window_size = self.ensemble.max_window_size
+        self.forecast_cb = forecast_cb
+        self.window_size = window_size
         self.prices = df[["high", "low", "open", "close"]]
 
         self.tick_ratio = tick_ratio
@@ -33,62 +41,46 @@ class TradingEnvironment(gym.Env):
 
         # Actions & Position: 0 = No position; 1 = Long; 2 = Short
         self.action_space = spaces.Discrete(3)
+
+        def forecast_box():
+            return spaces.Box(
+                low=-np.inf, high=np.inf, shape=(forecast_length,), dtype=np.float32
+            )
+
         self.observation_space = spaces.Dict(
             {
-                "lstm_forecast": spaces.Box(
-                    low=-np.inf,
-                    high=np.inf,
-                    shape=(forecast_length,),
-                    dtype=np.float32,
-                ),
-                "ar_forecast": spaces.Box(
-                    low=-np.inf,
-                    high=np.inf,
-                    shape=(forecast_length,),
-                    dtype=np.float32,
-                ),
-                "gru_forecast": spaces.Box(
-                    low=-np.inf,
-                    high=np.inf,
-                    shape=(forecast_length,),
-                    dtype=np.float32,
-                ),
+                "lstm_forecast": forecast_box(),
+                "ar_forecast": forecast_box(),
+                "gru_forecast": forecast_box(),
                 "position": spaces.Discrete(3),
                 "balance": spaces.Box(
                     low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32
                 ),
             }
         )
+        self.state_dim = sum(
+            np.prod(obs.shape) for obs in self.observation_space.values()
+        )
 
         # episode
-        self._balance = self._init_balance = balance
+        self._init_balance = balance
         self._start_tick = self.window_size
         self._end_tick = len(self.df) - 1
-        self._done = None
-        self._truncated = False
-        self._current_tick = None
-        self._entry_price = 0
-        self._last_trade_tick = None
-        self._position = None
-        self._position_history = None
-        self._total_reward = None
-        self._total_profit = None
-        self._first_rendering = None
-        self.history = None
+        self._reset_tracking()
 
-    def reset(self, *, seed=None, options=None):
+    def _reset_tracking(self):
         self._done = False
         self._truncated = False
         self._balance = self._init_balance
         self._current_tick = self._start_tick
         self._entry_price = 0
-        self._last_trade_tick = self._current_tick - 1
         self._position = 0
         self._position_history = (self.window_size * [None]) + [self._position]
-        self._total_reward = 0.0
-        self._total_profit = 1.0  # unit
         self._first_rendering = True
         self.history = {}
+
+    def reset(self, *, seed=None, options=None):
+        self._reset_tracking()
         return self._get_observation(), {}
 
     def step(self, action):
@@ -103,21 +95,18 @@ class TradingEnvironment(gym.Env):
             elif self._position == 2:
                 price_diff = self.entry_price - current_close_price
             self.entry_price = current_close_price
-            self._last_trade_tick = self._current_tick
 
         reward = self._calculate_reward(price_diff)
-        self._total_reward += reward
-        self._update_profit(price_diff)
+        profit, fees = self._update_balance(price_diff)
         self._truncated = self._balance <= 0
 
         self._position = action
         self._position_history.append(self._position)
         observation = self._get_observation()
-        info = dict(
-            total_reward=self._total_reward,
-            total_profit=self._total_profit,
-            position=self._position,
-        )
+        info: TradingStats = {
+            "profit": profit,
+            "fees": fees,
+        }
         self._update_history(info)
 
         return observation, reward, self._done, self._truncated, info
@@ -126,7 +115,7 @@ class TradingEnvironment(gym.Env):
         next_window = self.df[
             (self._current_tick - self.window_size + 1) : self._current_tick + 1
         ]
-        forecast = self.ensemble.forecast(next_window)
+        forecast = self.forecast_cb(next_window)
 
         return {
             "lstm_forecast": forecast["lstm"],
@@ -136,7 +125,7 @@ class TradingEnvironment(gym.Env):
             "balance": [self._balance],
         }
 
-    def _update_history(self, info):
+    def _update_history(self, info: TradingStats):
         if not self.history:
             self.history = {key: [] for key in info.keys()}
 
@@ -164,13 +153,6 @@ class TradingEnvironment(gym.Env):
             _plot_position(start_position, self._start_tick)
 
         _plot_position(self._position, self._current_tick)
-
-        plt.suptitle(
-            "Total Reward: %.6f" % self._total_reward
-            + " ~ "
-            + "Total Profit: %.6f" % self._total_profit
-        )
-
         plt.pause(0.01)
 
     def render_all(self, mode="human"):
@@ -188,30 +170,21 @@ class TradingEnvironment(gym.Env):
         plt.plot(short_ticks, self.prices[short_ticks], "ro")
         plt.plot(long_ticks, self.prices[long_ticks], "go")
 
-        plt.suptitle(
-            "Total Reward: %.6f" % self._total_reward
-            + " ~ "
-            + "Total Profit: %.6f" % self._total_profit
-        )
-
     def close(self):
         plt.close()
 
-    def save_rendering(self, filepath):
+    def save_rendering(self, filepath: str):
         plt.savefig(filepath)
 
     def pause_rendering(self):
         plt.show()
 
-    def _calculate_reward(self, diff_price):
+    def _calculate_reward(self, diff_price: float):
         # TODO: Reward function?
         return diff_price
 
-    def _update_profit(self, reward):
-        profit = self.trade_volume * (reward * self.tick_ratio - self.fees_per_contract)
-        self._balance += profit
-        self._total_profit += profit
-
-    def max_possible_profit(self):  # trade fees are ignored
-        # TODO: separate profits & fees -> track both for eval
-        raise NotImplementedError
+    def _update_balance(self, price_diff: float):
+        fees = self.trade_volume * self.fees_per_contract
+        profit = self.trade_volume * price_diff * self.tick_ratio
+        self._balance += profit - fees
+        return (profit, fees)

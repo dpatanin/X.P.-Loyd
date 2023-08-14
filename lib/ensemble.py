@@ -1,47 +1,42 @@
-from typing import TypedDict
-
 import keras
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-
-
-class EnsembleConfig(TypedDict):
-    lstm_model_paths_and_columns: list[tuple[str, list[str]]]
-    ar_model_path: str
-    ar_columns: list[str]
-    gru_model_path: str
-    gru_columns: list[str]
-    lstm_window: float
-    ar_window: float
-    gru_window: float
 
 
 class Ensemble:
     """
     Ensembles DNN models.
-    `window` overwrites unspecified windows.
     """
 
-    def __init__(self, config: EnsembleConfig):
-        self.max_window_size = max(
-            config["lstm_window"],
-            config["ar_window"],
-            config["gru_window"],
+    def __init__(
+        self,
+        lstm_model_paths_and_columns: list[tuple[str, list[str]]],
+        ar_model_path: str,
+        ar_columns: list[str],
+        gru_model_path: str,
+        gru_columns: list[str],
+        lstm_window: float,
+        ar_window: float,
+        gru_window: float,
+    ):
+        self.max_window_size: int = max(
+            lstm_window,
+            ar_window,
+            gru_window,
         )
-        self.lstm_window = config["lstm_window"]
-        self.ar_window = config["ar_window"]
-        self.gru_window = config["gru_window"]
+        self.lstm_window = lstm_window
+        self.ar_window = ar_window
+        self.gru_window = gru_window
 
         self.lstm_models_and_columns = [
             (self._load(model), columns)
-            for model, columns in config["lstm_model_paths_and_columns"]
+            for model, columns in lstm_model_paths_and_columns
         ]
-        self.ar_model = self._load(config["ar_model_path"])
-        self.gru_model = self._load(config["gru_model_path"])
+        self.ar_model = self._load(ar_model_path)
+        self.gru_model = self._load(gru_model_path)
 
-        self.ar_columns = config["ar_columns"]
-        self.gru_columns = config["gru_columns"]
+        self.ar_columns = ar_columns
+        self.gru_columns = gru_columns
 
     def forecast(self, data: pd.DataFrame):
         assert len(data) <= self.max_window_size, "Data sequence too short."
@@ -62,4 +57,4 @@ class Ensemble:
         return {"lstm": lstm_prediction, "ar": ar_prediction, "gru": gru_prediction}
 
     def _load(self, path) -> keras.Sequential:
-        return tf.saved_model.load(path)
+        return keras.models.load_model(path)
