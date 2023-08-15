@@ -15,6 +15,7 @@ from lib.trading_env import TradingEnvironment
 from lib.train_loop import run_parallel_training_iterations
 from lib.window_generator import WindowGenerator
 
+
 def main():
     now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 
@@ -52,9 +53,7 @@ def main():
     ar_columns = ["close_ema"]
     gru_columns = ["close_ema", "sentiment"]
 
-
     ############################# DNN Stuff #############################
-
 
     def dataset_maker(wg: WindowGenerator, dp: DataProcessor):
         return {
@@ -62,7 +61,6 @@ def main():
             "ds_val": lambda: wg.make_dataset(dp.val_df),
             "ds_test": lambda: wg.make_dataset(dp.test_df),
         }
-
 
     def single_shot():
         return keras.Sequential(
@@ -74,7 +72,6 @@ def main():
             ]
         )
 
-
     def gru():
         return keras.Sequential(
             [
@@ -84,7 +81,6 @@ def main():
                 ),
             ]
         )
-
 
     def compile_and_fit(config: dict):
         tb_callback = keras.callbacks.TensorBoard(
@@ -106,10 +102,11 @@ def main():
             validation_data=config["datasets"]["ds_val"](),
             callbacks=[tb_callback, early_stopping],
         )
-        model.evaluate(config["datasets"]["ds_test"](), verbose=0, callbacks=[tb_callback])
+        model.evaluate(
+            config["datasets"]["ds_test"](), verbose=0, callbacks=[tb_callback]
+        )
 
         model.save(f"models/{DESC}_{config['name']}__{now}.keras")
-
 
     def run_forecast():
         configs = [
@@ -174,18 +171,15 @@ def main():
         for config in configs:
             compile_and_fit(config)
 
-
     ############################# RL Stuff #############################
-
 
     def env_creator(ensemble: Ensemble):
         return TradingEnvironment(
             df=dp_sentiment.train_df,
             window_size=ensemble.max_window_size,
             forecast_cb=ensemble.forecast,
-            forecast_length=PRED_LENGTH,
+            seq_length=PRED_LENGTH,
         )
-
 
     def run_trading():
         ensemble = Ensemble(
@@ -287,7 +281,8 @@ def main():
     run_trading()
     # run_forecast()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Set multiprocessing start mode
-    multiprocessing.set_start_method('spawn')
+    multiprocessing.set_start_method("spawn")
     main()
