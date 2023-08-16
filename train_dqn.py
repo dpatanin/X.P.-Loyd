@@ -8,7 +8,6 @@ import tensorflow as tf
 from tf_agents.agents.cql import cql_sac_agent
 from tf_agents.agents.ddpg import critic_rnn_network
 from tf_agents.agents.sac import tanh_normal_projection_network
-from tf_agents.environments.py_environment import PyEnvironment
 from tf_agents.metrics import py_metrics
 from tf_agents.networks import actor_distribution_rnn_network
 from tf_agents.policies import py_tf_eager_policy, random_py_policy
