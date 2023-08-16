@@ -5,7 +5,6 @@ from datetime import datetime
 import pandas as pd
 import reverb  # type: ignore
 import tensorflow as tf
-from tqdm import tqdm
 from tf_agents.agents.cql import cql_sac_agent
 from tf_agents.agents.ddpg import critic_rnn_network
 from tf_agents.agents.sac import tanh_normal_projection_network
@@ -16,6 +15,7 @@ from tf_agents.policies import py_tf_eager_policy, random_py_policy
 from tf_agents.replay_buffers import reverb_replay_buffer, reverb_utils
 from tf_agents.train import actor, learner, triggers
 from tf_agents.train.utils import spec_utils, strategy_utils, train_utils
+from tqdm import tqdm
 
 from lib.data_processor import DataProcessor
 from lib.trading_env import PyTradingEnvWrapper, TradingEnvironment
@@ -43,6 +43,13 @@ BATCH_SIZE = 512
 
 
 dp = DataProcessor("source.csv", 5)
+pb = tqdm(range(18), desc="Create environments", leave=False)
+
+
+def update_pb(desc: str = None):
+    pb.update()
+    if desc:
+        pb.set_description(desc)
 
 
 def env_creator(df: pd.DataFrame):
@@ -58,11 +65,13 @@ def env_creator(df: pd.DataFrame):
 collect_env = env_creator(dp.train_df)
 eval_env = env_creator(dp.val_df)
 
+update_pb("Get specs")
 strategy = strategy_utils.get_strategy(tpu=False, use_gpu=True)
 
 observation_spec, action_spec, time_step_spec = spec_utils.get_tensor_specs(collect_env)
 
 with strategy.scope():
+    update_pb("Create critic net")
     critic_net = critic_rnn_network.CriticRnnNetwork(
         (observation_spec, action_spec),
         observation_fc_layer_params=None,
@@ -73,6 +82,7 @@ with strategy.scope():
         last_kernel_initializer="glorot_uniform",
     )
 
+    update_pb("Create actor net")
     actor_net = actor_distribution_rnn_network.ActorDistributionRnnNetwork(
         observation_spec,
         action_spec,
@@ -84,6 +94,7 @@ with strategy.scope():
 
     train_step = train_utils.create_train_step()
 
+    update_pb("Initialize cql-sac agent")
     tf_agent = cql_sac_agent.CqlSacAgent(
         time_step_spec,
         action_spec,
@@ -107,6 +118,7 @@ with strategy.scope():
 
     tf_agent.initialize()
 
+    update_pb("Create reverb replay")
     rate_limiter = reverb.rate_limiters.SampleToInsertRatio(
         samples_per_insert=3.0, min_size_to_sample=3, error_buffer=3.0
     )
@@ -129,29 +141,35 @@ with strategy.scope():
         local_server=reverb_server,
     )
 
+    update_pb("Prefetch experiences")
     dataset = reverb_replay.as_dataset(
         sample_batch_size=BATCH_SIZE, num_steps=2
     ).prefetch(50)
     experience_dataset_fn = lambda: dataset
 
+    update_pb("Create policies")
     tf_eval_policy = tf_agent.policy
     eval_policy = py_tf_eager_policy.PyTFEagerPolicy(
         tf_eval_policy, use_tf_function=True
     )
+    update_pb()
 
     tf_collect_policy = tf_agent.collect_policy
     collect_policy = py_tf_eager_policy.PyTFEagerPolicy(
         tf_collect_policy, use_tf_function=True
     )
+    update_pb()
 
     random_policy = random_py_policy.RandomPyPolicy(
         collect_env.time_step_spec(), collect_env.action_spec()
     )
+    update_pb()
 
     rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
         reverb_replay.py_client, table_name, sequence_length=2, stride_length=1
     )
 
+    update_pb("Run initial actor")
     initial_collect_actor = actor.Actor(
         collect_env,
         random_policy,
@@ -161,6 +179,7 @@ with strategy.scope():
     )
     initial_collect_actor.run()
 
+    update_pb("Create actors & learner")
     env_step_metric = py_metrics.EnvironmentSteps()
     collect_actor = actor.Actor(
         collect_env,
@@ -171,6 +190,7 @@ with strategy.scope():
         summary_dir=os.path.join(tempdir, learner.TRAIN_DIR),
         observers=[rb_observer, env_step_metric],
     )
+    update_pb()
 
     eval_actor = actor.Actor(
         eval_env,
@@ -180,6 +200,7 @@ with strategy.scope():
         metrics=actor.eval_metrics(20),
         summary_dir=os.path.join(tempdir, "eval"),
     )
+    update_pb()
 
     saved_model_dir = os.path.join(tempdir, learner.POLICY_SAVED_MODEL_DIR)
 
@@ -190,6 +211,7 @@ with strategy.scope():
         ),
         triggers.StepPerSecondLogTrigger(train_step, interval=1000),
     ]
+    update_pb()
 
     agent_learner = learner.Learner(
         tempdir,
@@ -199,6 +221,7 @@ with strategy.scope():
         triggers=learning_triggers,
         strategy=strategy,
     )
+    update_pb()
 
     def get_eval_metrics():
         eval_actor.run()
@@ -217,25 +240,32 @@ with strategy.scope():
     # Reset the train step
     tf_agent.train_step_counter.assign(0)
 
-    # Evaluate the agent's policy once before training.
+    update_pb("Evaluate agent's policy")
     avg_return = get_eval_metrics()["AverageReturn"]
     returns = [avg_return]
+    update_pb()
+    pb.close()
 
-    for _ in tqdm(range(100000)):
-        # Training.
-        collect_actor.run()
-        loss_info = agent_learner.run(iterations=1)
+    num_iterations = 100000
+    with tqdm(range(num_iterations), desc="Training") as pbar:
+        for _ in range(num_iterations):
+            # Training.
+            collect_actor.run()
+            loss_info = agent_learner.run(iterations=1)
 
-        # Evaluating.
-        step = agent_learner.train_step_numpy
+            # Evaluating.
+            step = agent_learner.train_step_numpy
 
-        if step % 10000 == 0:
-            metrics = get_eval_metrics()
-            log_eval_metrics(step, metrics)
-            returns.append(metrics["AverageReturn"])
+            if step % 10000 == 0:
+                metrics = get_eval_metrics()
+                log_eval_metrics(step, metrics)
+                returns.append(metrics["AverageReturn"])
 
-        if step % 5000 == 0:
-            print("step = {0}: loss = {1}".format(step, loss_info.loss.numpy()))
+            pbar.set_description(
+                f"Training | Step {step}: loss = {loss_info.loss.numpy()}"
+            )
+
+            pbar.update()
 
     rb_observer.close()
     reverb_server.stop()
