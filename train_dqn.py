@@ -117,154 +117,156 @@ with strategy.scope():
 
     tf_agent.initialize()
 
-    update_pb("Create reverb replay")
-    rate_limiter = reverb.rate_limiters.SampleToInsertRatio(
-        samples_per_insert=3.0, min_size_to_sample=3, error_buffer=3.0
+update_pb("Create reverb replay")
+rate_limiter = reverb.rate_limiters.SampleToInsertRatio(
+    samples_per_insert=3.0, min_size_to_sample=3, error_buffer=3.0
+)
+
+table_name = "uniform_table"
+table = reverb.Table(
+    table_name,
+    max_size=10000,
+    sampler=reverb.selectors.Uniform(),
+    remover=reverb.selectors.Fifo(),
+    rate_limiter=reverb.rate_limiters.MinSize(1),
+)
+
+reverb_server = reverb.Server([table])
+
+reverb_replay = reverb_replay_buffer.ReverbReplayBuffer(
+    tf_agent.collect_data_spec,
+    sequence_length=2,
+    table_name="uniform_table",
+    local_server=reverb_server,
+)
+
+update_pb("Prefetch experiences")
+dataset = reverb_replay.as_dataset(sample_batch_size=BATCH_SIZE, num_steps=2).prefetch(
+    50
+)
+experience_dataset_fn = lambda: dataset
+
+update_pb("Create policies")
+tf_eval_policy = tf_agent.policy
+eval_policy = py_tf_eager_policy.PyTFEagerPolicy(tf_eval_policy, use_tf_function=True)
+update_pb()
+
+tf_collect_policy = tf_agent.collect_policy
+collect_policy = py_tf_eager_policy.PyTFEagerPolicy(
+    tf_collect_policy, use_tf_function=True
+)
+update_pb()
+
+random_policy = random_py_policy.RandomPyPolicy(
+    collect_env.time_step_spec(), collect_env.action_spec()
+)
+update_pb()
+
+rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
+    reverb_replay.py_client, table_name, sequence_length=2, stride_length=1
+)
+
+update_pb("Run initial actor")
+initial_collect_actor = actor.Actor(
+    collect_env,
+    random_policy,
+    train_step,
+    steps_per_run=10000,
+    observers=[rb_observer],
+)
+initial_collect_actor.run()
+
+update_pb("Create collect actor")
+env_step_metric = py_metrics.EnvironmentSteps()
+collect_actor = actor.Actor(
+    collect_env,
+    collect_policy,
+    train_step,
+    steps_per_run=1,
+    metrics=actor.collect_metrics(10),
+    summary_dir=os.path.join(tempdir, learner.TRAIN_DIR),
+    observers=[rb_observer, env_step_metric],
+)
+
+update_pb("Create eval actor")
+eval_actor = actor.Actor(
+    eval_env,
+    eval_policy,
+    train_step,
+    episodes_per_run=20,
+    metrics=actor.eval_metrics(20),
+    summary_dir=os.path.join(tempdir, "eval"),
+)
+
+update_pb("Create triggers")
+saved_model_dir = os.path.join(tempdir, learner.POLICY_SAVED_MODEL_DIR)
+
+# Triggers to save the agent's policy checkpoints.
+learning_triggers = [
+    triggers.PolicySavedModelTrigger(
+        saved_model_dir, tf_agent, train_step, interval=5000
+    ),
+    triggers.StepPerSecondLogTrigger(train_step, interval=1000),
+]
+
+update_pb("Create learner")
+agent_learner = learner.Learner(
+    tempdir,
+    train_step,
+    tf_agent,
+    experience_dataset_fn,
+    triggers=learning_triggers,
+    strategy=strategy,
+)
+
+
+update_pb("Get metrics")
+
+
+def get_eval_metrics():
+    eval_actor.run()
+    return {metric.name: metric.result() for metric in eval_actor.metrics}
+
+
+metrics = get_eval_metrics()
+
+
+def log_eval_metrics(step, metrics):
+    eval_results = (", ").join(
+        "{} = {:.6f}".format(name, result) for name, result in metrics.items()
     )
+    print("step = {0}: {1}".format(step, eval_results))
 
-    table_name = "uniform_table"
-    table = reverb.Table(
-        table_name,
-        max_size=10000,
-        sampler=reverb.selectors.Uniform(),
-        remover=reverb.selectors.Fifo(),
-        rate_limiter=reverb.rate_limiters.MinSize(1),
-    )
 
-    reverb_server = reverb.Server([table])
+log_eval_metrics(0, metrics)
 
-    reverb_replay = reverb_replay_buffer.ReverbReplayBuffer(
-        tf_agent.collect_data_spec,
-        sequence_length=2,
-        table_name="uniform_table",
-        local_server=reverb_server,
-    )
+# Reset the train step
+tf_agent.train_step_counter.assign(0)
 
-    update_pb("Prefetch experiences")
-    dataset = reverb_replay.as_dataset(
-        sample_batch_size=BATCH_SIZE, num_steps=2
-    ).prefetch(50)
-    experience_dataset_fn = lambda: dataset
+update_pb("Evaluate agent's policy")
+avg_return = get_eval_metrics()["AverageReturn"]
+returns = [avg_return]
+update_pb()
+pb.close()
 
-    update_pb("Create policies")
-    tf_eval_policy = tf_agent.policy
-    eval_policy = py_tf_eager_policy.PyTFEagerPolicy(
-        tf_eval_policy, use_tf_function=True
-    )
-    update_pb()
+num_iterations = 100000
+with tqdm(range(num_iterations), desc="Training") as pbar:
+    for _ in range(num_iterations):
+        # Training.
+        collect_actor.run()
+        loss_info = agent_learner.run(iterations=1)
 
-    tf_collect_policy = tf_agent.collect_policy
-    collect_policy = py_tf_eager_policy.PyTFEagerPolicy(
-        tf_collect_policy, use_tf_function=True
-    )
-    update_pb()
+        # Evaluating.
+        step = agent_learner.train_step_numpy
 
-    random_policy = random_py_policy.RandomPyPolicy(
-        collect_env.time_step_spec(), collect_env.action_spec()
-    )
-    update_pb()
+        if step % 10000 == 0:
+            metrics = get_eval_metrics()
+            log_eval_metrics(step, metrics)
+            returns.append(metrics["AverageReturn"])
 
-    rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
-        reverb_replay.py_client, table_name, sequence_length=2, stride_length=1
-    )
+        pbar.set_description(f"Training | Loss: {loss_info.loss.numpy()}")
 
-    update_pb("Run initial actor")
-    initial_collect_actor = actor.Actor(
-        collect_env,
-        random_policy,
-        train_step,
-        steps_per_run=10000,
-        observers=[rb_observer],
-    )
-    initial_collect_actor.run()
+        pbar.update()
 
-    update_pb("Create actors & learner")
-    env_step_metric = py_metrics.EnvironmentSteps()
-    collect_actor = actor.Actor(
-        collect_env,
-        collect_policy,
-        train_step,
-        steps_per_run=1,
-        metrics=actor.collect_metrics(10),
-        summary_dir=os.path.join(tempdir, learner.TRAIN_DIR),
-        observers=[rb_observer, env_step_metric],
-    )
-    update_pb()
-
-    eval_actor = actor.Actor(
-        eval_env,
-        eval_policy,
-        train_step,
-        episodes_per_run=20,
-        metrics=actor.eval_metrics(20),
-        summary_dir=os.path.join(tempdir, "eval"),
-    )
-    update_pb()
-
-    saved_model_dir = os.path.join(tempdir, learner.POLICY_SAVED_MODEL_DIR)
-
-    # Triggers to save the agent's policy checkpoints.
-    learning_triggers = [
-        triggers.PolicySavedModelTrigger(
-            saved_model_dir, tf_agent, train_step, interval=5000
-        ),
-        triggers.StepPerSecondLogTrigger(train_step, interval=1000),
-    ]
-    update_pb()
-
-    agent_learner = learner.Learner(
-        tempdir,
-        train_step,
-        tf_agent,
-        experience_dataset_fn,
-        triggers=learning_triggers,
-        strategy=strategy,
-    )
-    update_pb()
-
-    def get_eval_metrics():
-        eval_actor.run()
-        return {metric.name: metric.result() for metric in eval_actor.metrics}
-
-    metrics = get_eval_metrics()
-
-    def log_eval_metrics(step, metrics):
-        eval_results = (", ").join(
-            "{} = {:.6f}".format(name, result) for name, result in metrics.items()
-        )
-        print("step = {0}: {1}".format(step, eval_results))
-
-    log_eval_metrics(0, metrics)
-
-    # Reset the train step
-    tf_agent.train_step_counter.assign(0)
-
-    update_pb("Evaluate agent's policy")
-    avg_return = get_eval_metrics()["AverageReturn"]
-    returns = [avg_return]
-    update_pb()
-    pb.close()
-
-    num_iterations = 100000
-    with tqdm(range(num_iterations), desc="Training") as pbar:
-        for _ in range(num_iterations):
-            # Training.
-            collect_actor.run()
-            loss_info = agent_learner.run(iterations=1)
-
-            # Evaluating.
-            step = agent_learner.train_step_numpy
-
-            if step % 10000 == 0:
-                metrics = get_eval_metrics()
-                log_eval_metrics(step, metrics)
-                returns.append(metrics["AverageReturn"])
-
-            pbar.set_description(
-                f"Training | Step {step}: loss = {loss_info.loss.numpy()}"
-            )
-
-            pbar.update()
-
-    rb_observer.close()
-    reverb_server.stop()
+rb_observer.close()
+reverb_server.stop()

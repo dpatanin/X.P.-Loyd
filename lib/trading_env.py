@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from gymnasium import spaces
-from tf_agents.environments import PyEnvironment, TFEnvironment
+from tf_agents.environments import PyEnvironment
 from tf_agents.specs import BoundedArraySpec
 from tf_agents.trajectories import time_step as ts
 from tf_agents.typing import types
@@ -37,14 +37,12 @@ class TradingEnvironment(gym.Env):
         self.action_space = spaces.Box(low=-trade_limit, high=trade_limit, shape=(1,))
 
         obs_shape = (2 + window_size * len(features),)
-        self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=obs_shape, dtype=np.float64
-        )
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape)
 
         # episode
         self._init_balance = balance
         self._start_tick = self.window_size
-        self._end_tick = len(self.df) - 1
+        self._end_tick = len(self.df)
 
         self.reset()
 
@@ -62,13 +60,10 @@ class TradingEnvironment(gym.Env):
 
         return self.observation
 
-    def step(self, action):
-        assert (
-            action.shape == self.action_spec().shape
-        ), f"Unexpected action shape.\nReceived: {action.shape}.\nExpected: {self.action_spec().shape}"
+    def step(self, action: np.ndarray):
         self._current_tick += 1
         self._done = self._current_tick == self._end_tick
-        trade_volume = round(action[0])
+        trade_volume = action.round()[0]
 
         profit = fees = 0.00
         if trade_volume != self._position:
@@ -86,7 +81,13 @@ class TradingEnvironment(gym.Env):
         info = {"profit": profit, "fees": fees, "balance": self._balance}
         self._update_history(info)
 
-        return self.observation, profit, self._done, self._truncated, info
+        return (
+            self.observation,
+            np.array(profit, dtype=np.float32),
+            self._done,
+            self._truncated,
+            info,
+        )
 
     def _update_observation(self):
         next_window = self.df[
@@ -99,7 +100,8 @@ class TradingEnvironment(gym.Env):
                 [self._position],
                 [self._balance],
                 *[next_window[feature].values for feature in self.features],
-            ]
+            ],
+            dtype=self.observation_space.dtype,
         )
 
     def _update_history(self, info):
@@ -163,64 +165,26 @@ class TradingEnvironment(gym.Env):
         plt.show()
 
     def observation_spec(self):
-        return self._get_space_spec(self.observation_space)
+        return self._get_space_spec(self.observation_space, "observation")
 
     def action_spec(self):
-        return self._get_space_spec(self.action_space)
+        return self._get_space_spec(self.action_space, "action")
 
     def time_step_spec(self):
         return ts.time_step_spec(self.observation_spec())
 
-    def _get_space_spec(self, space: gym.Space):
+    def _get_space_spec(self, space: gym.Space, name: str):
         return BoundedArraySpec(
-            shape=space.shape, dtype=space.dtype, minimum=space.low, maximum=space.high
+            shape=space.shape,
+            dtype=space.dtype,
+            minimum=space.low,
+            maximum=space.high,
+            name=name,
         )
-
-
-class TFTradingEnvWrapper(TFEnvironment):
-    def __init__(self, env: TradingEnvironment):
-        super().__init__(
-            time_step_spec=env.time_step_spec(), action_spec=env.action_spec()
-        )
-
-        self._env = env
-        self._reset()
-
-    def _current_time_step(self):
-        return ts.TimeStep(
-            step_type=self._current_step,
-            reward=self._latest_reward,
-            discount=self._discount,
-            observation=self._env.observation,
-        )
-
-    def _reset(self):
-        self._env.reset()
-        self._discount = 1.0  # Currently not in use
-        self._latest_reward = 0.0
-        self._current_step = ts.StepType.FIRST
-
-        return self._current_time_step()
-
-    def _step(self, action):
-        if self._current_step == ts.StepType.LAST:
-            return self._reset()
-        observation, reward, done, truncated, _info = self._env.step(action)
-        self._current_step = ts.StepType.LAST if done or truncated else ts.StepType.MID
-
-        return ts.TimeStep(
-            step_type=self._current_step,
-            reward=reward,
-            discount=self._discount,
-            observation=observation,
-        )
-
-    def render(self):
-        self._env.render()
 
 
 class PyTradingEnvWrapper(PyEnvironment):
-    def __init__(self, env: TradingEnvironment, handle_auto_reset: bool = False):
+    def __init__(self, env: TradingEnvironment, handle_auto_reset=False):
         super().__init__(handle_auto_reset)
 
         self._env = env
@@ -267,12 +231,12 @@ class PyTradingEnvWrapper(PyEnvironment):
 
     def _reset(self) -> ts.TimeStep:
         observation = self._env.reset()
-        self._discount = 1.0  # Currently not in use
+        self._discount = np.array(1.0, dtype=np.float32)  # Currently not in use
         self._latest_info = {}
         self._current_time_step = ts.TimeStep(
             step_type=ts.StepType.FIRST,
-            reward=0.0,
-            discount=0.0,
+            reward=np.array(0.0, dtype=np.float32),
+            discount=self._discount,
             observation=observation,
         )
 
