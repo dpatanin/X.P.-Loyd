@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import Any, Optional, Text
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
@@ -6,14 +6,11 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from gymnasium import spaces
-from tf_agents.specs import ArraySpec, BoundedArraySpec, BoundedTensorSpec
+from tf_agents.environments import PyEnvironment, TFEnvironment
+from tf_agents.specs import BoundedArraySpec, array_spec
 from tf_agents.trajectories import time_step as ts
-
-
-class TradingStats(TypedDict):
-    profit: float
-    fees: float
-    balance: float
+from tf_agents.typing import types
+from tf_agents.utils import common
 
 
 class TradingEnvironment(gym.Env):
@@ -39,22 +36,10 @@ class TradingEnvironment(gym.Env):
         self.tick_ratio = tick_ratio
         self.fees_per_contract = fees_per_contract
 
-        def act_pos_space():
-            return spaces.Box(low=-trade_limit, high=trade_limit, shape=(1,))
+        self.action_space = spaces.Box(low=-trade_limit, high=trade_limit, shape=(1,))
 
-        def simple_box(length):
-            return spaces.Box(
-                low=-np.inf, high=np.inf, shape=(length,), dtype=np.float32
-            )
-
-        self.action_space = act_pos_space()
-        self.observation_space = spaces.Dict(
-            {
-                "position": act_pos_space(),
-                "balance": simple_box(1),
-            }
-            | {f: simple_box(window_size) for f in features}
-        )
+        obs_shape = (2 + window_size * len(features),)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape, dtype=np.float64)
 
         # episode
         self._init_balance = balance
@@ -78,31 +63,30 @@ class TradingEnvironment(gym.Env):
         return self.observation
 
     def step(self, action):
+        assert (
+            action.shape == self.action_spec().shape
+        ), f"Unexpected action shape.\nReceived: {action.shape}.\nExpected: {self.action_spec().shape}"
         self._current_tick += 1
         self._done = self._current_tick == self._end_tick
-        trade_volume = round(action)
+        trade_volume = round(action[0])
 
-        price_diff = 0
+        profit = fees = 0.00
         if trade_volume != self._position:
             current_close_price = self.df["close"].iloc[self._current_tick]
-            if self._position == 1:
-                price_diff = current_close_price - self.entry_price
-            elif self._position == 2:
-                price_diff = self.entry_price - current_close_price
-            self.entry_price = current_close_price
+            price_diff = current_close_price - self._entry_price
+            self._entry_price = current_close_price
 
-        reward = self._calculate_reward(price_diff)
-        profit, fees = self._update_balance(price_diff, trade_volume)
-        self._truncated = self._balance <= 0
+            profit, fees = self._update_balance(price_diff, self._position)
+            self._truncated = self._balance <= 0
 
-        self._position = action
+        self._position = trade_volume
         self._position_history.append(self._position)
 
         self._update_observation()
-        info: TradingStats = {"profit": profit, "fees": fees, "balance": self._balance}
+        info = {"profit": profit, "fees": fees, "balance": self._balance}
         self._update_history(info)
 
-        return self.observation, reward, self._done, self._truncated, info
+        return self.observation, profit, self._done, self._truncated, info
 
     def _update_observation(self):
         next_window = self.df[
@@ -110,32 +94,23 @@ class TradingEnvironment(gym.Env):
         ]
 
         # Ensure order of inputs/outputs
-        self.observation = {
-            "position": [self._position],
-            "balance": [self._balance],
-        } | {f: next_window[f].values for f in self.features}
+        self.observation = np.concatenate(
+            [
+                [self._position],
+                [self._balance],
+                *[next_window[feature].values for feature in self.features],
+            ]
+        )
 
-        # np.concatenate(
-        #     [
-        #         [self._position],
-        #         [self._balance],
-        #         *[next_window[feature].values for feature in self.features],
-        #     ]
-        # )
-
-    def _update_history(self, info: TradingStats):
+    def _update_history(self, info):
         if not self.history:
             self.history = {key: [] for key in info.keys()}
 
         for key, value in info.items():
             self.history[key].append(value)
 
-    def _calculate_reward(self, diff_price: float):
-        # TODO: Reward function?
-        return diff_price
-
     def _update_balance(self, price_diff: float, trade_volume: int):
-        fees = trade_volume * self.fees_per_contract
+        fees = abs(trade_volume) * self.fees_per_contract
         profit = trade_volume * price_diff * self.tick_ratio
         self._balance += profit - fees
         return (profit, fees)
@@ -188,26 +163,117 @@ class TradingEnvironment(gym.Env):
         plt.show()
 
     def observation_spec(self):
-        return {
-            k: ArraySpec(v.shape, v.dtype)
-            for k, v in self.observation_space.spaces.items()
-        }
+        return self._get_space_spec(self.observation_space)
 
     def action_spec(self):
-        if isinstance(self.action_space, gym.spaces.Box):
-            return BoundedArraySpec(
-                shape=self.action_space.shape,
-                dtype=self.action_space.dtype,
-                minimum=self.action_space.low,
-                maximum=self.action_space.high,
-            )
-        elif isinstance(self.action_space, gym.spaces.Discrete):
-            return BoundedTensorSpec(
-                shape=(),
-                dtype=np.int32,
-                minimum=self.action_space.n - 1,
-                maximum=self.action_space.n - 1,
-            )
+        return self._get_space_spec(self.action_space)
 
     def time_step_spec(self):
         return ts.time_step_spec(self.observation_spec())
+
+    def _get_space_spec(self, space: gym.Space):
+        return BoundedArraySpec(
+            shape=space.shape, dtype=space.dtype, minimum=space.low, maximum=space.high
+        )
+
+
+class TFTradingEnvWrapper(TFEnvironment):
+    def __init__(self, env: TradingEnvironment):
+        super().__init__(
+            time_step_spec=env.time_step_spec(), action_spec=env.action_spec()
+        )
+
+        self._env = env
+        self._reset()
+
+    def _current_time_step(self):
+        return ts.TimeStep(
+            step_type=self._current_step,
+            reward=self._latest_reward,
+            discount=self._discount,
+            observation=self._env.observation,
+        )
+
+    def _reset(self):
+        self._env.reset()
+        self._discount = 1.0  # Currently not in use
+        self._latest_reward = 0.0
+        self._current_step = ts.StepType.FIRST
+
+        return self._current_time_step()
+
+    def _step(self, action):
+        if self._current_step == ts.StepType.LAST:
+            return self._reset()
+        observation, reward, done, truncated, _info = self._env.step(action)
+        self._current_step = ts.StepType.LAST if done or truncated else ts.StepType.MID
+
+        return ts.TimeStep(
+            step_type=self._current_step,
+            reward=reward,
+            discount=self._discount,
+            observation=observation,
+        )
+
+    def render(self):
+        self._env.render()
+
+
+class PyTradingEnvWrapper(PyEnvironment):
+    def __init__(self, env: TradingEnvironment, handle_auto_reset: bool = False):
+        super().__init__(handle_auto_reset)
+
+        self._env = env
+        self._latest_info = {}
+        self._reset()
+
+    def observation_spec(self) -> types.NestedArraySpec:
+        return self._env.observation_spec()
+
+    def action_spec(self) -> types.NestedArraySpec:
+        return self._env.action_spec()
+
+    def time_step_spec(self) -> ts.TimeStep:
+        return self._env.time_step_spec()
+
+    def render(self, mode: Text = "rgb_array") -> Optional[types.NestedArray]:
+        self._env.render()
+
+    def get_info(self) -> types.NestedArray:
+        def dict_to_nested_arrays(dictionary):
+            if isinstance(dictionary, dict):
+                nested_array = []
+                for key, value in dictionary.items():
+                    nested_value = dict_to_nested_arrays(value)
+                    nested_array.append((key, nested_value))
+                return nested_array
+            else:
+                return dictionary
+
+        return dict_to_nested_arrays(self._latest_info)
+
+    def _step(self, action: types.NestedArray) -> ts.TimeStep:
+        observation, reward, done, truncated, info = self._env.step(action)
+
+        self._latest_info = info
+        self._current_time_step = ts.TimeStep(
+            step_type=ts.StepType.LAST if done or truncated else ts.StepType.MID,
+            reward=reward,
+            discount=self._discount,
+            observation=observation,
+        )
+
+        return self._current_time_step
+
+    def _reset(self) -> ts.TimeStep:
+        observation = self._env.reset()
+        self._discount = 1.0  # Currently not in use
+        self._latest_info = {}
+        self._current_time_step = ts.TimeStep(
+            step_type=ts.StepType.FIRST,
+            reward=0.0,
+            discount=0.0,
+            observation=observation,
+        )
+
+        return self.current_time_step()

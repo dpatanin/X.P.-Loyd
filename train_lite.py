@@ -5,11 +5,11 @@ from datetime import datetime
 import pandas as pd
 import reverb  # type: ignore
 import tensorflow as tf
-import tqdm
+from tqdm import tqdm
 from tf_agents.agents.cql import cql_sac_agent
 from tf_agents.agents.ddpg import critic_rnn_network
 from tf_agents.agents.sac import tanh_normal_projection_network
-from tf_agents.environments import FlattenObservationsWrapper
+from tf_agents.environments.py_environment import PyEnvironment
 from tf_agents.metrics import py_metrics
 from tf_agents.networks import actor_distribution_rnn_network
 from tf_agents.policies import py_tf_eager_policy, random_py_policy
@@ -18,7 +18,7 @@ from tf_agents.train import actor, learner, triggers
 from tf_agents.train.utils import spec_utils, strategy_utils, train_utils
 
 from lib.data_processor import DataProcessor
-from lib.trading_env import TradingEnvironment
+from lib.trading_env import PyTradingEnvWrapper, TradingEnvironment
 
 tempdir = tempfile.gettempdir()
 
@@ -46,9 +46,11 @@ dp = DataProcessor("source.csv", 5)
 
 
 def env_creator(df: pd.DataFrame):
-    return FlattenObservationsWrapper(
+    return PyTradingEnvWrapper(
         TradingEnvironment(
-            df=df, window_size=SEQ_LENGTH, features=features,
+            df=df,
+            window_size=SEQ_LENGTH,
+            features=features,
         )
     )
 
