@@ -1,16 +1,14 @@
-from typing import Any, Optional, Text
+from typing import Optional, Text
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from gymnasium import spaces
 from tf_agents.environments import PyEnvironment, TFEnvironment
-from tf_agents.specs import BoundedArraySpec, array_spec
+from tf_agents.specs import BoundedArraySpec
 from tf_agents.trajectories import time_step as ts
 from tf_agents.typing import types
-from tf_agents.utils import common
 
 
 class TradingEnvironment(gym.Env):
@@ -39,7 +37,9 @@ class TradingEnvironment(gym.Env):
         self.action_space = spaces.Box(low=-trade_limit, high=trade_limit, shape=(1,))
 
         obs_shape = (2 + window_size * len(features),)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape, dtype=np.float64)
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=obs_shape, dtype=np.float64
+        )
 
         # episode
         self._init_balance = balance
