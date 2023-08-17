@@ -280,6 +280,6 @@ with tqdm(range(TIME_STEPS), desc="Training") as pbar:
     except TypeError as error:
         logging.error(error)
 
-tf.saved_model.save(tf_agent.policy, "/models/saved_model")
+tf.saved_model.save(tf_agent.policy, "/tmp/models/saved_model")
 rb_observer.close()
 reverb_server.stop()

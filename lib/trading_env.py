@@ -272,10 +272,13 @@ class PyTradingEnvWrapper(PyEnvironment):
                 return obj
             else:
                 raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-            
-        with open(f"{file_name}.json", "w") as json_file:
-            for ep in self._env._episode_history:
-                for key, value_list in ep.items():
-                    ep[key] = [convert_to_json_serializable(value) for value in value_list]
 
-            json.dump(ep, json_file)
+        with open(f"{file_name}.json", "w") as json_file:
+            if len(self._env._episode_history) > 0:
+                for ep in self._env._episode_history:
+                    for key, value_list in ep.items():
+                        ep[key] = [
+                            convert_to_json_serializable(value) for value in value_list
+                        ]
+
+            json.dump(self._env._episode_history, json_file)
