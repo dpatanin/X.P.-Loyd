@@ -3,6 +3,7 @@ import warnings
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "4"  # or any {0:5}
 warnings.simplefilter("ignore")
+import logging
 import tempfile
 from datetime import datetime
 
@@ -38,13 +39,13 @@ features = [
     "volume",
 ]
 
-DESC = "CQL-SAC"
 FULL_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM"  # No sentiment but ~15 years
 SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21293628&authkey=!ANbFvs1RrC9WQ3c"  # With sentiment but ~5 years
 SEQ_LENGTH = 30
 BATCH_SIZE = 512
+TIME_STEPS = 100000
 
-dp = DataProcessor("source.csv", 5)
+dp = DataProcessor(FULL_DATA, 5)
 pb = tqdm(range(18), desc="Create environments")
 
 
@@ -60,6 +61,9 @@ def env_creator(df: pd.DataFrame):
             df=df,
             window_size=SEQ_LENGTH,
             features=features,
+            balance=10000.00,
+            fees_per_contract=0.25,
+            trade_limit=50,
         )
     )
 
@@ -252,9 +256,8 @@ returns = [avg_return]
 update_pb("Training prepared!")
 pb.close()
 
-num_iterations = 100000
-with tqdm(range(num_iterations), desc="Training") as pbar:
-    for _ in range(num_iterations):
+with tqdm(range(TIME_STEPS), desc="Training") as pbar:
+    for _ in range(TIME_STEPS):
         # Training.
         collect_actor.run()
         loss_info = agent_learner.run(iterations=1)
@@ -263,6 +266,7 @@ with tqdm(range(num_iterations), desc="Training") as pbar:
         step = agent_learner.train_step_numpy
 
         if step % 10000 == 0:
+            pbar.set_description("Evaluating")
             metrics = get_eval_metrics()
             log_eval_metrics(step, metrics)
             returns.append(metrics["AverageReturn"])
@@ -271,5 +275,11 @@ with tqdm(range(num_iterations), desc="Training") as pbar:
 
         pbar.update()
 
+    try:
+        collect_env.save_episode_history(f"logs/episode-history__{now}")
+    except TypeError as error:
+        logging.error(error)
+
+tf.saved_model.save(tf_agent.policy, "/models/saved_model")
 rb_observer.close()
 reverb_server.stop()

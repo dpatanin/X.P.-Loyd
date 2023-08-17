@@ -1,3 +1,4 @@
+import json
 from typing import Optional, Text
 
 import gymnasium as gym
@@ -43,6 +44,7 @@ class TradingEnvironment(gym.Env):
         self._init_balance = balance
         self._start_tick = self.window_size
         self._end_tick = len(self.df)
+        self._episode_history = []
 
         self.reset()
 
@@ -52,6 +54,8 @@ class TradingEnvironment(gym.Env):
         self._balance = self._init_balance
         self._current_tick = self._start_tick
         self._entry_price = 0
+        self._total_profit = 0
+        self._total_fees = 0
         self._position = 0
         self._position_history = (self.window_size * [None]) + [self._position]
         self._first_rendering = True
@@ -63,7 +67,7 @@ class TradingEnvironment(gym.Env):
     def step(self, action: np.ndarray):
         self._current_tick += 1
         self._done = self._current_tick == self._end_tick
-        trade_volume = action.round()[0]
+        trade_volume = action[0]
 
         profit = fees = 0.00
         if trade_volume != self._position:
@@ -78,8 +82,10 @@ class TradingEnvironment(gym.Env):
         self._position_history.append(self._position)
 
         self._update_observation()
-        info = {"profit": profit, "fees": fees, "balance": self._balance}
+        info = self._get_info(profit, fees)
         self._update_history(info)
+        if self._done or self._truncated:
+            self._episode_history.append(self.history)
 
         return (
             self.observation,
@@ -113,17 +119,31 @@ class TradingEnvironment(gym.Env):
 
     def _update_balance(self, price_diff: float, trade_volume: int):
         fees = abs(trade_volume) * self.fees_per_contract
+        self._total_fees += fees
+
         profit = trade_volume * price_diff * self.tick_ratio
+        self._total_profit += profit
+
         self._balance += profit - fees
         return (profit, fees)
+
+    def _get_info(self, profit, fees):
+        return {
+            "profit": profit,
+            "total_profit": self._total_profit,
+            "fees": fees,
+            "total_fees": self._total_fees,
+            "balance": self._balance,
+            "position": self._position,
+        }
 
     def render(self, mode="human"):
         def _plot_position(position, tick):
             if position == 0:
                 color = "blue"
-            elif position == 1:
+            elif position > 0:
                 color = "green"
-            elif position == 2:
+            elif position < 0:
                 color = "red"
             else:
                 color = None
@@ -147,9 +167,9 @@ class TradingEnvironment(gym.Env):
         short_ticks = []
         long_ticks = []
         for i, tick in enumerate(window_ticks):
-            if self._position_history[i] == 2:
+            if self._position_history[i] < 0:
                 short_ticks.append(tick)
-            elif self._position_history[i] == 1:
+            elif self._position_history[i] > 0:
                 long_ticks.append(tick)
 
         plt.plot(short_ticks, self.prices[short_ticks], "ro")
@@ -184,8 +204,8 @@ class TradingEnvironment(gym.Env):
 
 
 class PyTradingEnvWrapper(PyEnvironment):
-    def __init__(self, env: TradingEnvironment, handle_auto_reset=False):
-        super().__init__(handle_auto_reset)
+    def __init__(self, env: TradingEnvironment):
+        super().__init__()
 
         self._env = env
         self._latest_info = {}
@@ -217,6 +237,8 @@ class PyTradingEnvWrapper(PyEnvironment):
         return dict_to_nested_arrays(self._latest_info)
 
     def _step(self, action: types.NestedArray) -> ts.TimeStep:
+        if self._current_time_step.is_last():
+            return self._reset()
         observation, reward, done, truncated, info = self._env.step(action)
 
         self._latest_info = info
@@ -241,3 +263,19 @@ class PyTradingEnvWrapper(PyEnvironment):
         )
 
         return self.current_time_step()
+
+    def save_episode_history(self, file_name: str):
+        def convert_to_json_serializable(obj):
+            if isinstance(obj, np.generic):
+                return obj.item()
+            elif isinstance(obj, (int, float, str)):
+                return obj
+            else:
+                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+            
+        with open(f"{file_name}.json", "w") as json_file:
+            for ep in self._env._episode_history:
+                for key, value_list in ep.items():
+                    ep[key] = [convert_to_json_serializable(value) for value in value_list]
+
+            json.dump(ep, json_file)
