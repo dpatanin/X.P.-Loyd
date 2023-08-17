@@ -17,7 +17,7 @@ class DataProcessor:
     def __init__(self, src: str, ema_period: int) -> None:
         download = None if self._is_local(src) else wget.download(src)
 
-        self._pb = tqdm(range(10), desc="Loading data", leave=False)
+        self._pb = tqdm(range(10), desc="Loading data")
         df = pd.read_csv(download or src)
         if download:
             os.remove(download)
@@ -56,7 +56,7 @@ class DataProcessor:
         self.train_df = df[: int(n * 0.7)]
         self.val_df = df[int(n * 0.7) : int(n * 0.9)]
         self.test_df = df[int(n * 0.9) :]
-        self._update_pb("Done")
+        self._update_pb("Data processed!")
         self._pb.close()
 
     def _is_local(self, url):

@@ -1,4 +1,8 @@
 import os
+import warnings
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "4"  # or any {0:5}
+warnings.simplefilter("ignore")
 import tempfile
 from datetime import datetime
 
@@ -40,9 +44,8 @@ SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%2129
 SEQ_LENGTH = 30
 BATCH_SIZE = 512
 
-
 dp = DataProcessor("source.csv", 5)
-pb = tqdm(range(18), desc="Create environments", leave=False)
+pb = tqdm(range(18), desc="Create environments")
 
 
 def update_pb(desc: str = None):
@@ -220,7 +223,7 @@ agent_learner = learner.Learner(
 )
 
 
-update_pb("Get metrics")
+update_pb("Run eval actor")
 
 
 def get_eval_metrics():
@@ -246,7 +249,7 @@ tf_agent.train_step_counter.assign(0)
 update_pb("Evaluate agent's policy")
 avg_return = get_eval_metrics()["AverageReturn"]
 returns = [avg_return]
-update_pb()
+update_pb("Training prepared!")
 pb.close()
 
 num_iterations = 100000
