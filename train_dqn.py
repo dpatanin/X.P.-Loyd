@@ -4,7 +4,6 @@ import warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "4"  # or any {0:5}
 warnings.simplefilter("ignore")
 import logging
-import tempfile
 from datetime import datetime
 
 import pandas as pd
@@ -19,12 +18,11 @@ from tf_agents.policies import py_tf_eager_policy, random_py_policy
 from tf_agents.replay_buffers import reverb_replay_buffer, reverb_utils
 from tf_agents.train import actor, learner, triggers
 from tf_agents.train.utils import spec_utils, strategy_utils, train_utils
+from tf_agents.utils import common
 from tqdm import tqdm
 
 from lib.data_processor import DataProcessor
 from lib.trading_env import PyTradingEnvWrapper, TradingEnvironment
-
-tempdir = tempfile.gettempdir()
 
 now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 features = [
@@ -39,14 +37,18 @@ features = [
     "volume",
 ]
 
+LOG_DIR = "logs"
+MODEL_DIR = "models"
 FULL_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM"  # No sentiment but ~15 years
 SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21293628&authkey=!ANbFvs1RrC9WQ3c"  # With sentiment but ~5 years
 SEQ_LENGTH = 30
 BATCH_SIZE = 512
-TIME_STEPS = 100000
+TIME_STEPS = 1000
+CHECKPOINT_INTERVAL = 100
+LOAD_CHECKPOINT = True
 
 dp = DataProcessor(FULL_DATA, 5)
-pb = tqdm(range(18), desc="Create environments")
+pb = tqdm(range(16), desc="Create environments")
 
 
 def update_pb(desc: str = None):
@@ -191,7 +193,7 @@ collect_actor = actor.Actor(
     train_step,
     steps_per_run=1,
     metrics=actor.collect_metrics(10),
-    summary_dir=os.path.join(tempdir, learner.TRAIN_DIR),
+    summary_dir=os.path.join(LOG_DIR, "collect"),
     observers=[rb_observer, env_step_metric],
 )
 
@@ -202,40 +204,24 @@ eval_actor = actor.Actor(
     train_step,
     episodes_per_run=20,
     metrics=actor.eval_metrics(20),
-    summary_dir=os.path.join(tempdir, "eval"),
+    summary_dir=os.path.join(LOG_DIR, "eval"),
 )
-
-update_pb("Create triggers")
-saved_model_dir = os.path.join(tempdir, learner.POLICY_SAVED_MODEL_DIR)
-
-# Triggers to save the agent's policy checkpoints.
-learning_triggers = [
-    triggers.PolicySavedModelTrigger(
-        saved_model_dir, tf_agent, train_step, interval=5000
-    ),
-    triggers.StepPerSecondLogTrigger(train_step, interval=1000),
-]
 
 update_pb("Create learner")
 agent_learner = learner.Learner(
-    tempdir,
+    MODEL_DIR,
     train_step,
     tf_agent,
     experience_dataset_fn,
-    triggers=learning_triggers,
+    triggers=[triggers.StepPerSecondLogTrigger(train_step, interval=1000)],
     strategy=strategy,
+    summary_root_dir=LOG_DIR,
 )
-
-
-update_pb("Run eval actor")
 
 
 def get_eval_metrics():
     eval_actor.run()
     return {metric.name: metric.result() for metric in eval_actor.metrics}
-
-
-metrics = get_eval_metrics()
 
 
 def log_eval_metrics(step, metrics):
@@ -245,17 +231,23 @@ def log_eval_metrics(step, metrics):
     print("step = {0}: {1}".format(step, eval_results))
 
 
-log_eval_metrics(0, metrics)
+update_pb("Load checkpointer")
+train_checkpointer = common.Checkpointer(
+    ckpt_dir=f"{MODEL_DIR}/{learner.POLICY_CHECKPOINT_DIR}",
+    max_to_keep=20,
+    agent=tf_agent,
+    policy=tf_agent.policy,
+    replay_buffer=reverb_replay,
+)
+if LOAD_CHECKPOINT and train_checkpointer.checkpoint_exists:
+    train_checkpointer.initialize_or_restore()
+else:
+    print("No checkpoint found.")
 
-# Reset the train step
-tf_agent.train_step_counter.assign(0)
-
-update_pb("Evaluate agent's policy")
-avg_return = get_eval_metrics()["AverageReturn"]
-returns = [avg_return]
 update_pb("Training prepared!")
 pb.close()
 
+returns = []
 with tqdm(range(TIME_STEPS), desc="Training") as pbar:
     for _ in range(TIME_STEPS):
         # Training.
@@ -271,7 +263,12 @@ with tqdm(range(TIME_STEPS), desc="Training") as pbar:
             log_eval_metrics(step, metrics)
             returns.append(metrics["AverageReturn"])
 
-        pbar.set_description(f"Training | Loss: {loss_info.loss.numpy()}")
+        if step % CHECKPOINT_INTERVAL == 0:
+            train_checkpointer.save(step)
+
+        pbar.set_description(
+            f"Training | Step: {step} | Loss: {loss_info.loss.numpy()}"
+        )
 
         pbar.update()
 
@@ -280,6 +277,6 @@ with tqdm(range(TIME_STEPS), desc="Training") as pbar:
     except TypeError as error:
         logging.error(error)
 
-tf.saved_model.save(tf_agent.policy, "/tmp/models/saved_model")
+tf.saved_model.save(tf_agent.policy, f"{MODEL_DIR}/final__{now}")
 rb_observer.close()
 reverb_server.stop()
