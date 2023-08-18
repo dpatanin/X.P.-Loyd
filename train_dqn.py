@@ -4,7 +4,6 @@ import warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "4"  # or any {0:5}
 warnings.simplefilter("ignore")
 import logging
-from datetime import datetime
 
 import pandas as pd
 import reverb  # type: ignore
@@ -24,7 +23,6 @@ from tqdm import tqdm
 from lib.data_processor import DataProcessor
 from lib.trading_env import PyTradingEnvWrapper, TradingEnvironment
 
-now = datetime.now().strftime("%d_%m_%Y %H_%M_%S")
 features = [
     "day_sin",
     "day_cos",
@@ -248,6 +246,7 @@ update_pb("Training prepared!")
 pb.close()
 
 returns = []
+start_step = agent_learner.train_step_numpy
 with tqdm(range(TIME_STEPS), desc="Training") as pbar:
     for _ in range(TIME_STEPS):
         # Training.
@@ -273,10 +272,10 @@ with tqdm(range(TIME_STEPS), desc="Training") as pbar:
         pbar.update()
 
     try:
-        collect_env.save_episode_history(f"logs/episode-history__{now}")
+        collect_env.save_episode_history(f"logs/episode-history_{start_step}-{step}")
     except TypeError as error:
         logging.error(error)
 
-tf.saved_model.save(tf_agent.policy, f"{MODEL_DIR}/final__{now}")
+tf.saved_model.save(tf_agent.policy, f"{MODEL_DIR}/final_{start_step}-{step}")
 rb_observer.close()
 reverb_server.stop()
