@@ -90,7 +90,10 @@ class TradingEnvironment(gym.Env):
         self.history = {}
         self._update_observation()
 
-        return self.observation, self._get_info(0.00, 0.00)
+        info = self._get_info(0.00, 0.00)
+        self._update_history(info)
+
+        return self.observation, info
 
     def step(self, action: np.ndarray):
         self._current_tick += 1
