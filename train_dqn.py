@@ -292,8 +292,9 @@ finally:
         collect_env.save_episode_history(
             f"{LOG_DIR}/episode-history/{start_step}-{step}"
         )
-    except TypeError as error:
+    except Exception as error:
         logging.error(error)
+
     train_checkpointer.save(step)
     tf.saved_model.save(tf_agent.policy, f"{MODEL_DIR}/final_{start_step}-{step}")
     rb_observer.close()

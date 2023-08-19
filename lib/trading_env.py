@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Optional, Text
 
 import gymnasium as gym
@@ -312,6 +313,8 @@ class PyTradingEnvWrapper(PyEnvironment):
 
     def save_episode_history(self, file_name: str):
         self._env._episode_history.append(self._env.history)
+        os.makedirs("/".join(file_name.split("/")[:-1]), exist_ok=True)
+
         with open(f"{file_name}.json", "w") as json_file:
             json.dump(
                 self._env._episode_history, json_file, default=self._serialize_numpy
