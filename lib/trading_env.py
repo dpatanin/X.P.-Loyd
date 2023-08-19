@@ -59,6 +59,7 @@ class TradingEnvironment(gym.Env):
         self._init_balance = balance
         self._prices = df[["high", "low", "open", "close"]]
 
+        self._checkpoint_length = checkpoint_length or len(df)
         if episode_history:
             self._episode_history = (
                 episode_history if keep_full_history else episode_history[-1]
