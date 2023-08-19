@@ -24,7 +24,15 @@ class TradingEnvironment(gym.Env):
         balance=10000.00,
         tick_ratio=12.5 / 0.25,
         fees_per_contract=0.00,
+        episode_history: list[dict] = None,
+        checkpoint_length: int = None,
+        checkpoint_tick: int = None,
     ):
+        """
+        A gym environment simulating simple day trading. Requires price data: `["high", "low", "open", "close"]` to be present in the df.
+        If `episode_history` is not None, the latest checkpoint will be loaded from it and training continues at that point. (`checkpoint_length` is thus required)
+        If `checkpoint_tick` is provided, the checkpoint will be loaded from there.
+        """
         super(TradingEnvironment, self).__init__()
 
         self.df = df
@@ -40,11 +48,18 @@ class TradingEnvironment(gym.Env):
         obs_shape = (2 + window_size * len(features),)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape)
 
-        # episode
         self._init_balance = balance
-        self._start_tick = self.window_size
-        self._end_tick = len(self.df)
-        self._episode_history = []
+        self._episode_history = episode_history or []
+        self._checkpoint = (
+            episode_history[-1]["checkpoint"][-1] if episode_history else 0
+        )
+        self._checkpoint_length = checkpoint_length or len(df)
+        self._start_tick = (
+            checkpoint_tick or self._checkpoint * checkpoint_length
+            if episode_history
+            else self.window_size
+        )
+        self._end_tick = len(self.df) - 1
 
         self.reset()
 
@@ -67,8 +82,11 @@ class TradingEnvironment(gym.Env):
     def step(self, action: np.ndarray):
         self._current_tick += 1
         self._done = self._current_tick == self._end_tick
-        trade_volume = action[0]
+        if self._current_tick >= self._start_tick + self._checkpoint_length:
+            self._checkpoint += 1
+            self._start_tick += self._checkpoint_length
 
+        trade_volume = action[0]
         profit = fees = 0.00
         if trade_volume != self._position:
             current_close_price = self.df["close"].iloc[self._current_tick]
@@ -135,6 +153,7 @@ class TradingEnvironment(gym.Env):
             "total_fees": self._total_fees,
             "balance": self._balance,
             "position": self._position,
+            "checkpoint": self._checkpoint,
         }
 
     def render(self, mode="human"):
@@ -271,6 +290,6 @@ class PyTradingEnvWrapper(PyEnvironment):
             )
 
     def _serialize_numpy(self, obj):
-        if isinstance(obj, np.ndarray):
+        if isinstance(obj, np.generic):
             return obj.item()  # Convert numpy scalar to a Python scalar
         raise TypeError(f"Object of type {type(obj)} is not JSON serializable")

@@ -3,6 +3,7 @@ import warnings
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "4"  # or any {0:5}
 warnings.simplefilter("ignore")
+import json
 import logging
 
 import pandas as pd
@@ -37,13 +38,16 @@ features = [
 
 LOG_DIR = "logs"
 MODEL_DIR = "models"
+EP_HISTORY = "logs/episode-history"  # Singular file
 FULL_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM"  # No sentiment but ~15 years
 SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21293628&authkey=!ANbFvs1RrC9WQ3c"  # With sentiment but ~5 years
+
 SEQ_LENGTH = 30
 BATCH_SIZE = 512
-TIME_STEPS = 1000
-CHECKPOINT_INTERVAL = 100
+TIME_STEPS = 100000
+CHECKPOINT_INTERVAL = 5000  # Agent
 LOAD_CHECKPOINT = True
+CHECKPOINT_LENGTH = 23 * 60  # Environment
 
 dp = DataProcessor(FULL_DATA, 5)
 pb = tqdm(range(16), desc="Create environments")
@@ -64,6 +68,10 @@ def env_creator(df: pd.DataFrame):
             balance=10000.00,
             fees_per_contract=0.25,
             trade_limit=50,
+            episode_history=json.load(open("logs/episode-history.json"))
+            if LOAD_CHECKPOINT
+            else None,
+            checkpoint_length=CHECKPOINT_LENGTH if LOAD_CHECKPOINT else None,
         )
     )
 
@@ -278,9 +286,10 @@ except Exception as error:
     logging.error(error)
 finally:
     try:
-        collect_env.save_episode_history(f"logs/episode-history_{start_step}-{step}")
+        collect_env.save_episode_history(f"{LOG_DIR}/episode-history")
     except TypeError as error:
         logging.error(error)
+    train_checkpointer.save(step)
     tf.saved_model.save(tf_agent.policy, f"{MODEL_DIR}/final_{start_step}-{step}")
     rb_observer.close()
     reverb_server.stop()
