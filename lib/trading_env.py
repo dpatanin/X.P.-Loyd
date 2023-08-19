@@ -265,20 +265,12 @@ class PyTradingEnvWrapper(PyEnvironment):
         return self.current_time_step()
 
     def save_episode_history(self, file_name: str):
-        def convert_to_json_serializable(obj):
-            if isinstance(obj, np.generic):
-                return obj.item()
-            elif isinstance(obj, (int, float, str)):
-                return obj
-            else:
-                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-
         with open(f"{file_name}.json", "w") as json_file:
-            if len(self._env._episode_history) > 0:
-                for ep in self._env._episode_history:
-                    for key, value_list in ep.items():
-                        ep[key] = [
-                            convert_to_json_serializable(value) for value in value_list
-                        ]
+            json.dump(
+                self._env._episode_history, json_file, default=self._serialize_numpy
+            )
 
-            json.dump(self._env._episode_history, json_file)
+    def _serialize_numpy(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.item()  # Convert numpy scalar to a Python scalar
+        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")

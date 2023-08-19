@@ -240,42 +240,47 @@ train_checkpointer = common.Checkpointer(
 if LOAD_CHECKPOINT and train_checkpointer.checkpoint_exists:
     train_checkpointer.initialize_or_restore()
 else:
-    print("No checkpoint found.")
+    logging.error("No checkpoint found.")
 
 update_pb("Training prepared!")
 pb.close()
 
 returns = []
 start_step = agent_learner.train_step_numpy
-with tqdm(range(TIME_STEPS), desc="Training") as pbar:
-    for _ in range(TIME_STEPS):
-        # Training.
-        collect_actor.run()
-        loss_info = agent_learner.run(iterations=1)
+try:
+    with tqdm(range(TIME_STEPS), desc="Training") as pbar:
+        for _ in range(TIME_STEPS):
+            # Training.
+            collect_actor.run()
+            loss_info = agent_learner.run(iterations=1)
 
-        # Evaluating.
-        step = agent_learner.train_step_numpy
+            # Evaluating.
+            step = agent_learner.train_step_numpy
 
-        if step % 10000 == 0:
-            pbar.set_description("Evaluating")
-            metrics = get_eval_metrics()
-            log_eval_metrics(step, metrics)
-            returns.append(metrics["AverageReturn"])
+            if step % 10000 == 0:
+                pbar.set_description("Evaluating")
+                metrics = get_eval_metrics()
+                log_eval_metrics(step, metrics)
+                returns.append(metrics["AverageReturn"])
 
-        if step % CHECKPOINT_INTERVAL == 0:
-            train_checkpointer.save(step)
+            if step % CHECKPOINT_INTERVAL == 0:
+                train_checkpointer.save(step)
 
-        pbar.set_description(
-            f"Training | Step: {step} | Loss: {loss_info.loss.numpy()}"
-        )
+            pbar.set_description(
+                f"Training | Step: {step} | Loss: {loss_info.loss.numpy()}"
+            )
 
-        pbar.update()
+            pbar.update()
 
+except KeyboardInterrupt:
+    pass
+except Exception as error:
+    logging.error(error)
+finally:
     try:
         collect_env.save_episode_history(f"logs/episode-history_{start_step}-{step}")
     except TypeError as error:
         logging.error(error)
-
-tf.saved_model.save(tf_agent.policy, f"{MODEL_DIR}/final_{start_step}-{step}")
-rb_observer.close()
-reverb_server.stop()
+    tf.saved_model.save(tf_agent.policy, f"{MODEL_DIR}/final_{start_step}-{step}")
+    rb_observer.close()
+    reverb_server.stop()
