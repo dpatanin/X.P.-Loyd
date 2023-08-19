@@ -102,7 +102,7 @@ class TradingEnvironment(gym.Env):
         trade_volume = action[0]
         profit = fees = 0.00
         if trade_volume != self._position:
-            current_close_price = self.df["close"].iloc[self._current_tick]
+            current_close_price = self._df["close"].iloc[self._current_tick]
             price_diff = current_close_price - self._entry_price
             self._entry_price = current_close_price
 
