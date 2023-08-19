@@ -311,6 +311,7 @@ class PyTradingEnvWrapper(PyEnvironment):
         return self.current_time_step()
 
     def save_episode_history(self, file_name: str):
+        self._env._episode_history.append(self._env.history)
         with open(f"{file_name}.json", "w") as json_file:
             json.dump(
                 self._env._episode_history, json_file, default=self._serialize_numpy
