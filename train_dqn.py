@@ -38,7 +38,6 @@ features = [
 
 LOG_DIR = "logs"
 MODEL_DIR = "models"
-EP_HISTORY = "logs/episode-history"  # Singular file
 FULL_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM"  # No sentiment but ~15 years
 SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21293628&authkey=!ANbFvs1RrC9WQ3c"  # With sentiment but ~5 years
 
@@ -68,7 +67,7 @@ def env_creator(df: pd.DataFrame):
             balance=10000.00,
             fees_per_contract=0.25,
             trade_limit=50,
-            episode_history=json.load(open("logs/episode-history.json"))
+            episode_history=json.load(open("logs/episode-history/[step]-[step].json"))
             if LOAD_CHECKPOINT
             else None,
             checkpoint_length=CHECKPOINT_LENGTH if LOAD_CHECKPOINT else None,
@@ -286,7 +285,9 @@ except Exception as error:
     logging.error(error)
 finally:
     try:
-        collect_env.save_episode_history(f"{LOG_DIR}/episode-history")
+        collect_env.save_episode_history(
+            f"{LOG_DIR}/episode-history/{start_step}-{step}"
+        )
     except TypeError as error:
         logging.error(error)
     train_checkpointer.save(step)

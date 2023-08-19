@@ -25,13 +25,15 @@ class TradingEnvironment(gym.Env):
         tick_ratio=12.5 / 0.25,
         fees_per_contract=0.00,
         episode_history: list[dict] = None,
+        keep_full_history=False,
         checkpoint_length: int = None,
         checkpoint_tick: int = None,
     ):
         """
         A gym environment simulating simple day trading. Requires price data: `["high", "low", "open", "close"]` to be present in the df.
         If `episode_history` is not None, the latest checkpoint will be loaded from it and training continues at that point. (`checkpoint_length` is thus required)
-        If `checkpoint_tick` is provided, the checkpoint will be loaded from there.
+        If `checkpoint_tick` is provided, the checkpoint will be loaded from there instead.
+        `episode_history` will only keep last entry (episode) of loaded file unless `keep_full_history` is set to `True`.
         """
         super(TradingEnvironment, self).__init__()
 
@@ -49,16 +51,18 @@ class TradingEnvironment(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape)
 
         self._init_balance = balance
-        self._episode_history = episode_history or []
-        self._checkpoint = (
-            episode_history[-1]["checkpoint"][-1] if episode_history else 0
-        )
-        self._checkpoint_length = checkpoint_length or len(df)
-        self._start_tick = (
-            checkpoint_tick or self._checkpoint * checkpoint_length
-            if episode_history
-            else self.window_size
-        )
+
+        if episode_history:
+            self._episode_history = (
+                episode_history if keep_full_history else episode_history[-1]
+            )
+            self._checkpoint = episode_history[-1]["checkpoint"][-1]
+            self._start_tick = checkpoint_tick or self._checkpoint * checkpoint_length
+        else:
+            self._episode_history = []
+            self._checkpoint = 0
+            self._start_tick = self.window_size
+
         self._end_tick = len(self.df) - 1
 
         self.reset()
