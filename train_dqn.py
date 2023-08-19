@@ -244,10 +244,14 @@ train_checkpointer = common.Checkpointer(
     policy=tf_agent.policy,
     replay_buffer=reverb_replay,
 )
-if LOAD_CHECKPOINT and train_checkpointer.checkpoint_exists:
-    train_checkpointer.initialize_or_restore()
-else:
-    logging.error("No checkpoint found.")
+if LOAD_CHECKPOINT:
+    if train_checkpointer.checkpoint_exists:
+        try:
+            train_checkpointer.initialize_or_restore()
+        except Exception as error:
+            logging.error(f"Checkpoint could not be restored: {error}")
+    else:
+        logging.error("No checkpoint found.")
 
 update_pb("Training prepared!")
 pb.close()
