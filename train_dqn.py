@@ -67,6 +67,7 @@ def env_creator(df: pd.DataFrame):
             balance=10000.00,
             fees_per_contract=0.25,
             trade_limit=50,
+            streak_bonus_max=2,
             episode_history=json.load(open("logs/episode-history/100000-508441.json"))
             if LOAD_CHECKPOINT
             else None,
