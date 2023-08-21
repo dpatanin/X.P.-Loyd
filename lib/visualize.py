@@ -5,7 +5,7 @@ from bokeh.io import curdoc
 from bokeh.layouts import column
 from bokeh.models import FixedTicker
 from bokeh.palettes import HighContrast3
-from bokeh.plotting import figure, show
+from bokeh.plotting import figure, save, show
 from tqdm import tqdm
 
 curdoc().theme = "dark_minimal"
@@ -25,6 +25,7 @@ def update_pb(desc: str = None):
         pb.set_description(desc)
 
 
+DIR = "logs/episode-history"
 common_args = {
     "height": 840,
     "width_policy": "max",
@@ -36,10 +37,10 @@ common_args = {
 
 pb = tqdm(range(7), desc="Load episode history", position=0, leave=True)
 
-filenames = next(walk("logs/episode-history"), (None, None, []))[2]
+filenames = next(walk(DIR), (None, None, []))[2]
 ep_history = []
 for file in filenames:
-    with open(f"logs/episode-history/{file}") as f:
+    with open(f"{DIR}/{file}") as f:
         ep_history.extend(json.load(f))
 
 update_pb("Create timestep figures")
@@ -141,11 +142,11 @@ c_figure.axis.minor_tick_line_color = None
 c_figure.outline_line_color = None
 
 update_pb("Build Html site")
-show(
-    column(
-        [*ts_figures, pf_figure, c_figure],
-        sizing_mode="stretch_width",
-        width_policy="max",
-    )
+document = column(
+    [*ts_figures, pf_figure, c_figure],
+    sizing_mode="stretch_width",
+    width_policy="max",
 )
+save(document, filename=f"{DIR}/visualization.html", title="DQN Results")
+show(document)
 update_pb("Done!")
