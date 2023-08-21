@@ -27,6 +27,7 @@ class TradingEnvironment(gym.Env):
         fees_per_contract=0.00,
         streak_span=15,
         streak_bonus_max=10.00,
+        streak_difficulty=1.00,
         episode_history: list[dict] = None,
         keep_full_history=False,
         checkpoint_length: int = None,
@@ -47,10 +48,11 @@ class TradingEnvironment(gym.Env):
         self._features = features
         self._trade_limit = trade_limit
 
-        self.streak_span = streak_span
-        self.streak_bonus_max = streak_bonus_max
-        self.tick_ratio = tick_ratio
-        self.fees_per_contract = fees_per_contract
+        self._streak_span = streak_span
+        self._streak_bonus_max = streak_bonus_max
+        self._streak_difficulty = streak_difficulty
+        self._tick_ratio = tick_ratio
+        self._fees_per_contract = fees_per_contract
 
         self.action_space = spaces.Box(low=-trade_limit, high=trade_limit, shape=(1,))
 
@@ -154,27 +156,22 @@ class TradingEnvironment(gym.Env):
             self.history[key].append(value)
 
     def _update_balance(self, price_diff: float, trade_volume: int):
-        fees = abs(trade_volume) * self.fees_per_contract
+        fees = abs(trade_volume) * self._fees_per_contract
         self._total_fees += fees
 
-        profit = trade_volume * price_diff * self.tick_ratio
+        profit = trade_volume * price_diff * self._tick_ratio
         self._total_profit += profit
 
         self._balance += profit - fees
         return (profit, fees)
 
     def _update_streak(self, profit: float):
-        profits = self.history["profit"][-self.streak_span + 1 :] + [profit]
-
-        streak_bonus_half = (self.streak_bonus_max - 1) / 2
+        profits = self.history["profit"][-self._streak_span + 1 :] + [profit]
         positive_count = sum(profit > 0 for profit in profits)
-        self._streak = 1 + streak_bonus_half * (positive_count / self.streak_span)
 
-        severity_threshold = self._trade_limit * self.tick_ratio
-        sum_positive = sum(value for value in reversed(profits) if value > 0)
-        self._streak += (
-            sum_positive / (self.streak_span / 3 * severity_threshold)
-        ) * streak_bonus_half
+        x0 = self._trade_limit * self._tick_ratio * self._streak_difficulty
+        k = self._streak_span + self._streak_difficulty - positive_count
+        self._streak = 1 + self._streak_bonus_max / (1 + np.exp(-k * (profit - x0)))
 
     def _get_info(self, profit, fees):
         return {
