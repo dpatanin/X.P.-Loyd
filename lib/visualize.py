@@ -1,25 +1,29 @@
 import json
 from os import walk
 
+from bokeh.core.properties import Int
 from bokeh.io import curdoc
 from bokeh.layouts import column
+from bokeh.models import LayoutDOM, Legend, LegendItem
 from bokeh.palettes import HighContrast3
 from bokeh.plotting import figure, show
 from tqdm import tqdm
 
 curdoc().theme = "dark_minimal"
-WIDTH = 1600
-HEIGHT = 840
 
-pb = tqdm(range(7), desc="Load episode history", position=0, leave=True)
+
+class BelowLegend(LayoutDOM):
+    __implementation__ = "BelowLegend.ts"
+
+    width = Int(default=100)
+    height = Int(default=100)
 
 
 def get_color(index, total_values):
     return (
         255,
-        int((id * 255) / total_values),
+        int((index * 255) / total_values),
         255,
-        0.3 + ((index / (total_values - 1)) * 0.7),
     )
 
 
@@ -29,10 +33,21 @@ def update_pb(desc: str = None):
         pb.set_description(desc)
 
 
+common_args = {
+    "height": 840,
+    "width_policy": "max",
+    "sizing_mode": "stretch_width",
+    "tools": "pan,wheel_zoom,box_zoom,save,reset,help, hover",
+    "hidpi": True,
+    "output_backend": "webgl",
+}
+
+pb = tqdm(range(7), desc="Load episode history", position=0, leave=True)
+
 # filenames = next(walk("logs/episode-history"), (None, None, []))[2]
 filenames = ["0-100000.json"]
 ep_history = []
-for file in tqdm(filenames, desc="Load files", position=1, leave=False):
+for file in filenames:
     with open(f"logs/episode-history/{file}") as f:
         ep_history.extend(json.load(f))
 
@@ -44,26 +59,37 @@ ts_figures = [
         title=f"{key} per timestep",
         x_axis_label="Time Steps",
         y_axis_label=key,
-        height=HEIGHT,
-        width_policy="max",
-        sizing_mode="stretch_width",
+        **common_args,
     )
     for key in keys
 ]
 
 
 update_pb("Create timestep lines")
-for nk, key in enumerate(tqdm(keys, desc="Figures", position=1, leave=False)):
-    for id, data in enumerate(
-        tqdm(ts_progress[key], desc="Lines", position=2, leave=False)
-    ):
-        ts_figures[nk].line(
-            list(range(1, len(data) + 1)),
-            data,
-            legend_label=f"EP {id+1}",
-            line_width=2,
-            color=get_color(id, len(ts_progress[key])),
+for nk, key in enumerate(keys):
+    ts_f = ts_figures[nk]
+    ts_p = ts_progress[key]
+    legend_it = [
+        LegendItem(
+            label=f"EP {id+1}",
+            renderers=[
+                ts_f.line(
+                    list(range(1, len(data) + 1)),
+                    data,
+                    line_width=2,
+                    color=get_color(id, len(ts_p)),
+                    muted_color=get_color(id, len(ts_p)),
+                    muted_alpha=0,
+                )
+            ],
+            index=id,
         )
+        for id, data in enumerate(ts_p)
+    ]
+
+    legend = Legend(items=legend_it, orientation="horizontal")
+    legend.click_policy = "mute"
+    ts_f.add_layout(legend, "below")
 
 update_pb("Read profits, fees & checkpoints")
 x_episodes = [str(n) for n in range(1, len(ep_history) + 1)]
@@ -83,12 +109,7 @@ pf_figure = figure(
     title="Total profits & fees",
     x_axis_label="Episodes",
     y_axis_label="$$$",
-    toolbar_location=None,
-    tools="hover",
-    tooltips="$name @x_episodes: @$name",
-    height=HEIGHT,
-    width_policy="max",
-    sizing_mode="stretch_width",
+    **common_args,
 )
 pf_figure.vbar_stack(
     pf_keys,
@@ -110,9 +131,7 @@ c_figure = figure(
     title="Final checkpoints per episode",
     x_axis_label="Episodes",
     y_axis_label="Checkpoints",
-    height=HEIGHT,
-    width_policy="max",
-    sizing_mode="stretch_width",
+    **common_args,
 )
 c_figure.vbar(
     x=x_episodes,
