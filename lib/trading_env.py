@@ -65,7 +65,7 @@ class TradingEnvironment(gym.Env):
             self._episode_history = (
                 episode_history if keep_full_history else episode_history[-1:]
             )
-            self._checkpoint = episode_history[0]["checkpoint"][-1]
+            self._checkpoint = episode_history[-1]["checkpoint"][-1]
             self._start_tick = (
                 checkpoint_tick or self._checkpoint * checkpoint_length
                 if self._checkpoint > 0
