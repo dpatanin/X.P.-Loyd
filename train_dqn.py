@@ -67,7 +67,9 @@ def env_creator(df: pd.DataFrame):
             balance=10000.00,
             fees_per_contract=0.25,
             trade_limit=50,
-            episode_history=json.load(open("logs/episode-history/[step]-[step].json"))
+            streak_span=SEQ_LENGTH,
+            streak_bonus_max=2,
+            episode_history=json.load(open("logs/episode-history/100000-508441.json"))
             if LOAD_CHECKPOINT
             else None,
             checkpoint_length=CHECKPOINT_LENGTH if LOAD_CHECKPOINT else None,
@@ -77,6 +79,8 @@ def env_creator(df: pd.DataFrame):
 
 collect_env = env_creator(dp.train_df)
 eval_env = env_creator(dp.val_df)
+
+print(collect_env._env._start_tick)
 
 update_pb("Get specs")
 strategy = strategy_utils.get_strategy(tpu=False, use_gpu=True)
