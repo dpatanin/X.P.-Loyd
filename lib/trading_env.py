@@ -28,6 +28,8 @@ class TradingEnvironment(gym.Env):
         streak_span=15,
         streak_bonus_max=10.00,
         streak_difficulty=1.00,
+        trade_reward_weight=0.7,
+        balance_change_weight=0.3,
         episode_history: list[dict] = None,
         keep_full_history=False,
         checkpoint_length: int = None,
@@ -62,6 +64,8 @@ class TradingEnvironment(gym.Env):
 
         self._init_balance = balance
         self._prices = df[["high", "low", "open", "close"]]
+        self._trade_reward_weight = trade_reward_weight
+        self._balance_change_weight = balance_change_weight
 
         self._checkpoint_length = checkpoint_length or len(df)
         if episode_history:
@@ -174,9 +178,46 @@ class TradingEnvironment(gym.Env):
         k = self._streak_span + self._streak_difficulty - positive_count
         self._streak = 1 + self._streak_bonus_max / (1 + np.exp(-k * (profit - x0)))
 
+    def _update_weights(self):
+        # Calculate the ratio of trade rewards to balance change
+        trade_reward_ratio = self._total_profit / (
+            self._total_profit - self._total_fees
+        )
+
+        # Adjust weights based on the trade reward ratio
+        if trade_reward_ratio > 1.0:
+            self._trade_reward_weight *= 1.05
+            self._balance_change_weight *= 0.95
+        else:
+            self._trade_reward_weight *= 0.95
+            self._balance_change_weight *= 1.05
+
+        # Normalize the weights
+        total_weight = self._trade_reward_weight + self._balance_change_weight
+        self._trade_reward_weight /= total_weight
+        self._balance_change_weight /= total_weight
+
     def _calculate_reward(self, profit: float, fees: float):
-        reward = profit - fees
-        return reward if reward < 0 else self._streak * reward
+        trade_reward = profit - fees
+
+        # Calculate the change in total balance
+        initial_balance = self._initial_balance
+        current_balance = initial_balance + self._total_profit - self._total_fees
+        balance_change = current_balance - initial_balance
+
+        # Adjust weights dynamically
+        self._update_weights()
+
+        # Calculate the composite reward
+        composite_reward = (self._trade_reward_weight * trade_reward) + (
+            self._balance_change_weight * balance_change
+        )
+
+        return (
+            composite_reward
+            if composite_reward < 0
+            else self._streak * composite_reward
+        )
 
     def _get_info(self, profit, fees):
         return {
