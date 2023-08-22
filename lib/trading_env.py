@@ -35,8 +35,9 @@ class TradingEnvironment(gym.Env):
     ):
         """
         A gym environment simulating simple day trading. Requires price data: `["high", "low", "open", "close"]` to be present in the df.
-        If `episode_history` is not None, the latest checkpoint will be loaded from it and training continues at that point. (`checkpoint_length` is thus required)
+        If `episode_history` is not None, the latest checkpoint will be loaded from it and training continues at that point.
         If `checkpoint_tick` is provided, the checkpoint will be loaded from there instead.
+        `checkpoint_length` is required for making checkpoints.
         `episode_history` will only keep last entry (episode) of loaded file unless `keep_full_history` is set to `True`.
         `streak_bonus_max` is the upper bound of the streak bonus multiplier.
         `streak_span` is the durational threshold for streaks.
@@ -124,7 +125,7 @@ class TradingEnvironment(gym.Env):
 
         self._update_observation()
         self._update_streak(profit)
-        reward = profit if profit <= 0 else self._streak * profit
+        reward = self._calculate_reward(profit, fees)
 
         info = self._get_info(profit, fees)
         self._update_history(info)
@@ -172,6 +173,10 @@ class TradingEnvironment(gym.Env):
         x0 = self._trade_limit * self._tick_ratio * self._streak_difficulty
         k = self._streak_span + self._streak_difficulty - positive_count
         self._streak = 1 + self._streak_bonus_max / (1 + np.exp(-k * (profit - x0)))
+
+    def _calculate_reward(self, profit: float, fees: float):
+        reward = profit - fees
+        return reward if reward < 0 else self._streak * reward
 
     def _get_info(self, profit, fees):
         return {
