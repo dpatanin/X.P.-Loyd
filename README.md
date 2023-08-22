@@ -61,6 +61,7 @@ All directory locations are specified inside the `config.yaml` and thus not furt
 ### Run
 
 Enter wsl: `wsl.exe`
+(If this doesn't work for you, try selecting the distro you want to start e.g. "Ubuntu" `wsl -d <distro-name>`. Display a list of your installed distro's by typing `wsl -l` in the console.)
 Activate conda environment: `conda activate tf`
 Run: `python train.py`
 
