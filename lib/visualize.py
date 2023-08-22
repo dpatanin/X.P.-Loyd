@@ -5,7 +5,7 @@ from bokeh.io import curdoc
 from bokeh.layouts import column
 from bokeh.models import FixedTicker
 from bokeh.palettes import HighContrast3
-from bokeh.plotting import figure, save, show
+from bokeh.plotting import figure, save, show, output_file
 from tqdm import tqdm
 
 curdoc().theme = "dark_minimal"
@@ -37,9 +37,11 @@ common_args = {
 
 pb = tqdm(range(7), desc="Load episode history", position=0, leave=True)
 
+output_file(filename=f"{DIR}/visualization.html", title="DQN Results")
 filenames = next(walk(DIR), (None, None, []))[2]
+json_files = [fname for fname in filenames if fname.endswith(".json")]
 ep_history = []
-for file in filenames:
+for file in json_files:
     with open(f"{DIR}/{file}") as f:
         ep_history.extend(json.load(f))
 
@@ -147,6 +149,6 @@ document = column(
     sizing_mode="stretch_width",
     width_policy="max",
 )
-save(document, filename=f"{DIR}/visualization.html", title="DQN Results")
+save(document)
 show(document)
 update_pb("Done!")

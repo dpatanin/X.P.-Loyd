@@ -27,6 +27,10 @@ from lib.trading_env import PyTradingEnvWrapper, TradingEnvironment
 features = [
     "day_sin",
     "day_cos",
+    "high",
+    "low",
+    "open",
+    "close",
     "high_diff",
     "low_diff",
     "open_pct",
@@ -41,10 +45,10 @@ MODEL_DIR = "models"
 FULL_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM"  # No sentiment but ~15 years
 SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21293628&authkey=!ANbFvs1RrC9WQ3c"  # With sentiment but ~5 years
 
-SEQ_LENGTH = 30
+SEQ_LENGTH = 15
 BATCH_SIZE = 512
 TIME_STEPS = 100000
-CHECKPOINT_INTERVAL = 5000  # Agent
+CHECKPOINT_INTERVAL = 15000  # Agent
 LOAD_CHECKPOINT = True
 CHECKPOINT_LENGTH = 23 * 60  # Environment
 
@@ -69,18 +73,17 @@ def env_creator(df: pd.DataFrame):
             trade_limit=50,
             streak_span=SEQ_LENGTH,
             streak_bonus_max=2,
-            episode_history=json.load(open("logs/episode-history/100000-508441.json"))
+            streak_difficulty=2,
+            episode_history=json.load(open("logs/episode-history/0-100000.json"))
             if LOAD_CHECKPOINT
             else None,
-            checkpoint_length=CHECKPOINT_LENGTH if LOAD_CHECKPOINT else None,
+            checkpoint_length=CHECKPOINT_LENGTH,
         )
     )
 
 
 collect_env = env_creator(dp.train_df)
 eval_env = env_creator(dp.val_df)
-
-print(collect_env._env._start_tick)
 
 update_pb("Get specs")
 strategy = strategy_utils.get_strategy(tpu=False, use_gpu=True)
