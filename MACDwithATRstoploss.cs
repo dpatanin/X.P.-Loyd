@@ -32,6 +32,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private double PositionClosingPrice;
 		private double AfterClosingPrice;
 		private bool AfterStopLoss;
+		private double upper;
+		private double lower;
+		private double upper2;
+		private double lower2;
+		private double avgPrice;
 		
 		protected override void OnStateChange()
 		{
@@ -53,16 +58,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 				TraceOrders									= false;
 				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
 				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
-				BarsRequiredToTrade							= 20;
+				BarsRequiredToTrade							= 0;
 				// Disable this property for performance gains in Strategy Analyzer optimizations
 				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration	= true;
 				N					= 12;
-				X					= 30;
+				X					= 6;
 				Y					= 2;
 				fast				= 12; //MACD Period fast
 				slow				= 26; //MACD Period slow
 				signal				= 9; //MACD Period signal
+				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "Lower");
+				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "Upper");
+				AddPlot(new Stroke(Brushes.Red, 2), PlotStyle.Dot, "Lower2");
+				AddPlot(new Stroke(Brushes.Red, 2), PlotStyle.Dot, "Upper2");
 			}
 			else if (State == State.Configure)
 			{
@@ -77,71 +86,85 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		protected override void OnBarUpdate()
 		{
-			UpdateAfterStopLoss();
-			if(	Position.MarketPosition != MarketPosition.Long && 
-				Position.MarketPosition != MarketPosition.Short) //NoPositionExists
+			if(AfterStopLoss)
+				UpdateAfterStopLoss();
+			
+			if(Position.MarketPosition == MarketPosition.Flat) //NoPositionExists
 			{				
 				if(MACD(fast, slow, signal)[0] > MACD(fast, slow, signal).Avg[0]) //MACD line > Signal line
 				{
-					if(AfterStopLoss && Close[0] < PositionClosingPrice + Y*ATR(N)[0]) //AfterStopLoss && (Current Price < PositionClosingPrice + y*ATR(N))
-					{
-						Print("1: Close[0]" + Close[0] + " AfterStopLossBarrier, Plus: " + Y*ATR(N)[0]);
+					if(AfterStopLoss && Close[0] < upper2) //AfterStopLoss && (Current Price < PositionClosingPrice + y*ATR(N))
 						return;
-					}
 					else
 					{
 						Print("Enter Long");
 						ExitShort();
-						EnterLong();
-						PositionClosingPrice = Close[0];
-						AfterStopLoss = true;
+						EnterLong();					
 					}
 				}
 				else if(MACD(fast, slow, signal)[0] < MACD(fast, slow, signal).Avg[0]) //MACD line < Signal line
 				{
-					if(AfterStopLoss && Close[0] > PositionClosingPrice - Y*ATR(N)[0]) //AfterStopLoss && (Current Price > PositionClosingPrice - y*ATR(N))
-					{
-						Print("2: Close[0]" + Close[0] + " AfterStopLossBarrier, Minus: " + Y*ATR(N)[0]);
+					if(AfterStopLoss && Close[0] > lower2) //AfterStopLoss && (Current Price > PositionClosingPrice - y*ATR(N))
 						return;
-					}
 					else
 					{
 						Print("Enter Short");
 						ExitLong();
 						EnterShort();
-						PositionClosingPrice = Close[0];
-						AfterStopLoss = true;
 					}
 				}
+			}
+			else
+			{
+				Values[0][0] = upper;
+				Values[1][0] = lower;
 			}
 		}
 		
 		private void UpdateAfterStopLoss()
 		{
-			if(Close[0] < AfterClosingPrice - Y*ATR(N)[0])
+			if(Close[0] < lower2)
 			{
 				AfterStopLoss = false;
 			}
-			else if(Close[0] > AfterClosingPrice + Y*ATR(N)[0])
+			else if(Close[0] > upper2)
 			{
 				AfterStopLoss = false;
 			}
+			Values[2][0] = lower2;
+			Values[3][0] = upper2;
 		}
 		
 		protected override void OnPositionUpdate(Cbi.Position position, double averagePrice, int quantity, Cbi.MarketPosition marketPosition)
 		{
-		  if (position.MarketPosition == MarketPosition.Flat)
-		  {
-		    AfterStopLoss = true;
-			AfterClosingPrice = Close[0];
-			Print("ExitStopLoss: " + X*ATR(N)[0]);
-			SetStopLoss(CalculationMode.Currency, X*ATR(N)[0]);
-		  }
-		  else
-		  {
-			Print("SetStopLoss: " + X*ATR(N)[0] + " Position: " + position.MarketPosition);
-		  	SetStopLoss(CalculationMode.Currency, X*ATR(N)[0]);
-		  }
+			
+			if (position.MarketPosition == MarketPosition.Flat)
+			{
+				AfterStopLoss = true;
+				AfterClosingPrice = Close[0];
+				
+				//Resets StopLoss and ProfitTaget
+				SetStopLoss(CalculationMode.Ticks, X*ATR(N)[0]);
+				SetProfitTarget(CalculationMode.Ticks, X*ATR(N)[0]);
+				
+				//Sets red ATR-Barrier
+				lower2 = AfterClosingPrice - Y*ATR(N)[0]*0.25;
+				upper2 = AfterClosingPrice + Y*ATR(N)[0]*0.25;
+				
+				Print("Exit last Position");
+			}
+			else
+			{
+				avgPrice = position.AveragePrice;
+				
+				//Set StopLoss and ProfitTarget
+				SetStopLoss(CalculationMode.Ticks, X*ATR(N)[0]);
+				SetProfitTarget(CalculationMode.Ticks, X*ATR(N)[0]);
+				
+				//Sets green ATR-Barrier
+				lower = avgPrice - X*ATR(N)[0]*0.25;
+				upper = avgPrice + X*ATR(N)[0]*0.25;
+			}
 		}
 
 		#region Properties
