@@ -86,6 +86,37 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		protected override void OnBarUpdate()
 		{
+			if(Position.MarketPosition == MarketPosition.Long)//Long Position Exists
+			{
+				//StopLoss Long
+				if(Close[0] < lower)
+				{
+					Print("Exit Long");
+					ExitLong();
+				}
+				//TakeProfit Long
+				else if(Close[0] > upper)
+				{
+					lower = Close[0] - X*ATR(N)[0]*0.25;
+					upper = Close[0] + X*ATR(N)[0]*0.25;
+				}
+			}
+			else if(Position.MarketPosition == MarketPosition.Short)//Long Position Exists
+			{
+				//StopLoss Short
+				if(Close[0] > upper)
+				{
+					Print("Exit Long");
+					ExitShort();
+				}
+				//TakeProfit Short
+				else if(Close[0] < lower)
+				{
+					lower = Close[0] - X*ATR(N)[0]*0.25;
+					upper = Close[0] + X*ATR(N)[0]*0.25;
+				}
+			}
+			
 			if(AfterStopLoss)
 				UpdateAfterStopLoss();
 			
@@ -98,8 +129,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 					else
 					{
 						Print("Enter Long");
-						ExitShort();
-						EnterLong();					
+						EnterLong();
 					}
 				}
 				else if(MACD(fast, slow, signal)[0] < MACD(fast, slow, signal).Avg[0]) //MACD line < Signal line
@@ -109,7 +139,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 					else
 					{
 						Print("Enter Short");
-						ExitLong();
 						EnterShort();
 					}
 				}
@@ -135,17 +164,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 			Values[3][0] = upper2;
 		}
 		
-		protected override void OnPositionUpdate(Cbi.Position position, double averagePrice, int quantity, Cbi.MarketPosition marketPosition)
+		protected override void OnPositionUpdate(Cbi.Position position, 
+			double averagePrice, int quantity, Cbi.MarketPosition marketPosition)
 		{
-			
+			//Position Closed
 			if (position.MarketPosition == MarketPosition.Flat)
 			{
 				AfterStopLoss = true;
 				AfterClosingPrice = Close[0];
 				
 				//Resets StopLoss and ProfitTaget
-				SetStopLoss(CalculationMode.Ticks, X*ATR(N)[0]);
-				SetProfitTarget(CalculationMode.Ticks, X*ATR(N)[0]);
+				//SetStopLoss(CalculationMode.Ticks, X*ATR(N)[0]);
+				//SetProfitTarget(CalculationMode.Ticks, X*ATR(N)[0]);
 				
 				//Sets red ATR-Barrier
 				lower2 = AfterClosingPrice - Y*ATR(N)[0]*0.25;
@@ -153,17 +183,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				Print("Exit last Position");
 			}
+			
+			//Position Opened
 			else
 			{
 				avgPrice = position.AveragePrice;
 				
 				//Set StopLoss and ProfitTarget
-				SetStopLoss(CalculationMode.Ticks, X*ATR(N)[0]);
-				SetProfitTarget(CalculationMode.Ticks, X*ATR(N)[0]);
+				//SetStopLoss(CalculationMode.Ticks, X*ATR(N)[0]);
+				//SetProfitTarget(CalculationMode.Ticks, X*ATR(N)[0]);
 				
 				//Sets green ATR-Barrier
-				lower = avgPrice - X*ATR(N)[0]*0.25;
-				upper = avgPrice + X*ATR(N)[0]*0.25;
+				lower = Close[0] - X*ATR(N)[0]*0.25;
+				upper = Close[0] + X*ATR(N)[0]*0.25;
 			}
 		}
 
