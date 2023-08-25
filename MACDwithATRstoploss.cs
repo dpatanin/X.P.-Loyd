@@ -62,10 +62,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				// Disable this property for performance gains in Strategy Analyzer optimizations
 				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration	= true;
-				N					= 12;
-				X					= 6;
-				Y					= 2;
-				multiplier			= 1; //MACD multiplier
+				N					= 24;
+                X					= 18;
+                Y					= 4;
+                multiplier			= 3; //MACD multiplier
 				fast				= 12; //MACD Period fast
 				slow				= 26; //MACD Period slow
 				signal				= 9; //MACD Period signal
