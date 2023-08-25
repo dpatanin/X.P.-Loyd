@@ -27,8 +27,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class MACDwithATRstoploss : Strategy
 	{
-		private double StopLossBarrierLong;
-		private double StopLossBarrierShort;
 		private double PositionClosingPrice;
 		private double AfterClosingPrice;
 		private bool AfterStopLoss;
@@ -36,8 +34,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private double lower;
 		private double upper2;
 		private double lower2;
-		private double avgPrice;
-		
+		private int fast;
+		private int slow;
+		private int signal;
+
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
@@ -65,6 +65,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				N					= 12;
 				X					= 6;
 				Y					= 2;
+				multiplier			= 1; //MACD multiplier
 				fast				= 12; //MACD Period fast
 				slow				= 26; //MACD Period slow
 				signal				= 9; //MACD Period signal
@@ -75,17 +76,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			else if (State == State.Configure)
 			{
+				fast *= multiplier;
+				slow *= multiplier;
+				signal *= multiplier;
 				AddChartIndicator(MACD(fast,slow,signal));
 				AddChartIndicator(ATR(N));
-			}
-			else if (State == State.DataLoaded)
-			{
-				PositionClosingPrice = Close[0];
 			}
 		}
 
 		protected override void OnBarUpdate()
 		{
+			double atr = X*ATR(N)[0]*0.25;
 			if(Position.MarketPosition == MarketPosition.Long)//Long Position Exists
 			{
 				//StopLoss Long
@@ -97,8 +98,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 				//TakeProfit Long
 				else if(Close[0] > upper)
 				{
-					lower = Close[0] - X*ATR(N)[0]*0.25;
-					upper = Close[0] + X*ATR(N)[0]*0.25;
+					lower = Close[0] - atr;
+					upper = Close[0] + atr;
+					PositionClosingPrice = Close[0];
+				}
+				else
+				{
+					lower = PositionClosingPrice - atr;
+					upper = PositionClosingPrice + atr;
 				}
 			}
 			else if(Position.MarketPosition == MarketPosition.Short)//Long Position Exists
@@ -112,16 +119,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 				//TakeProfit Short
 				else if(Close[0] < lower)
 				{
-					lower = Close[0] - X*ATR(N)[0]*0.25;
-					upper = Close[0] + X*ATR(N)[0]*0.25;
+					lower = Close[0] - atr;
+					upper = Close[0] + atr;
+					PositionClosingPrice = Close[0];
+				}
+				else
+				{
+					lower = PositionClosingPrice - atr;
+					upper = PositionClosingPrice + atr;
 				}
 			}
-			
+
 			if(AfterStopLoss)
 				UpdateAfterStopLoss();
-			
+
 			if(Position.MarketPosition == MarketPosition.Flat) //NoPositionExists
-			{				
+			{
 				if(MACD(fast, slow, signal)[0] > MACD(fast, slow, signal).Avg[0]) //MACD line > Signal line
 				{
 					if(AfterStopLoss && Close[0] < upper2) //AfterStopLoss && (Current Price < PositionClosingPrice + y*ATR(N))
@@ -149,7 +162,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Values[1][0] = lower;
 			}
 		}
-		
+
 		private void UpdateAfterStopLoss()
 		{
 			if(Close[0] < lower2)
@@ -163,8 +176,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			Values[2][0] = lower2;
 			Values[3][0] = upper2;
 		}
-		
-		protected override void OnPositionUpdate(Cbi.Position position, 
+
+		protected override void OnPositionUpdate(Cbi.Position position,
 			double averagePrice, int quantity, Cbi.MarketPosition marketPosition)
 		{
 			//Position Closed
@@ -172,30 +185,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				AfterStopLoss = true;
 				AfterClosingPrice = Close[0];
-				
-				//Resets StopLoss and ProfitTaget
-				//SetStopLoss(CalculationMode.Ticks, X*ATR(N)[0]);
-				//SetProfitTarget(CalculationMode.Ticks, X*ATR(N)[0]);
-				
+
 				//Sets red ATR-Barrier
-				lower2 = AfterClosingPrice - Y*ATR(N)[0]*0.25;
-				upper2 = AfterClosingPrice + Y*ATR(N)[0]*0.25;
-				
+				double atr = Y*ATR(N)[0]*0.25;
+				lower2 = AfterClosingPrice - atr;
+				upper2 = AfterClosingPrice + atr;
+
 				Print("Exit last Position");
 			}
-			
+
 			//Position Opened
 			else
 			{
-				avgPrice = position.AveragePrice;
-				
-				//Set StopLoss and ProfitTarget
-				//SetStopLoss(CalculationMode.Ticks, X*ATR(N)[0]);
-				//SetProfitTarget(CalculationMode.Ticks, X*ATR(N)[0]);
-				
-				//Sets green ATR-Barrier
-				lower = Close[0] - X*ATR(N)[0]*0.25;
-				upper = Close[0] + X*ATR(N)[0]*0.25;
+				PositionClosingPrice = Close[0];
 			}
 		}
 
@@ -220,20 +222,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="fast", Order=4, GroupName="Parameters")]
-		public int fast
-		{ get; set; }
-		
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="slow", Order=5, GroupName="Parameters")]
-		public int slow
-		{ get; set; }
-		
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="signal", Order=6, GroupName="Parameters")]
-		public int signal
+		[Display(Name="MACD multiplier", Order=4, GroupName="Parameters")]
+		public int multiplier
 		{ get; set; }
 		#endregion
 	}
