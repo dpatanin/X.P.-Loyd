@@ -56,7 +56,7 @@ def update_pb(desc: str = None):
         pb.set_description(desc)
 
 
-def env_creator(df: pd.DataFrame):
+def env_creator(df: pd.DataFrame, load_checkpoint: bool):
     return TFPyTradingEnvWrapper(
         TradingEnvironment(
             df=df,
@@ -67,14 +67,16 @@ def env_creator(df: pd.DataFrame):
             streak_span=SEQ_LENGTH,
             streak_bonus_max=2,
             streak_difficulty=12,
-            episode_history=json.load(open("logs/train/150000-300000.json")),
+            episode_history=json.load(open("logs/train/150000-300000.json"))
+            if load_checkpoint
+            else None,
             checkpoint_length=CHECKPOINT_LENGTH,
         )
     )
 
 
-train_env = env_creator(dp.train_df)
-eval_env = env_creator(dp.val_df)
+train_env = env_creator(dp.train_df, LOAD_CHECKPOINT)
+eval_env = env_creator(dp.val_df, False)
 
 update_pb("Create network")
 categorical_q_net = categorical_q_network.CategoricalQNetwork(
