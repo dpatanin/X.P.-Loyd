@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from gymnasium import spaces
-from tf_agents.environments import PyEnvironment
+from tf_agents.environments import PyEnvironment, TFPyEnvironment
 from tf_agents.specs import BoundedArraySpec
 from tf_agents.trajectories import time_step as ts
 from tf_agents.typing import types
@@ -21,7 +21,7 @@ class TradingEnvironment(gym.Env):
         df: pd.DataFrame,
         window_size: int,
         features: list[str],
-        trade_limit=10,
+        trade_volume=1,
         balance=10000.00,
         tick_ratio=12.5 / 0.25,
         fees_per_contract=0.00,
@@ -49,7 +49,7 @@ class TradingEnvironment(gym.Env):
         self._df = df
         self._window_size = window_size
         self._features = features
-        self._trade_limit = trade_limit
+        self._trade_volume = trade_volume
 
         self._streak_span = streak_span
         self._streak_bonus_max = streak_bonus_max
@@ -57,12 +57,12 @@ class TradingEnvironment(gym.Env):
         self._tick_ratio = tick_ratio
         self._fees_per_contract = fees_per_contract
 
-        self.action_space = spaces.Box(low=-trade_limit, high=trade_limit, shape=(1,))
+        self.action_space = spaces.Discrete(3)  # 0 = No position; 1 = Long; 2 = Short
 
-        obs_shape = (2 + window_size * len(features),)
+        obs_shape = (3 + window_size * len(features),)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape)
 
-        self._init_balance = balance
+        self._initial_balance = balance
         self._prices = df[["high", "low", "open", "close"]]
         self._trade_reward_weight = trade_reward_weight
         self._balance_change_weight = balance_change_weight
@@ -90,64 +90,88 @@ class TradingEnvironment(gym.Env):
     def reset(self):
         self._done = False
         self._truncated = False
-        self._balance = self._init_balance
+        self._balance = self._initial_balance
         self._current_tick = self._start_tick
         self._streak = 1
-        self._entry_price = 0
+        self._entry_price_diff = 0
         self._total_profit = 0
         self._total_fees = 0
         self._position = 0
         self._position_history = (self._window_size * [None]) + [self._position]
         self._first_rendering = True
         self.history = {}
-        self._update_observation()
+        self._update_observation(0)
 
         info = self._get_info(0.00, 0.00)
         self._update_history(info)
 
         return self.observation, info
 
-    def step(self, action: np.ndarray):
+    def step(self, action: int):
         self._current_tick += 1
         self._done = self._current_tick == self._end_tick
+
         if self._current_tick >= self._start_tick + self._checkpoint_length:
             self._checkpoint += 1
             self._start_tick += self._checkpoint_length
 
-        trade_volume = action[0]
-        profit = fees = 0.00
-        if trade_volume != self._position:
-            current_close_price = self._df["close"].iloc[self._current_tick]
-            price_diff = current_close_price - self._entry_price
-            self._entry_price = current_close_price
-
-            profit, fees = self._update_balance(price_diff, self._position)
-            self._truncated = self._balance <= 0
-
-        self._position = trade_volume
+        current_close_price = self._df["close"].iloc[self._current_tick]
+        profit, fees = (
+            self._take_action(action, current_close_price)
+            if action != self._position
+            else (0.0, 0.0)
+        )
+        self._position = action
         self._position_history.append(self._position)
 
-        self._update_observation()
+        self._update_observation(current_close_price)
         self._update_streak(profit)
+        self._update_weights(profit)
         reward = self._calculate_reward(profit, fees)
 
         info = self._get_info(profit, fees)
         self._update_history(info)
+
         if self._done or self._truncated:
             self._episode_history.append(self.history)
 
         return (self.observation, reward, self._done, self._truncated, info)
 
-    def _update_observation(self):
+    def _take_action(self, action: int, current_close_price: float):
+        price_diff = 0
+
+        # Exit or switch (switch includes exit) -> Get price diff with correct sign
+        if action == 0 or self._position != 0:
+            if self._position == 1:
+                price_diff = current_close_price - self._entry_price
+
+            elif self._position == 2:
+                price_diff = self._entry_price - current_close_price
+
+            self._entry_price = 0
+
+        # Enter or switch (switch includes enter) -> Set entry price
+        if action != 0:
+            self._entry_price = current_close_price
+
+        profit, fees = self._update_balance(price_diff)
+        self._truncated = self._balance <= 0
+
+        return profit, fees
+
+    def _update_observation(self, current_close_price: float):
         next_window = self._df[
             (self._current_tick - self._window_size + 1) : self._current_tick + 1
         ]
+        entry_price_diff = (
+            current_close_price - self._entry_price if self._position != 0 else 0
+        )
 
-        # Ensure order of inputs/outputs
         self.observation = np.concatenate(
             [
+                [self._total_profit - self._total_fees],
                 [self._position],
-                [self._balance],
+                [entry_price_diff],
                 *[next_window[feature].values for feature in self._features],
             ],
             dtype=self.observation_space.dtype,
@@ -160,11 +184,11 @@ class TradingEnvironment(gym.Env):
         for key, value in info.items():
             self.history[key].append(value)
 
-    def _update_balance(self, price_diff: float, trade_volume: int):
-        fees = abs(trade_volume) * self._fees_per_contract
+    def _update_balance(self, price_diff: float):
+        fees = self._trade_volume * self._fees_per_contract
         self._total_fees += fees
 
-        profit = trade_volume * price_diff * self._tick_ratio
+        profit = self._trade_volume * price_diff * self._tick_ratio
         self._total_profit += profit
 
         self._balance += profit - fees
@@ -174,23 +198,22 @@ class TradingEnvironment(gym.Env):
         profits = self.history["profit"][-self._streak_span + 1 :] + [profit]
         positive_count = sum(profit > 0 for profit in profits)
 
-        x0 = self._trade_limit * self._tick_ratio * self._streak_difficulty
+        x0 = self._trade_volume * self._tick_ratio * self._streak_difficulty
         k = self._streak_span + self._streak_difficulty - positive_count
         self._streak = 1 + self._streak_bonus_max / (1 + np.exp(-k * (profit - x0)))
 
-    def _update_weights(self):
-        # Calculate the ratio of trade rewards to balance change
-        trade_reward_ratio = self._total_profit / (
-            self._total_profit - self._total_fees
-        )
+    def _update_weights(self, profit: float):
+        # When balance is low, momentary gains are less important; when balance rises, should not overshadow momentary gains
+        # Calculate the ratio of trades to total net profit (+ 1 to avoid division by zero)
+        trade_balance_ratio = abs(profit / (self._total_profit - self._total_fees + 1))
 
-        # Adjust weights based on the trade reward ratio
-        if trade_reward_ratio > 1.0:
-            self._trade_reward_weight *= 1.05
-            self._balance_change_weight *= 0.95
-        else:
+        # Adjust weights based on the trade balance ratio
+        if trade_balance_ratio > 1.0:
             self._trade_reward_weight *= 0.95
             self._balance_change_weight *= 1.05
+        else:
+            self._trade_reward_weight *= 1.05
+            self._balance_change_weight *= 0.95
 
         # Normalize the weights
         total_weight = self._trade_reward_weight + self._balance_change_weight
@@ -198,25 +221,10 @@ class TradingEnvironment(gym.Env):
         self._balance_change_weight /= total_weight
 
     def _calculate_reward(self, profit: float, fees: float):
-        trade_reward = profit - fees
-
-        # Calculate the change in total balance
-        initial_balance = self._initial_balance
-        current_balance = initial_balance + self._total_profit - self._total_fees
-        balance_change = current_balance - initial_balance
-
-        # Adjust weights dynamically
-        self._update_weights()
-
         # Calculate the composite reward
-        composite_reward = (self._trade_reward_weight * trade_reward) + (
-            self._balance_change_weight * balance_change
-        )
-
-        return (
-            composite_reward
-            if composite_reward < 0
-            else self._streak * composite_reward
+        streak = self._streak if profit >= 0 else 1
+        return streak * (self._trade_reward_weight * (profit - fees)) + (
+            self._balance_change_weight * (self._balance - self._initial_balance)
         )
 
     def _get_info(self, profit, fees):
@@ -279,22 +287,29 @@ class TradingEnvironment(gym.Env):
         plt.show()
 
     def observation_spec(self):
-        return self._get_space_spec(self.observation_space, "observation")
+        return BoundedArraySpec(
+            shape=self.observation_space.shape,
+            dtype=self.observation_space.dtype,
+            minimum=self.observation_space.low,
+            maximum=self.observation_space.high,
+            name="observation",
+        )
 
     def action_spec(self):
-        return self._get_space_spec(self.action_space, "action")
+        return BoundedArraySpec(
+            shape=(), dtype=np.int64, name="action", minimum=0, maximum=2
+        )
 
     def time_step_spec(self):
         return ts.time_step_spec(self.observation_spec())
 
-    def _get_space_spec(self, space: gym.Space, name: str):
-        return BoundedArraySpec(
-            shape=space.shape,
-            dtype=space.dtype,
-            minimum=space.low,
-            maximum=space.high,
-            name=name,
-        )
+
+class TFPyTradingEnvWrapper(TFPyEnvironment):
+    def __init__(self, env: TradingEnvironment):
+        py_env = PyTradingEnvWrapper(env)
+        super().__init__(py_env)
+
+        self.save_episode_history = py_env.save_episode_history
 
 
 class PyTradingEnvWrapper(PyEnvironment):
@@ -363,11 +378,10 @@ class PyTradingEnvWrapper(PyEnvironment):
         os.makedirs("/".join(file_name.split("/")[:-1]), exist_ok=True)
 
         with open(f"{file_name}.json", "w") as json_file:
-            json.dump(
-                self._env._episode_history, json_file, default=self._serialize_numpy
-            )
+            json.dump(self._env._episode_history, json_file, default=serialize_numpy)
 
-    def _serialize_numpy(self, obj):
-        if isinstance(obj, np.generic):
-            return obj.item()  # Convert numpy scalar to a Python scalar
-        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+def serialize_numpy(obj):
+    if isinstance(obj, (np.generic, np.ndarray)):
+        return obj.item()  # Convert numpy scalar to a Python scalar
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")

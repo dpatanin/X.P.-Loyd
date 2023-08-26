@@ -29,37 +29,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class TradingAgent : Strategy
 	{	
-		#region Properties
-
-		[NinjaScriptProperty]
-		[Display(Name = "Trade Amount", GroupName = "Trading Agent Parameters", Order = 2)]
-		public int tradeAmount
-		{ get; set; }
-
-		#endregion
-
 		private int numBar;
-		private int sequenceLength = 10;
-		private int totalBarsInSession = 1380;
+		private int sequenceLength = 20;
 		
-		// Initial price data for normalizing
-		private bool initCollected = false;
-		private double initOpen;
-		private double initHigh;
-		private double initLow;
-		private double initClose;
 
 		public class RequestData
         {
-            public List<double> progress = new List<double>();
             public List<double> open = new List<double>();
             public List<double> high = new List<double>();
             public List<double> low = new List<double>();
             public List<double> close = new List<double>();
             public List<double> volume = new List<double>();
-            public int contracts;
-            public double entryPrice;
+			public int position;
             public double balance;
+            public double entryPrice;
 		}
 
 		private RequestData data = new RequestData();
@@ -86,7 +69,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
 				BarsRequiredToTrade							= 0;
 				IsInstantiatedOnEachOptimizationIteration	= true;
-				tradeAmount									= 1;
 			}
 		}
 		
@@ -96,20 +78,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (State == State.Historical)
                 return;	
 
-			if (CurrentBars[0] > 0 && !initCollected)
-			{
-				initCollected = true;
-
-				initOpen = Open[0];
-				initHigh = High[0];
-				initLow = Low[0];
-				initClose = Close[0];
-			}
-			
-			data.progress.Add(((double)Bars.BarsSinceNewTradingDay / totalBarsInSession) * 100);
-
-			numBar = CurrentBar;
-			if(numBar % sequenceLength == 0 && numBar != 0)
+			if(CurrentBar > sequenceLength)
 			{
 				CollectData();
 				SendHttpRequest(Newtonsoft.Json.JsonConvert.SerializeObject(data));
@@ -121,20 +90,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{			
 			for (int i = 0; i < sequenceLength; i++)
 			{
-				data.open.Add(Open[i] - initOpen);
-				data.high.Add(High[i] - initHigh);
-				data.low.Add(Low[i] - initLow);
-				data.close.Add(Close[i] - initClose);
+				data.open.Add(Open[i]);
+				data.high.Add(High[i]);
+				data.low.Add(Low[i]);
+				data.close.Add(Close[i]);
 				data.volume.Add(Volume[i]);
 			}
-			data.contracts = Position.Quantity;
+			
+			data.position = GetPosition();
 			data.entryPrice = Position.AveragePrice;
 			data.balance = GetAccountBalance();
 		}
 		
 		private void ClearData()
 		{
-			data.progress.Clear();
 			data.open.Clear();
 			data.high.Clear();
 			data.low.Clear();
@@ -147,6 +116,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 			Account a = Account.All.First(t => t.Name == "Playback101");
 			double value = a.Get(AccountItem.CashValue, Currency.UsDollar);
 			return value;
+		}
+		
+		private int GetPosition()
+		{
+			switch(Position.MarketPosition) 
+			{
+			  case MarketPosition.Flat:
+			    return 0;
+			  case MarketPosition.Long:
+			    return 1;
+			  case MarketPosition.Short:
+			    return 2;
+			  default:
+			    return 0;
+			}
 		}
 		
 		private async void SendHttpRequest(string json)
@@ -165,23 +149,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print("POST request sent successfully. Response: " + responseContent);
 						
 		                dynamic parsedResponse = Newtonsoft.Json.JsonConvert.DeserializeObject(responseContent);
-		                double prediction = parsedResponse.prediction;
-						
-						ExitPosition();
-						if (prediction > 0)
-						{
-							EnterLong(tradeAmount);
-							Print("Entered a long position with amount: " + tradeAmount);
-						}
-						else if (prediction < 0)
-						{
-							EnterShort(tradeAmount);
-							Print("Entered a short position with amount: " + tradeAmount);
-						}
-						else
-						{
-							Print("No action taken.");
-						}
+		                int prediction = parsedResponse.prediction;
+
+						PerformAction(prediction);
                     }
                     else
                     {
@@ -196,6 +166,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
         }
+		
+		private void PerformAction(int prediction)
+		{
+			int position = GetPosition();
+			
+			if (prediction != position)
+			{
+				ExitPosition();
+				if (prediction == 1)
+				{	
+				  EnterLong();
+				  Print("Entered long with amount: 1");
+				}
+				else if (prediction == 2)
+				{	
+				  EnterShort();
+				  Print("Entered short with amount: 1");
+				}
+			}
+		}
 		
 		private void ExitPosition()
 		{

@@ -2,3 +2,4 @@
 .vs
 env
 __pycache__
+**/visualization.html

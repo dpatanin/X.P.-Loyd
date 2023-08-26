@@ -3,9 +3,8 @@ from os import walk
 
 from bokeh.io import curdoc
 from bokeh.layouts import column
-from bokeh.models import FixedTicker
 from bokeh.palettes import HighContrast3
-from bokeh.plotting import figure, save, show, output_file
+from bokeh.plotting import figure, output_file, save
 from tqdm import tqdm
 
 curdoc().theme = "dark_minimal"
@@ -25,7 +24,7 @@ def update_pb(desc: str = None):
         pb.set_description(desc)
 
 
-DIR = "logs/episode-history"
+DIR = "logs/eval"
 common_args = {
     "height": 840,
     "width_policy": "max",
@@ -111,10 +110,6 @@ pf_figure.vbar_stack(
     legend_label=pf_keys,
 )
 
-x_tick_subset = FixedTicker(
-    ticks=list(range(0, len(x_episodes), int(len(x_episodes) * 0.05)))
-)
-
 pf_figure.x_range.range_padding = 0.05
 pf_figure.xgrid.grid_line_color = None
 pf_figure.axis.minor_tick_line_color = None
@@ -150,5 +145,4 @@ document = column(
     width_policy="max",
 )
 save(document)
-show(document)
 update_pb("Done!")
