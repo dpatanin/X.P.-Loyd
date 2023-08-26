@@ -3,7 +3,6 @@ import os
 from typing import Optional, Text
 
 import gymnasium as gym
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from gymnasium import spaces
@@ -65,7 +64,6 @@ class TradingEnvironment(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape)
 
         self._initial_balance = balance
-        self._prices = df[["high", "low", "open", "close"]]
         self._trade_reward_weight = trade_reward_weight
         self._balance_change_weight = balance_change_weight
 
@@ -100,8 +98,6 @@ class TradingEnvironment(gym.Env):
         self._total_profit = 0
         self._total_fees = 0
         self._position = 0
-        self._position_history = (self._window_size * [None]) + [self._position]
-        self._first_rendering = True
         self.history = {}
         self._update_observation(0)
 
@@ -126,7 +122,6 @@ class TradingEnvironment(gym.Env):
             else (0.0, 0.0)
         )
         self._position = action
-        self._position_history.append(self._position)
 
         self._update_observation(current_close_price)
         self._update_streak(profit)
@@ -250,53 +245,6 @@ class TradingEnvironment(gym.Env):
             "checkpoint": self._checkpoint,
         }
 
-    def render(self, mode="human"):
-        def _plot_position(position, tick):
-            if position == 0:
-                color = "blue"
-            elif position > 0:
-                color = "green"
-            elif position < 0:
-                color = "red"
-            else:
-                color = None
-            if color:
-                plt.scatter(tick, self._prices[tick], color=color)
-
-        if self._first_rendering:
-            self._first_rendering = False
-            plt.cla()
-            plt.plot(self._prices)
-            start_position = self._position_history[self._start_tick]
-            _plot_position(start_position, self._start_tick)
-
-        _plot_position(self._position, self._current_tick)
-        plt.pause(0.01)
-
-    def render_all(self, mode="human"):
-        window_ticks = np.arange(len(self._position_history))
-        plt.plot(self._prices)
-
-        short_ticks = []
-        long_ticks = []
-        for i, tick in enumerate(window_ticks):
-            if self._position_history[i] < 0:
-                short_ticks.append(tick)
-            elif self._position_history[i] > 0:
-                long_ticks.append(tick)
-
-        plt.plot(short_ticks, self._prices[short_ticks], "ro")
-        plt.plot(long_ticks, self._prices[long_ticks], "go")
-
-    def close(self):
-        plt.close()
-
-    def save_rendering(self, filepath: str):
-        plt.savefig(filepath)
-
-    def pause_rendering(self):
-        plt.show()
-
     def observation_spec(self):
         return BoundedArraySpec(
             shape=self.observation_space.shape,
@@ -339,9 +287,6 @@ class PyTradingEnvWrapper(PyEnvironment):
 
     def time_step_spec(self) -> ts.TimeStep:
         return self._env.time_step_spec()
-
-    def render(self, mode: Text = "rgb_array") -> Optional[types.NestedArray]:
-        self._env.render()
 
     def get_info(self) -> types.NestedArray:
         def dict_to_nested_arrays(dictionary):
