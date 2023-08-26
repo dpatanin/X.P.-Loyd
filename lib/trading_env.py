@@ -1,6 +1,5 @@
 import json
 import os
-from typing import Optional, Text
 
 import gymnasium as gym
 import numpy as np
@@ -25,20 +24,14 @@ class TradingEnvironment(gym.Env):
         tick_ratio=12.5 / 0.25,
         fees_per_contract=0.00,
         streak_span=15,
-        streak_bonus_max=10.00,
+        streak_bonus_max=5.00,
         streak_difficulty=1.00,
         max_ticks_without_action=23 * 60,
-        trade_reward_weight=0.7,
-        balance_change_weight=0.3,
-        episode_history: list[dict] = None,
         checkpoint_length: int = 23 * 60 * 31,
+        env_state_dir: str = None,
     ):
         """
-        A gym environment simulating simple day trading. Requires price data: `["high", "low", "open", "close"]` to be present in the df.
         If `episode_history` is not None, the latest checkpoint will be loaded from it and training continues at that point.
-        If `checkpoint_tick` is provided, the checkpoint will be loaded from there instead.
-        `checkpoint_length` is required for making checkpoints.
-        `episode_history` will only keep last entry (episode) of loaded file unless `keep_full_history` is set to `True`.
         `streak_bonus_max` is the upper bound of the streak bonus multiplier.
         `streak_span` is the durational threshold for streaks.
         """
@@ -62,27 +55,28 @@ class TradingEnvironment(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape)
 
         self._initial_balance = balance
-        self._trade_reward_weight = trade_reward_weight
-        self._balance_change_weight = balance_change_weight
+        self._trade_reward_weight = 0.7
+        self._balance_change_weight = 0.3
 
         self._ticker = TradingEnvTicker(
             start_tick=window_size,
             end_tick=len(self._df) - 1,
             checkpoint_length=checkpoint_length,
         )
-        self._episode_history = episode_history or []
+
+        self.history: list[pd.DataFrame] = []
         self.reset()
+
+        if env_state_dir:
+            self.load_env_state(env_state_dir)
 
     def reset(self):
         self._done = False
         self._truncated = False
         self._balance = self._initial_balance
-        self._streak = 1
-        self._entry_price_diff = 0
-        self._total_profit = 0
-        self._total_fees = 0
+        self._streak_multiplier = 1
         self._position = 0
-        self.history = {}
+        self.history.append(self._new_history_ep())
         self._ticker.reset_to_checkpoint()
         self._update_observation(0)
 
@@ -110,9 +104,6 @@ class TradingEnvironment(gym.Env):
 
         info = self._get_info(profit, fees)
         self._update_history(info)
-
-        if self._done or self._truncated:
-            self._episode_history.append(self.history)
 
         if self._done:
             self._ticker.restart_from_beginning()
@@ -150,7 +141,7 @@ class TradingEnvironment(gym.Env):
 
         self.observation = np.concatenate(
             [
-                [self._total_profit - self._total_fees],
+                [self._balance - self._initial_balance],
                 [self._position],
                 [entry_price_diff],
                 *[next_window[feature].values for feature in self._features],
@@ -158,19 +149,12 @@ class TradingEnvironment(gym.Env):
             dtype=self.observation_space.dtype,
         )
 
-    def _update_history(self, info):
-        if not self.history:
-            self.history = {key: [] for key in info.keys()}
-
-        for key, value in info.items():
-            self.history[key].append(value)
+    def _update_history(self, info: dict):
+        self.history[-1][self._ticker.current_tick] = info.values()
 
     def _update_balance(self, price_diff: float):
         fees = self._trade_volume * self._fees_per_contract
-        self._total_fees += fees
-
         profit = self._trade_volume * price_diff * self._tick_ratio
-        self._total_profit += profit
 
         self._balance += profit - fees
         return (profit, fees)
@@ -181,12 +165,14 @@ class TradingEnvironment(gym.Env):
 
         x0 = self._trade_volume * self._tick_ratio * self._streak_difficulty
         k = self._streak_span + self._streak_difficulty - positive_count
-        self._streak = 1 + self._streak_bonus_max / (1 + np.exp(-k * (profit - x0)))
+        self._streak_multiplier = 1 + self._streak_bonus_max / (
+            1 + np.exp(-k * (profit - x0))
+        )
 
     def _update_weights(self, profit: float):
         # When balance is low, momentary gains are less important; when balance rises, should not overshadow momentary gains
         # Calculate the ratio of trades to total net profit (+ 1 to avoid division by zero)
-        trade_balance_ratio = abs(profit / (self._total_profit - self._total_fees + 1))
+        trade_balance_ratio = abs(profit / (self._balance - self._initial_balance + 1))
 
         # Adjust weights based on the trade balance ratio
         if trade_balance_ratio > 1.0:
@@ -203,7 +189,7 @@ class TradingEnvironment(gym.Env):
 
     def _calculate_reward(self, profit: float, fees: float):
         # Calculate the composite reward
-        streak = self._streak if profit >= 0 else 1
+        streak = self._streak_multiplier if profit >= 0 else 1
         laziness_punishment = (
             self._ticker.ticks_since_last_action - self._max_ticks_without_action
         )
@@ -217,14 +203,55 @@ class TradingEnvironment(gym.Env):
     def _get_info(self, profit, fees):
         return {
             "profit": profit,
-            "total_profit": self._total_profit,
             "fees": fees,
-            "total_fees": self._total_fees,
             "balance": self._balance,
             "position": self._position,
-            "streak": self._streak,
-            "checkpoint": self._ticker.checkpoint,
+            "streak": self._streak_multiplier,
         }
+
+    def _new_history_ep(self):
+        return pd.DataFrame(columns=self._get_info(0, 0).keys())
+
+    def save_history(self, dir: str):
+        for df in self.history:
+            index = df.index
+            df.to_csv(f"{dir}/{index[0]}-{index[-1]}.csv")
+
+    def save_env_state(self, dir: str):
+        state = {
+            "balance": self._balance,
+            "position": self._position,
+            "entryPrice": self._entry_price,
+            "currentTick": self._ticker.current_tick,
+            "checkpoint": self._ticker.checkpoint,
+            "ticksSinceLastAction": self._ticker.ticks_since_last_action,
+            "streakMultiplier": self._streak_multiplier,
+            "tradeRewardWeight": self._trade_reward_weight,
+            "balanceChangeWeight": self._balance_change_weight,
+            "done": self._done,
+            "truncated": self._truncated,
+        }
+        with open(f"{dir}/env_save.json", "w") as json_file:
+            json.dump(state, json_file)
+
+    def load_env_state(self, dir: str):
+        with open(f"{dir}/env_save.json", "r") as json_file:
+            state = json.load(json_file)
+            self._balance = state["balance"]
+            self._position = state["position"]
+            self._entry_price = state["entryPrice"]
+            self._ticker.current_tick = state["currentTick"]
+            self._ticker.checkpoint = state["checkpoint"]
+            self._ticker.ticks_since_last_action = state["ticksSinceLastAction"]
+            self._streak_multiplier = state["streakMultiplier"]
+            self._trade_reward_weight = state["tradeRewardWeight"]
+            self._balance_change_weight = state["balanceChangeWeight"]
+            self._done = state["done"]
+            self._truncated = state["truncated"]
+
+        self.history = [self._new_history_ep()]
+        self._update_observation(0)
+        self._update_history(self._get_info(0.00, 0.00))
 
     def observation_spec(self):
         return BoundedArraySpec(
@@ -250,11 +277,12 @@ class TradingEnvTicker:
         start_tick: int,
         end_tick: int,
         checkpoint_length: int,
+        checkpoint: int = None,
     ) -> None:
-        self.checkpoint = start_tick
+        self.checkpoint = checkpoint or start_tick
         self._checkpoint_length = checkpoint_length
 
-        self.current_tick = start_tick
+        self.current_tick = checkpoint or start_tick
         self.ticks_since_last_action = 0
         self._start_tick = start_tick
         self._end_tick = end_tick
@@ -285,7 +313,7 @@ class TFPyTradingEnvWrapper(TFPyEnvironment):
         py_env = PyTradingEnvWrapper(env)
         super().__init__(py_env)
 
-        self.save_episode_history = py_env.save_episode_history
+        self.save = py_env.save
 
 
 class PyTradingEnvWrapper(PyEnvironment):
@@ -346,15 +374,7 @@ class PyTradingEnvWrapper(PyEnvironment):
 
         return self.current_time_step()
 
-    def save_episode_history(self, file_name: str):
-        self._env._episode_history.append(self._env.history)
-        os.makedirs("/".join(file_name.split("/")[:-1]), exist_ok=True)
-
-        with open(f"{file_name}.json", "w") as json_file:
-            json.dump(self._env._episode_history, json_file, default=serialize_numpy)
-
-
-def serialize_numpy(obj):
-    if isinstance(obj, (np.generic, np.ndarray)):
-        return obj.item()  # Convert numpy scalar to a Python scalar
-    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+    def save(self, dir: str):
+        os.makedirs("/".join(dir.split("/")[:-1]), exist_ok=True)
+        self._env.save_history(dir)
+        self._env.save_env_state(dir)

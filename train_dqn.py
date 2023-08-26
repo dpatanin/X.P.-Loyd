@@ -43,7 +43,6 @@ TRAIN_STEPS = 900000
 EVAL_MIN_STEPS = 23 * 60 * 31
 CHECKPOINT_INTERVAL = 15000  # Agent
 LOAD_CHECKPOINT = True
-CHECKPOINT_LENGTH = 23 * 60  # Environment
 N_STEP_UPDATE = 2
 
 dp = DataProcessor(FULL_DATA, 5)
@@ -66,11 +65,8 @@ def env_creator(df: pd.DataFrame, load_checkpoint: bool):
             fees_per_contract=0.25,
             streak_span=SEQ_LENGTH,
             streak_bonus_max=2,
-            streak_difficulty=12,
-            episode_history=json.load(open("logs/train/150000-300000.json"))
-            if load_checkpoint
-            else None,
-            checkpoint_length=CHECKPOINT_LENGTH,
+            streak_difficulty=24,
+            checkpoint=json.load(open("logs/train")) if load_checkpoint else None,
         )
     )
 
@@ -189,7 +185,7 @@ try:
             time_step = eval_env.step(action_step.action)
             pbar.update()
 
-        eval_env.save_episode_history(f"{LOG_DIR}/eval/{start_step}-{step}")
+        eval_env.save(f"{LOG_DIR}/eval")
 
 except KeyboardInterrupt:
     pass
@@ -197,7 +193,7 @@ except Exception as error:
     logging.error(error.with_traceback())
 finally:
     try:
-        train_env.save_episode_history(f"{LOG_DIR}/train/{start_step}-{step}")
+        train_env.save(f"{LOG_DIR}/train")
     except Exception as error:
         logging.error(error)
 
