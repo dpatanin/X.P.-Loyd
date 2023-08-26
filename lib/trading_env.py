@@ -31,9 +31,7 @@ class TradingEnvironment(gym.Env):
         trade_reward_weight=0.7,
         balance_change_weight=0.3,
         episode_history: list[dict] = None,
-        keep_full_history=False,
-        checkpoint_length: int = None,
-        checkpoint_tick: int = None,
+        checkpoint_length: int = 23 * 60 * 31,
     ):
         """
         A gym environment simulating simple day trading. Requires price data: `["high", "low", "open", "close"]` to be present in the df.
@@ -67,38 +65,25 @@ class TradingEnvironment(gym.Env):
         self._trade_reward_weight = trade_reward_weight
         self._balance_change_weight = balance_change_weight
 
-        self._checkpoint_length = checkpoint_length or len(df)
-        if episode_history:
-            self._episode_history = (
-                episode_history if keep_full_history else episode_history[-1:]
-            )
-            self._checkpoint = episode_history[-1]["checkpoint"][-1]
-            self._start_tick = (
-                checkpoint_tick or self._checkpoint * checkpoint_length
-                if self._checkpoint > 0
-                else window_size
-            )
-        else:
-            self._episode_history = []
-            self._checkpoint = 0
-            self._start_tick = self._window_size
-
-        self._end_tick = len(self._df) - 1
-
+        self._ticker = TradingEnvTicker(
+            start_tick=window_size,
+            end_tick=len(self._df) - 1,
+            checkpoint_length=checkpoint_length,
+        )
+        self._episode_history = episode_history or []
         self.reset()
 
     def reset(self):
         self._done = False
         self._truncated = False
         self._balance = self._initial_balance
-        self._current_tick = self._start_tick
         self._streak = 1
-        self._ticks_since_last_action = 0
         self._entry_price_diff = 0
         self._total_profit = 0
         self._total_fees = 0
         self._position = 0
         self.history = {}
+        self._ticker.reset_to_checkpoint()
         self._update_observation(0)
 
         info = self._get_info(0.00, 0.00)
@@ -107,18 +92,13 @@ class TradingEnvironment(gym.Env):
         return self.observation, info
 
     def step(self, action: int):
-        self._current_tick += 1
-        self._ticks_since_last_action += 1
-        self._done = self._current_tick == self._end_tick
+        perform_action = action != self._position
+        self._done = self._ticker.update(perform_action)
 
-        if self._current_tick >= self._start_tick + self._checkpoint_length:
-            self._checkpoint += 1
-            self._start_tick += self._checkpoint_length
-
-        current_close_price = self._df["close"].iloc[self._current_tick]
+        current_close_price = self._df["close"].iloc[self._ticker.current_tick]
         profit, fees = (
             self._take_action(action, current_close_price)
-            if action != self._position
+            if perform_action
             else (0.0, 0.0)
         )
         self._position = action
@@ -134,10 +114,12 @@ class TradingEnvironment(gym.Env):
         if self._done or self._truncated:
             self._episode_history.append(self.history)
 
+        if self._done:
+            self._ticker.restart_from_beginning()
+
         return (self.observation, reward, self._done, self._truncated, info)
 
     def _take_action(self, action: int, current_close_price: float):
-        self._ticks_since_last_action = 0
         price_diff = 0
 
         # Exit or switch (switch includes exit) -> Get price diff with correct sign
@@ -160,9 +142,8 @@ class TradingEnvironment(gym.Env):
         return profit, fees
 
     def _update_observation(self, current_close_price: float):
-        next_window = self._df[
-            (self._current_tick - self._window_size + 1) : self._current_tick + 1
-        ]
+        next_tick = self._ticker.current_tick + 1
+        next_window = self._df[(next_tick - self._window_size) : next_tick]
         entry_price_diff = (
             current_close_price - self._entry_price if self._position != 0 else 0
         )
@@ -224,7 +205,7 @@ class TradingEnvironment(gym.Env):
         # Calculate the composite reward
         streak = self._streak if profit >= 0 else 1
         laziness_punishment = (
-            self._ticks_since_last_action - self._max_ticks_without_action
+            self._ticker.ticks_since_last_action - self._max_ticks_without_action
         )
 
         return (
@@ -242,7 +223,7 @@ class TradingEnvironment(gym.Env):
             "balance": self._balance,
             "position": self._position,
             "streak": self._streak,
-            "checkpoint": self._checkpoint,
+            "checkpoint": self._ticker.checkpoint,
         }
 
     def observation_spec(self):
@@ -261,6 +242,42 @@ class TradingEnvironment(gym.Env):
 
     def time_step_spec(self):
         return ts.time_step_spec(self.observation_spec())
+
+
+class TradingEnvTicker:
+    def __init__(
+        self,
+        start_tick: int,
+        end_tick: int,
+        checkpoint_length: int,
+    ) -> None:
+        self.checkpoint = start_tick
+        self._checkpoint_length = checkpoint_length
+
+        self.current_tick = start_tick
+        self.ticks_since_last_action = 0
+        self._start_tick = start_tick
+        self._end_tick = end_tick
+
+    def update(self, action_taken: bool = False):
+        self.current_tick += 1
+
+        self.ticks_since_last_action += (
+            -self.ticks_since_last_action if action_taken else 1
+        )
+
+        if self.current_tick >= self.checkpoint + self._checkpoint_length:
+            self.checkpoint = self.current_tick
+
+        return self.current_tick == self._end_tick
+
+    def reset_to_checkpoint(self):
+        self.current_tick = self.checkpoint
+        self.ticks_since_last_action = 0
+
+    def restart_from_beginning(self):
+        self.current_tick, self.checkpoint = self._start_tick
+        self.ticks_since_last_action = 0
 
 
 class TFPyTradingEnvWrapper(TFPyEnvironment):
