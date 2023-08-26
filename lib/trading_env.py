@@ -28,6 +28,7 @@ class TradingEnvironment(gym.Env):
         streak_span=15,
         streak_bonus_max=10.00,
         streak_difficulty=1.00,
+        max_ticks_without_action=23 * 60,
         trade_reward_weight=0.7,
         balance_change_weight=0.3,
         episode_history: list[dict] = None,
@@ -54,6 +55,7 @@ class TradingEnvironment(gym.Env):
         self._streak_span = streak_span
         self._streak_bonus_max = streak_bonus_max
         self._streak_difficulty = streak_difficulty
+        self._max_ticks_without_action = max_ticks_without_action
         self._tick_ratio = tick_ratio
         self._fees_per_contract = fees_per_contract
 
@@ -93,6 +95,7 @@ class TradingEnvironment(gym.Env):
         self._balance = self._initial_balance
         self._current_tick = self._start_tick
         self._streak = 1
+        self._ticks_since_last_action = 0
         self._entry_price_diff = 0
         self._total_profit = 0
         self._total_fees = 0
@@ -109,6 +112,7 @@ class TradingEnvironment(gym.Env):
 
     def step(self, action: int):
         self._current_tick += 1
+        self._ticks_since_last_action += 1
         self._done = self._current_tick == self._end_tick
 
         if self._current_tick >= self._start_tick + self._checkpoint_length:
@@ -138,6 +142,7 @@ class TradingEnvironment(gym.Env):
         return (self.observation, reward, self._done, self._truncated, info)
 
     def _take_action(self, action: int, current_close_price: float):
+        self._ticks_since_last_action = 0
         price_diff = 0
 
         # Exit or switch (switch includes exit) -> Get price diff with correct sign
@@ -223,8 +228,14 @@ class TradingEnvironment(gym.Env):
     def _calculate_reward(self, profit: float, fees: float):
         # Calculate the composite reward
         streak = self._streak if profit >= 0 else 1
-        return streak * (self._trade_reward_weight * (profit - fees)) + (
-            self._balance_change_weight * (self._balance - self._initial_balance)
+        laziness_punishment = (
+            self._ticks_since_last_action - self._max_ticks_without_action
+        )
+
+        return (
+            streak * (self._trade_reward_weight * (profit - fees))
+            + (self._balance_change_weight * (self._balance - self._initial_balance))
+            + laziness_punishment
         )
 
     def _get_info(self, profit, fees):
