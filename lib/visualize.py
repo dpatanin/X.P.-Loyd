@@ -1,13 +1,11 @@
-import json
 from os import walk
 
+import pandas as pd
 from bokeh.io import curdoc
 from bokeh.layouts import column
 from bokeh.palettes import HighContrast3
 from bokeh.plotting import figure, output_file, save
 from tqdm import tqdm
-
-curdoc().theme = "dark_minimal"
 
 
 def get_color(index, total_values):
@@ -24,7 +22,12 @@ def update_pb(desc: str = None):
         pb.set_description(desc)
 
 
-DIR = "logs/eval"
+FULL_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%21290022&authkey=!ADgq6YFliQNylSM"
+DIR = "logs/train"
+curdoc().theme = "dark_minimal"
+output_file(filename=f"{DIR}/visualization.html", title="DQN Results")
+
+pb = tqdm(range(5), desc="Load episode history", position=0, leave=True)
 common_args = {
     "height": 840,
     "width_policy": "max",
@@ -34,56 +37,59 @@ common_args = {
     "output_backend": "webgl",
 }
 
-pb = tqdm(range(7), desc="Load episode history", position=0, leave=True)
-
-output_file(filename=f"{DIR}/visualization.html", title="DQN Results")
 filenames = next(walk(DIR), (None, None, []))[2]
-json_files = [fname for fname in filenames if fname.endswith(".json")]
-ep_history = []
-for file in json_files:
-    with open(f"{DIR}/{file}") as f:
-        ep_history.extend(json.load(f))
+json_files = [fname for fname in filenames if fname.endswith(".csv")]
+ep_history = [pd.read_csv(f"{DIR}/{file}", index_col=0) for file in json_files]
 
-update_pb("Create timestep figures")
-keys = ep_history[0].keys()
-ts_progress = {key: [ep[key] for ep in ep_history] for key in keys}
-ts_figures = [
-    figure(
-        title=f"{key} per timestep",
-        x_axis_label="Time Steps",
-        y_axis_label=key,
-        tooltips=[("EP", "$name"), ("Timestep", "@x"), ("Value", "@y")],
-        **common_args,
+update_pb("Create line charts")
+initial_balance = ep_history[0]["balance"].iloc[0]
+balance_figure = figure(
+    title="Balance per timestep",
+    x_axis_label="Time Steps",
+    y_axis_label="$$$",
+    tooltips=[("EP", "$name"), ("Timestep", "@x"), ("Value", "@y")],
+    **common_args,
+)
+
+streak_figure = figure(
+    title="Streak per timestep",
+    x_axis_label="Time Steps",
+    y_axis_label="Streak multiplier",
+    tooltips=[("EP", "$name"), ("Timestep", "@x"), ("Value", "@y")],
+    **common_args,
+)
+
+for id, data in enumerate(ep_history):
+    index = data.index.values
+    color = get_color(id, len(ep_history))
+    name = str(id + 1)
+
+    balance_figure.line(
+        index,
+        data["balance"].values,
+        line_width=2,
+        name=name,
+        color=color,
+        muted_color=color,
+        muted_alpha=0,
     )
-    for key in keys
-]
+
+    streak_figure.line(
+        index,
+        data["streak"].values,
+        line_width=2,
+        name=name,
+        color=color,
+        muted_color=color,
+        muted_alpha=0,
+    )
 
 
-update_pb("Create timestep lines")
-for nk, key in enumerate(keys):
-    ts_f = ts_figures[nk]
-    ts_p = ts_progress[key]
-    [
-        ts_f.line(
-            list(range(1, len(data) + 1)),
-            data,
-            line_width=2,
-            name=str(id),
-            color=get_color(id, len(ts_p)),
-            muted_color=get_color(id, len(ts_p)),
-            muted_alpha=0,
-        )
-        for id, data in enumerate(ts_p)
-    ]
-
-
-update_pb("Read profits, fees & checkpoints")
+update_pb("Create profit & fees bar chart")
 x_episodes = [str(n) for n in range(1, len(ep_history) + 1)]
-total_profits = [ep["total_profit"][-1] for ep in ep_history]
-total_fees = [ep["total_fees"][-1] for ep in ep_history]
-checkpoints = [ep["checkpoint"][-1] for ep in ep_history]
+total_profits = [ep["profit"].sum() for ep in ep_history]
+total_fees = [ep["fees"].sum() for ep in ep_history]
 
-update_pb("Create profits-fees figure")
 pf_data = {
     "x_episodes": x_episodes,
     "total_profit": total_profits,
@@ -117,30 +123,12 @@ pf_figure.outline_line_color = None
 pf_figure.legend.location = "top_left"
 pf_figure.legend.orientation = "horizontal"
 
-update_pb("Create checkpoints figure")
-c_figure = figure(
-    x_range=x_episodes,
-    title="Final checkpoints per episode",
-    x_axis_label="Episodes",
-    y_axis_label="Checkpoints",
-    tooltips=[("EP", "@x"), ("Checkpoints", "@top")],
-    **common_args,
-)
-c_figure.vbar(
-    x=x_episodes,
-    top=checkpoints,
-    line_width=2,
-    color=(240, 0, 255),
-)
-c_figure.y_range.start = 0
-c_figure.x_range.range_padding = 0.1
-c_figure.xgrid.grid_line_color = None
-c_figure.axis.minor_tick_line_color = None
-c_figure.outline_line_color = None
+update_pb("Create streak figure")
+
 
 update_pb("Build Html site")
 document = column(
-    [*ts_figures, pf_figure, c_figure],
+    [balance_figure, streak_figure, pf_figure],
     sizing_mode="stretch_width",
     width_policy="max",
 )

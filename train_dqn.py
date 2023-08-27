@@ -39,10 +39,10 @@ SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%2129
 
 SEQ_LENGTH = 15
 BATCH_SIZE = 512
-TRAIN_STEPS = 900000
-EVAL_MIN_STEPS = 23 * 60 * 31
+TRAIN_STEPS = 10000
+EVAL_MIN_STEPS = 10000
 CHECKPOINT_INTERVAL = 15000  # Agent
-LOAD_CHECKPOINT = True
+LOAD_CHECKPOINT = False
 N_STEP_UPDATE = 2
 
 dp = DataProcessor(FULL_DATA, 5)
@@ -65,8 +65,8 @@ def env_creator(df: pd.DataFrame, load_checkpoint: bool):
             fees_per_contract=0.25,
             streak_span=SEQ_LENGTH,
             streak_bonus_max=2,
-            streak_difficulty=24,
-            checkpoint=json.load(open("logs/train")) if load_checkpoint else None,
+            streak_difficulty=18,
+            env_state_dir=json.load(open("logs/train")) if load_checkpoint else None,
         )
     )
 
@@ -173,13 +173,13 @@ try:
                 train_checkpointer.save(step)
 
             pbar.set_description(f"Training | Step: {step} | Loss: {train_loss.loss}")
-
             pbar.update()
 
     with tqdm(range(EVAL_MIN_STEPS), desc="Evaluation") as pbar:
         time_step = eval_env.reset()
         eval_step = 0
-        while not time_step.is_last() or eval_step < EVAL_MIN_STEPS:
+        # not time_step.is_last() or
+        while eval_step < EVAL_MIN_STEPS:
             eval_step += 1
             action_step = agent.policy.action(time_step)
             time_step = eval_env.step(action_step.action)

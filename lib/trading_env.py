@@ -66,6 +66,7 @@ class TradingEnvironment(gym.Env):
 
         self.history: list[pd.DataFrame] = []
         self.reset()
+        self.history.clear()
 
         if env_state_dir:
             self.load_env_state(env_state_dir)
@@ -149,9 +150,6 @@ class TradingEnvironment(gym.Env):
             dtype=self.observation_space.dtype,
         )
 
-    def _update_history(self, info: dict):
-        self.history[-1][self._ticker.current_tick] = info.values()
-
     def _update_balance(self, price_diff: float):
         fees = self._trade_volume * self._fees_per_contract
         profit = self._trade_volume * price_diff * self._tick_ratio
@@ -160,7 +158,9 @@ class TradingEnvironment(gym.Env):
         return (profit, fees)
 
     def _update_streak(self, profit: float):
-        profits = self.history["profit"][-self._streak_span + 1 :] + [profit]
+        profits = self.history[-1]["profit"][-self._streak_span + 1 :].to_list() + [
+            profit
+        ]
         positive_count = sum(profit > 0 for profit in profits)
 
         x0 = self._trade_volume * self._tick_ratio * self._streak_difficulty
@@ -212,6 +212,9 @@ class TradingEnvironment(gym.Env):
     def _new_history_ep(self):
         return pd.DataFrame(columns=self._get_info(0, 0).keys())
 
+    def _update_history(self, info: dict):
+        self.history[-1].loc[self._ticker.current_tick] = info.values()
+
     def save_history(self, dir: str):
         for df in self.history:
             index = df.index
@@ -232,7 +235,7 @@ class TradingEnvironment(gym.Env):
             "truncated": self._truncated,
         }
         with open(f"{dir}/env_save.json", "w") as json_file:
-            json.dump(state, json_file)
+            json.dump(state, json_file, default=serialize_numpy)
 
     def load_env_state(self, dir: str):
         with open(f"{dir}/env_save.json", "r") as json_file:
@@ -378,3 +381,9 @@ class PyTradingEnvWrapper(PyEnvironment):
         os.makedirs("/".join(dir.split("/")[:-1]), exist_ok=True)
         self._env.save_history(dir)
         self._env.save_env_state(dir)
+
+
+def serialize_numpy(obj):
+    if isinstance(obj, (np.generic, np.ndarray)):
+        return obj.item()  # Convert numpy scalar to a Python scalar
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")

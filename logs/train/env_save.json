@@ -1,0 +1,13 @@
+{
+    "balance": 865.75,
+    "position": 0,
+    "entryPrice": 0,
+    "currentTick": 1115,
+    "checkpoint": 15,
+    "ticksSinceLastAction": 13,
+    "streakMultiplier": 1.0,
+    "tradeRewardWeight": 1.0,
+    "balanceChangeWeight": 4.4e-323,
+    "done": false,
+    "truncated": false
+}
