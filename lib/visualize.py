@@ -1,9 +1,10 @@
 from os import walk
 
+import numpy as np
 import pandas as pd
 from bokeh.io import curdoc
 from bokeh.layouts import column
-from bokeh.models import BoxAnnotation, HoverTool, TabPanel, Tabs
+from bokeh.models import HoverTool, Label, TabPanel, Tabs
 from bokeh.palettes import HighContrast3
 from bokeh.plotting import figure, output_file, save
 from data_processor import DataProcessor
@@ -24,6 +25,10 @@ def update_pb(desc: str = None):
         pb.set_description(desc)
 
 
+def calc_avg_timedelta_min(starts, ends):
+    return np.nan_to_num((ends - starts).mean().total_seconds() / 60).round()
+
+
 curdoc().theme = "dark_minimal"
 
 dp = DataProcessor("source.csv", 5)
@@ -40,9 +45,9 @@ for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
 
     pb = tqdm(range(5), desc="Load episode history", position=0, leave=True)
 
-    filenames = next(walk(dir), (None, None, []))[2]
-    json_files = [fname for fname in filenames if fname.endswith(".csv")]
-    ep_history = [pd.read_csv(f"{dir}/{file}", index_col=0) for file in json_files]
+    filenames: list[str] = next(walk(dir), (None, None, []))[2]
+    csv_files = [fname for fname in filenames if fname.endswith(".csv")]
+    ep_history = [pd.read_csv(f"{dir}/{file}", index_col=0) for file in csv_files]
 
     update_pb("Create line charts")
     initial_balance = ep_history[0]["balance"].iloc[0]
@@ -136,22 +141,56 @@ for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
         )
 
         positions = data.set_index(price_df.index)["position"]
+
         position_starts = price_df[positions.diff() != 0].index
-        position_ends = price_df[positions.diff().shift(-1) != 0].index
+        position_ends = position_starts[1:]
+        position_starts = position_starts[:-1]
 
+        long_starts = position_starts[positions[position_starts] == 1]
+        long_ends = position_ends[positions[position_starts] == 1]
         price_figure.vstrip(
-            x0=position_starts[positions[position_starts] == 1],
-            x1=position_ends[positions[position_starts] == 1],
-            color="#FF0000",
+            x0=long_starts,
+            x1=long_ends,
+            color="#24ed85",
             alpha=0.2,
         )
 
+        short_starts = position_starts[positions[position_starts] == 2]
+        short_ends = position_ends[positions[position_starts] == 2]
         price_figure.vstrip(
-            x0=position_starts[positions[position_starts] == 2],
-            x1=position_ends[positions[position_starts] == 2],
-            color="#00FF00",
+            x0=short_starts,
+            x1=short_ends,
+            color="#ed3124",
             alpha=0.2,
         )
+
+        num_positions = (
+            f"Num. Positions | Short: {len(short_starts)}  Long: {len(long_starts)}"
+        )
+
+        # Calculate based on ticks -> price data has gaps
+        avg_longs = round(
+            (data.loc[data["position"] == 1, "position"].sum() + 1)
+            / (len(long_starts) + 1)
+        )
+        avg_shorts = round(
+            (data.loc[data["position"] == 2, "position"].sum() + 1)
+            / (len(short_starts) + 1)
+        )
+        avg_durations = (
+            f"Avg. Durations | Short: {avg_shorts} min.  Long: {avg_longs} min."
+        )
+        summary = Label(
+            x=50,
+            y=20,
+            x_units="screen",
+            y_units="screen",
+            text=f"{num_positions}\n{avg_durations}",
+            border_line_color="black",
+            background_fill_color="white",
+        )
+
+        price_figure.add_layout(summary)
 
         tabs.append(TabPanel(child=price_figure, title=f"EP:{name}"))
 
