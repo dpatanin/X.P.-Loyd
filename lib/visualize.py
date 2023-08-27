@@ -4,9 +4,10 @@ import numpy as np
 import pandas as pd
 from bokeh.io import curdoc
 from bokeh.layouts import column
-from bokeh.models import HoverTool, Label, TabPanel, Tabs
+from bokeh.models import ColumnDataSource, FactorRange, HoverTool, Label, TabPanel, Tabs
 from bokeh.palettes import HighContrast3
 from bokeh.plotting import figure, output_file, save
+from bokeh.transform import dodge, factor_cmap
 from data_processor import DataProcessor
 from tqdm import tqdm
 
@@ -39,7 +40,8 @@ def draw_profit_fees(history: list[pd.DataFrame]):
         "total_profit": total_profits,
         "total_fees": total_fees,
     }
-    pf_keys = ["total_profit", "total_fees"]
+    source = ColumnDataSource(data=pf_data)
+
     pf_figure = figure(
         x_range=x_episodes,
         title="Total profits & fees",
@@ -47,12 +49,23 @@ def draw_profit_fees(history: list[pd.DataFrame]):
         y_axis_label="$$$",
         **common_args,
     )
-    pf_figure.vbar_stack(
-        pf_keys,
-        x="x_episodes",
-        color=HighContrast3[:-1],
-        source=pf_data,
-        legend_label=pf_keys,
+
+    pf_figure.vbar(
+        x=dodge("x_episodes", -0.125, range=pf_figure.x_range),
+        width=0.2,
+        top="total_profit",
+        source=source,
+        color="#2e3adb",
+        legend_label="total_profit",
+    )
+
+    pf_figure.vbar(
+        x=dodge("x_episodes", 0.125, range=pf_figure.x_range),
+        width=0.2,
+        top="total_fees",
+        source=source,
+        color="#edc42d",
+        legend_label="total_fees",
     )
 
     pf_figure.add_tools(
@@ -65,6 +78,7 @@ def draw_profit_fees(history: list[pd.DataFrame]):
         )
     )
 
+    pf_figure.xaxis.major_label_orientation = 1
     pf_figure.x_range.range_padding = 0.05
     pf_figure.xgrid.grid_line_color = None
     pf_figure.axis.minor_tick_line_color = None
@@ -142,10 +156,10 @@ def draw_price_figure(data: pd.DataFrame, df: pd.DataFrame, name: str):
     )
 
     num_positions = (
-        f"Num. Positions | Short: {len(short_starts)}  Long: {len(long_starts)}"
+        f" Num. Positions | Short: {len(short_starts)}  Long: {len(long_starts)} "
     )
 
-    # Calculate based on ticks -> price data has gaps
+    # Calculate position durations based on ticks -> price data has gaps
     avg_longs = round(
         (data.loc[data["position"] == 1, "position"].sum() + 1) / (len(long_starts) + 1)
     )
@@ -153,13 +167,27 @@ def draw_price_figure(data: pd.DataFrame, df: pd.DataFrame, name: str):
         (data.loc[data["position"] == 2, "position"].sum() + 1)
         / (len(short_starts) + 1)
     )
-    avg_durations = f"Avg. Durations | Short: {avg_shorts} min.  Long: {avg_longs} min."
+    avg_durations = (
+        f" Avg. Durations | Short: {avg_shorts} min.  Long: {avg_longs} min. "
+    )
+
+    # Calculate profits made per position
+    total_profit_long = data.loc[
+        (data["profit"] != 0) & (data["position"].shift(1) == 1), "profit"
+    ].sum()
+    total_profit_short = data.loc[
+        (data["profit"] != 0) & (data["position"].shift(1) == 2), "profit"
+    ].sum()
+    total_profits = (
+        f" Total Profits  | Short: {total_profit_short}  Long: {total_profit_long} "
+    )
+
     summary = Label(
         x=50,
         y=20,
         x_units="screen",
         y_units="screen",
-        text=f"{num_positions}\n{avg_durations}",
+        text=f"\n{num_positions}\n{avg_durations}\n{total_profits}\n",
         border_line_color="black",
         background_fill_color="white",
     )
@@ -256,7 +284,7 @@ def visualize(dir: str, prices_df: pd.DataFrame):
         width_policy="max",
     )
     save(document)
-    update_pb("Done!")
+    update_pb("Visualization done!")
 
 
 for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
