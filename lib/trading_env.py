@@ -325,7 +325,13 @@ class PyTradingEnvWrapper(PyEnvironment):
 
         self._env = env
         self._latest_info = {}
-        self._reset()
+        self._discount = np.array(1.0, dtype=np.float32)  # Currently not in use
+        self._current_time_step = ts.TimeStep(
+            step_type=ts.StepType.FIRST,
+            reward=np.array(0.0, dtype=np.float32),
+            discount=self._discount,
+            observation=self._env.observation,
+        )
 
     def observation_spec(self) -> types.NestedArraySpec:
         return self._env.observation_spec()
