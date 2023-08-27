@@ -17,7 +17,7 @@ class DataProcessor:
     def __init__(self, src: str, period_fast=3, period_slow=5) -> None:
         download = None if self._is_local(src) else wget.download(src)
 
-        self._pb = tqdm(range(6), desc="Load data")
+        self._pb = tqdm(range(7), desc="Load data")
         df = pd.read_csv(download or src)
         if download:
             os.remove(download)
