@@ -29,7 +29,7 @@ class DataProcessor:
         date_time = pd.to_datetime(df.pop("dateTime"), format="%Y-%m-%d %H:%M:%S")
         self._update_pb()
 
-        timestamp_s = date_time.astype(int) // 10**9
+        timestamp_s = date_time.astype(np.int64) // 10**9
         self._update_pb()
 
         day = 24 * 60 * 60
