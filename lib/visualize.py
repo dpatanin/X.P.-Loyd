@@ -3,14 +3,14 @@ from os import walk
 import pandas as pd
 from bokeh.io import curdoc
 from bokeh.layouts import column
-from bokeh.models import HoverTool, TabPanel, Tabs
+from bokeh.models import BoxAnnotation, HoverTool, TabPanel, Tabs
 from bokeh.palettes import HighContrast3
 from bokeh.plotting import figure, output_file, save
 from data_processor import DataProcessor
 from tqdm import tqdm
 
 
-def get_color(index, total_values):
+def calc_line_color(index, total_values):
     return (
         255,
         int((index * 255) / total_values),
@@ -72,7 +72,7 @@ for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
         tqdm(ep_history, desc="Draw lines", position=1, leave=False)
     ):
         index = data.index.values
-        color = get_color(id, len(ep_history))
+        color = calc_line_color(id, len(ep_history))
         name = str(id + 1)
 
         balance_figure.line(
@@ -95,7 +95,7 @@ for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
             muted_alpha=0,
         )
 
-        price_df = df[index[0] : index[-1]]
+        price_df = df[index[0] : index[-1] + 1]
         inc = price_df.close > price_df.open
         dec = price_df.open > price_df.close
 
@@ -104,7 +104,6 @@ for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
             x_axis_type="datetime",
             x_axis_label="Datetime",
             y_axis_label="Prices",
-            background_fill_color="#efefef",
             **common_args,
         )
 
@@ -133,9 +132,25 @@ for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
             pd.Timedelta("1m"),
             price_df.open[inc],
             price_df.close[inc],
-            fill_color="white",
-            line_color="#49a3a3",
-            line_width=2,
+            color="#49a3a3",
+        )
+
+        positions = data.set_index(price_df.index)["position"]
+        position_starts = price_df[positions.diff() != 0].index
+        position_ends = price_df[positions.diff().shift(-1) != 0].index
+
+        price_figure.vstrip(
+            x0=position_starts[positions[position_starts] == 1],
+            x1=position_ends[positions[position_starts] == 1],
+            color="#FF0000",
+            alpha=0.2,
+        )
+
+        price_figure.vstrip(
+            x0=position_starts[positions[position_starts] == 2],
+            x1=position_ends[positions[position_starts] == 2],
+            color="#00FF00",
+            alpha=0.2,
         )
 
         tabs.append(TabPanel(child=price_figure, title=f"EP:{name}"))
