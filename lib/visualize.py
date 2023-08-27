@@ -10,6 +10,16 @@ from bokeh.plotting import figure, output_file, save
 from data_processor import DataProcessor
 from tqdm import tqdm
 
+curdoc().theme = "dark_minimal"
+common_args = {
+    "height": 840,
+    "width_policy": "max",
+    "sizing_mode": "stretch_width",
+    "hidpi": True,
+    "output_backend": "webgl",
+}
+dp = DataProcessor("source.csv", 5)
+
 
 def calc_line_color(index, total_values):
     return (
@@ -19,185 +29,10 @@ def calc_line_color(index, total_values):
     )
 
 
-def update_pb(desc: str = None):
-    pb.update()
-    if desc:
-        pb.set_description(desc)
-
-
-def calc_avg_timedelta_min(starts, ends):
-    return np.nan_to_num((ends - starts).mean().total_seconds() / 60).round()
-
-
-curdoc().theme = "dark_minimal"
-
-dp = DataProcessor("source.csv", 5)
-common_args = {
-    "height": 840,
-    "width_policy": "max",
-    "sizing_mode": "stretch_width",
-    "hidpi": True,
-    "output_backend": "webgl",
-}
-
-for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
-    output_file(filename=f"{dir}/visualization.html", title="DQN Results")
-
-    pb = tqdm(range(5), desc="Load episode history", position=0, leave=True)
-
-    filenames: list[str] = next(walk(dir), (None, None, []))[2]
-    csv_files = [fname for fname in filenames if fname.endswith(".csv")]
-    ep_history = [pd.read_csv(f"{dir}/{file}", index_col=0) for file in csv_files]
-
-    update_pb("Create line charts")
-    initial_balance = ep_history[0]["balance"].iloc[0]
-    simple_hover = HoverTool(
-        tooltips=[("EP", "$name"), ("Timestep", "@x"), ("Value", "@y")],
-    )
-
-    balance_figure = figure(
-        title="Balance per timestep",
-        x_axis_label="Time Steps",
-        y_axis_label="$$$",
-        **common_args,
-    )
-    balance_figure.add_tools(simple_hover)
-
-    streak_figure = figure(
-        title="Streak per timestep",
-        x_axis_label="Time Steps",
-        y_axis_label="Streak multiplier",
-        **common_args,
-    )
-    streak_figure.add_tools(simple_hover)
-
-    tabs = []
-
-    for id, data in enumerate(
-        tqdm(ep_history, desc="Draw lines", position=1, leave=False)
-    ):
-        index = data.index.values
-        color = calc_line_color(id, len(ep_history))
-        name = str(id + 1)
-
-        balance_figure.line(
-            index,
-            data["balance"].values,
-            line_width=2,
-            name=name,
-            color=color,
-            muted_color=color,
-            muted_alpha=0,
-        )
-
-        streak_figure.line(
-            index,
-            data["streak"].values,
-            line_width=2,
-            name=name,
-            color=color,
-            muted_color=color,
-            muted_alpha=0,
-        )
-
-        price_df = df[index[0] : index[-1] + 1]
-        inc = price_df.close > price_df.open
-        dec = price_df.open > price_df.close
-
-        price_figure = figure(
-            title=f"Price chart EP:{name}",
-            x_axis_type="datetime",
-            x_axis_label="Datetime",
-            y_axis_label="Prices",
-            **common_args,
-        )
-
-        price_figure.add_tools(
-            HoverTool(
-                tooltips=[("Date", "$x{%F}"), ("Price", "$y{0,0.00}")],
-                formatters={"$x": "datetime"},
-            )
-        )
-
-        price_figure.xaxis.major_label_orientation = 0.8
-
-        price_figure.segment(
-            price_df.index, price_df.high, price_df.index, price_df.low, color="black"
-        )
-
-        price_figure.vbar(
-            price_df.index[dec],
-            pd.Timedelta("1m"),
-            price_df.open[dec],
-            price_df.close[dec],
-            color="#eb3c40",
-        )
-        price_figure.vbar(
-            price_df.index[inc],
-            pd.Timedelta("1m"),
-            price_df.open[inc],
-            price_df.close[inc],
-            color="#49a3a3",
-        )
-
-        positions = data.set_index(price_df.index)["position"]
-
-        position_starts = price_df[positions.diff() != 0].index
-        position_ends = position_starts[1:]
-        position_starts = position_starts[:-1]
-
-        long_starts = position_starts[positions[position_starts] == 1]
-        long_ends = position_ends[positions[position_starts] == 1]
-        price_figure.vstrip(
-            x0=long_starts,
-            x1=long_ends,
-            color="#24ed85",
-            alpha=0.2,
-        )
-
-        short_starts = position_starts[positions[position_starts] == 2]
-        short_ends = position_ends[positions[position_starts] == 2]
-        price_figure.vstrip(
-            x0=short_starts,
-            x1=short_ends,
-            color="#ed3124",
-            alpha=0.2,
-        )
-
-        num_positions = (
-            f"Num. Positions | Short: {len(short_starts)}  Long: {len(long_starts)}"
-        )
-
-        # Calculate based on ticks -> price data has gaps
-        avg_longs = round(
-            (data.loc[data["position"] == 1, "position"].sum() + 1)
-            / (len(long_starts) + 1)
-        )
-        avg_shorts = round(
-            (data.loc[data["position"] == 2, "position"].sum() + 1)
-            / (len(short_starts) + 1)
-        )
-        avg_durations = (
-            f"Avg. Durations | Short: {avg_shorts} min.  Long: {avg_longs} min."
-        )
-        summary = Label(
-            x=50,
-            y=20,
-            x_units="screen",
-            y_units="screen",
-            text=f"{num_positions}\n{avg_durations}",
-            border_line_color="black",
-            background_fill_color="white",
-        )
-
-        price_figure.add_layout(summary)
-
-        tabs.append(TabPanel(child=price_figure, title=f"EP:{name}"))
-
-    update_pb("Create profit & fees bar chart")
-    x_episodes = [str(n) for n in range(1, len(ep_history) + 1)]
-    total_profits = [ep["profit"].sum() for ep in ep_history]
-    total_fees = [ep["fees"].sum() for ep in ep_history]
+def draw_profit_fees(history: list[pd.DataFrame]):
+    x_episodes = [str(n) for n in range(1, len(history) + 1)]
+    total_profits = [ep["profit"].sum() for ep in history]
+    total_fees = [ep["fees"].sum() for ep in history]
 
     pf_data = {
         "x_episodes": x_episodes,
@@ -237,7 +72,177 @@ for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
     pf_figure.legend.location = "top_left"
     pf_figure.legend.orientation = "horizontal"
 
+    return pf_figure
+
+
+def draw_price_figure(data: pd.DataFrame, df: pd.DataFrame, name: str):
+    index = data.index.values
+    price_df = df[index[0] : index[-1] + 1]
+    inc = price_df.close > price_df.open
+    dec = price_df.open > price_df.close
+
+    price_figure = figure(
+        title=f"Price chart EP:{name}",
+        x_axis_type="datetime",
+        x_axis_label="Datetime",
+        y_axis_label="Prices",
+        **common_args,
+    )
+
+    price_figure.add_tools(
+        HoverTool(
+            tooltips=[("Date", "$x{%F}"), ("Price", "$y{0,0.00}")],
+            formatters={"$x": "datetime"},
+        )
+    )
+
+    price_figure.xaxis.major_label_orientation = 0.8
+
+    price_figure.segment(
+        price_df.index, price_df.high, price_df.index, price_df.low, color="black"
+    )
+
+    price_figure.vbar(
+        price_df.index[dec],
+        pd.Timedelta("1m"),
+        price_df.open[dec],
+        price_df.close[dec],
+        color="#eb3c40",
+    )
+    price_figure.vbar(
+        price_df.index[inc],
+        pd.Timedelta("1m"),
+        price_df.open[inc],
+        price_df.close[inc],
+        color="#49a3a3",
+    )
+
+    positions = data.set_index(price_df.index)["position"]
+
+    position_starts = price_df[positions.diff() != 0].index
+    position_ends = position_starts[1:]
+    position_starts = position_starts[:-1]
+
+    long_starts = position_starts[positions[position_starts] == 1]
+    long_ends = position_ends[positions[position_starts] == 1]
+    price_figure.vstrip(
+        x0=long_starts,
+        x1=long_ends,
+        color="#24ed85",
+        alpha=0.2,
+    )
+
+    short_starts = position_starts[positions[position_starts] == 2]
+    short_ends = position_ends[positions[position_starts] == 2]
+    price_figure.vstrip(
+        x0=short_starts,
+        x1=short_ends,
+        color="#ed3124",
+        alpha=0.2,
+    )
+
+    num_positions = (
+        f"Num. Positions | Short: {len(short_starts)}  Long: {len(long_starts)}"
+    )
+
+    # Calculate based on ticks -> price data has gaps
+    avg_longs = round(
+        (data.loc[data["position"] == 1, "position"].sum() + 1) / (len(long_starts) + 1)
+    )
+    avg_shorts = round(
+        (data.loc[data["position"] == 2, "position"].sum() + 1)
+        / (len(short_starts) + 1)
+    )
+    avg_durations = f"Avg. Durations | Short: {avg_shorts} min.  Long: {avg_longs} min."
+    summary = Label(
+        x=50,
+        y=20,
+        x_units="screen",
+        y_units="screen",
+        text=f"{num_positions}\n{avg_durations}",
+        border_line_color="black",
+        background_fill_color="white",
+    )
+
+    price_figure.add_layout(summary)
+
+    return price_figure
+
+
+def visualize(dir: str, prices_df: pd.DataFrame):
+    output_file(filename=f"{dir}/visualization.html", title="DQN Results")
+
+    pb = tqdm(range(5), desc="Load episode history", position=0, leave=True)
+
+    def update_pb(desc: str = None):
+        pb.update()
+        if desc:
+            pb.set_description(desc)
+
+    filenames: list[str] = next(walk(dir), (None, None, []))[2]
+    csv_files = [fname for fname in filenames if fname.endswith(".csv")]
+    ep_history = [pd.read_csv(f"{dir}/{file}", index_col=0) for file in csv_files]
+
+    update_pb("Create line charts")
+    simple_hover = HoverTool(
+        tooltips=[("EP", "$name"), ("Timestep", "@x"), ("Value", "@y")],
+    )
+
+    balance_figure = figure(
+        title="Balance per timestep",
+        x_axis_label="Time Steps",
+        y_axis_label="$$$",
+        **common_args,
+    )
+    balance_figure.add_tools(simple_hover)
+
+    streak_figure = figure(
+        title="Streak per timestep",
+        x_axis_label="Time Steps",
+        y_axis_label="Streak multiplier",
+        **common_args,
+    )
+    streak_figure.add_tools(simple_hover)
+
+    for id, data in enumerate(
+        tqdm(ep_history, desc="Draw lines", position=1, leave=False)
+    ):
+        index = data.index.values
+        color = calc_line_color(id, len(ep_history))
+        name = str(id + 1)
+
+        balance_figure.line(
+            index,
+            data["balance"].values,
+            line_width=2,
+            name=name,
+            color=color,
+            muted_color=color,
+            muted_alpha=0,
+        )
+
+        streak_figure.line(
+            index,
+            data["streak"].values,
+            line_width=2,
+            name=name,
+            color=color,
+            muted_color=color,
+            muted_alpha=0,
+        )
+
+    tabs = [
+        TabPanel(
+            child=draw_price_figure(data, prices_df, str(id + 1)), title=f"EP:{id+1}"
+        )
+        for id, data, in enumerate(ep_history)
+    ]
+
+    update_pb("Create profit & fees bar chart")
+    pf_figure = draw_profit_fees(ep_history)
+
     update_pb("Create streak figure")
+    # TODO
 
     update_pb("Build Html site")
     document = column(
@@ -252,3 +257,7 @@ for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
     )
     save(document)
     update_pb("Done!")
+
+
+for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
+    visualize(dir, df)
