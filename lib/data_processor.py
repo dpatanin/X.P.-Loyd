@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 import numpy as np
 import pandas as pd
 import wget
+from SMACrossOver import SMACrossOver
 from tqdm import tqdm
 
 
@@ -49,6 +50,9 @@ class DataProcessor:
             df[f"{col}_ema"] = df[col].ewm(span=ema_period, adjust=False).mean()
 
         df.fillna(0, inplace=True)
+
+        strategy = SMACrossOver(df)
+        strategy.analyze(periodFast=3, periodSlow=5)
 
         self._update_pb("Splitting data")
         # Split data
