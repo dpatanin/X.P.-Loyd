@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import warnings
@@ -21,6 +20,7 @@ from tqdm import tqdm
 
 from lib.data_processor import DataProcessor
 from lib.trading_env import TFPyTradingEnvWrapper, TradingEnvironment
+from lib.visualize import visualize
 
 FEATURES = [
     "day_sin",
@@ -39,8 +39,8 @@ SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%2129
 
 SEQ_LENGTH = 15
 BATCH_SIZE = 512
-TRAIN_STEPS = 10000
-EVAL_MIN_STEPS = 10000
+TRAIN_STEPS = 100000
+EVAL_MIN_STEPS = 23*60*31
 CHECKPOINT_INTERVAL = 15000  # Agent
 LOAD_CHECKPOINT = False
 N_STEP_UPDATE = 2
@@ -65,8 +65,8 @@ def env_creator(df: pd.DataFrame, load_checkpoint: bool):
             fees_per_contract=0.25,
             streak_span=SEQ_LENGTH,
             streak_bonus_max=2,
-            streak_difficulty=18,
-            env_state_dir=json.load(open("logs/train")) if load_checkpoint else None,
+            streak_difficulty=14,
+            env_state_dir="logs/train" if load_checkpoint else None,
         )
     )
 
@@ -178,14 +178,14 @@ try:
     with tqdm(range(EVAL_MIN_STEPS), desc="Evaluation") as pbar:
         time_step = eval_env.reset()
         eval_step = 0
+
         # not time_step.is_last() or
-        while eval_step < EVAL_MIN_STEPS:
+        while not time_step.is_last() or eval_step < EVAL_MIN_STEPS:
             eval_step += 1
             action_step = agent.policy.action(time_step)
             time_step = eval_env.step(action_step.action)
             pbar.update()
 
-        eval_env.save(f"{LOG_DIR}/eval")
 
 except KeyboardInterrupt:
     pass
@@ -193,9 +193,13 @@ except Exception as error:
     logging.error(error.with_traceback())
 finally:
     try:
+        eval_env.save(f"{LOG_DIR}/eval")
         train_env.save(f"{LOG_DIR}/train")
     except Exception as error:
         logging.error(error)
 
     train_checkpointer.save(step)
     PolicySaver(agent.policy).save(f"{MODEL_DIR}/final_{start_step}-{step}")
+
+    visualize(f"{LOG_DIR}/train", dp.train_df)
+    visualize(f"{LOG_DIR}/eval", dp.val_df)

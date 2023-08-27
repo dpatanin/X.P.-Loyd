@@ -1,14 +1,11 @@
 from os import walk
 
-import numpy as np
 import pandas as pd
 from bokeh.io import curdoc
 from bokeh.layouts import column
-from bokeh.models import ColumnDataSource, FactorRange, HoverTool, Label, TabPanel, Tabs
-from bokeh.palettes import HighContrast3
+from bokeh.models import ColumnDataSource, HoverTool, Label, TabPanel, Tabs
 from bokeh.plotting import figure, output_file, save
-from bokeh.transform import dodge, factor_cmap
-from data_processor import DataProcessor
+from bokeh.transform import dodge
 from tqdm import tqdm
 
 curdoc().theme = "dark_minimal"
@@ -19,7 +16,6 @@ common_args = {
     "hidpi": True,
     "output_backend": "webgl",
 }
-dp = DataProcessor("source.csv", 5)
 
 
 def calc_line_color(index, total_values):
@@ -285,7 +281,3 @@ def visualize(dir: str, prices_df: pd.DataFrame):
     )
     save(document)
     update_pb("Visualization done!")
-
-
-for dir, df in [("logs/train", dp.train_df), ("logs/eval", dp.val_df)]:
-    visualize(dir, df)
