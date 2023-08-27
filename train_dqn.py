@@ -27,8 +27,10 @@ FEATURES = [
     "day_cos",
     "high_diff",
     "low_diff",
-    "open",
-    "close",
+    "open_pct",
+    "close_pct",
+    "SMA_diff",
+    "SMA_position",
     "volume",
 ]
 
@@ -39,13 +41,13 @@ SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%2129
 
 SEQ_LENGTH = 15
 BATCH_SIZE = 512
-TRAIN_STEPS = 100000
-EVAL_MIN_STEPS = 23*60*31
+TRAIN_STEPS = 1000000
+EVAL_MIN_STEPS = 23 * 60 * 31
 CHECKPOINT_INTERVAL = 15000  # Agent
 LOAD_CHECKPOINT = False
 N_STEP_UPDATE = 2
 
-dp = DataProcessor(FULL_DATA, 5)
+dp = DataProcessor(FULL_DATA)
 pb = tqdm(range(5), desc="Create environments")
 
 
