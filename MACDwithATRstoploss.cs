@@ -30,6 +30,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private double PositionClosingPrice;
 		private double AfterClosingPrice;
 		private bool AfterStopLoss;
+		private bool startOfWeek;
 		private double upper;
 		private double lower;
 		private double upper2;
@@ -63,9 +64,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration	= true;
 				N					= 24;
-                X					= 18;
-                Y					= 4;
-                multiplier			= 3; //MACD multiplier
+				X					= 18;
+				Y					= 4;
+				riskRewardRatio		= 1;
+				multiplier			= 3; //MACD multiplier
 				fast				= 12; //MACD Period fast
 				slow				= 26; //MACD Period slow
 				signal				= 9; //MACD Period signal
@@ -86,19 +88,35 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		protected override void OnBarUpdate()
 		{
+			if(Time[0].DayOfWeek.ToString() == "Friday"
+				&& Time[0].TimeOfDay.Hours == 23)
+			{
+				ExitLong();
+				ExitShort();
+				return;
+			}
+			else if(Time[0].DayOfWeek.ToString() == "Monday")
+			{
+				AfterStopLoss = false;
+				startOfWeek = true;
+			}
+			else if(Time[0].DayOfWeek.ToString() == "Tuesday")
+			{
+				AfterStopLoss = true;
+				startOfWeek = false;
+			}
 			double atr = X*ATR(N)[0]*0.25;
 			if(Position.MarketPosition == MarketPosition.Long)//Long Position Exists
 			{
 				//StopLoss Long
 				if(Close[0] < lower)
 				{
-					Print("Exit Long");
 					ExitLong();
 				}
 				//TakeProfit Long
 				else if(Close[0] > upper)
 				{
-					lower = Close[0] - atr;
+					lower = Close[0] - (atr / riskRewardRatio);
 					upper = Close[0] + atr;
 					PositionClosingPrice = Close[0];
 				}
@@ -113,14 +131,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 				//StopLoss Short
 				if(Close[0] > upper)
 				{
-					Print("Exit Long");
 					ExitShort();
 				}
 				//TakeProfit Short
 				else if(Close[0] < lower)
 				{
 					lower = Close[0] - atr;
-					upper = Close[0] + atr;
+					upper = Close[0] + (atr / riskRewardRatio);
 					PositionClosingPrice = Close[0];
 				}
 				else
@@ -141,7 +158,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 						return;
 					else
 					{
-						Print("Enter Long");
 						EnterLong();
 					}
 				}
@@ -151,7 +167,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 						return;
 					else
 					{
-						Print("Enter Short");
 						EnterShort();
 					}
 				}
@@ -190,8 +205,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				double atr = Y*ATR(N)[0]*0.25;
 				lower2 = AfterClosingPrice - atr;
 				upper2 = AfterClosingPrice + atr;
-
-				Print("Exit last Position");
 			}
 
 			//Position Opened
@@ -224,6 +237,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Range(1, int.MaxValue)]
 		[Display(Name="MACD multiplier", Order=4, GroupName="Parameters")]
 		public int multiplier
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, int.MaxValue)]
+		[Display(Name="Risk/Reward Ratio", Order=5, GroupName="Parameters")]
+		public int riskRewardRatio
 		{ get; set; }
 		#endregion
 	}
