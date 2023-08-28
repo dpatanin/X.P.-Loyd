@@ -41,10 +41,10 @@ SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%2129
 
 SEQ_LENGTH = 15
 BATCH_SIZE = 512
-TRAIN_STEPS = 1000000
+TRAIN_STEPS = 100000
 EVAL_MIN_STEPS = 23 * 60 * 31
 CHECKPOINT_INTERVAL = 15000  # Agent
-LOAD_CHECKPOINT = False
+LOAD_CHECKPOINT = True
 N_STEP_UPDATE = 2
 
 dp = DataProcessor(FULL_DATA)
@@ -174,19 +174,24 @@ try:
             if step % CHECKPOINT_INTERVAL == 0:
                 train_checkpointer.save(step)
 
-            pbar.set_description(f"Training | Step: {step} | Loss: {train_loss.loss}")
-            pbar.update()
+            if step % 10 == 0:
+                pbar.set_description(
+                    f"Training | Step: {step} | Loss: {train_loss.loss}"
+                )
+                pbar.update(10)
 
     with tqdm(range(EVAL_MIN_STEPS), desc="Evaluation") as pbar:
         time_step = eval_env.reset()
         eval_step = 0
 
-        # not time_step.is_last() or
         while not time_step.is_last() or eval_step < EVAL_MIN_STEPS:
             eval_step += 1
             action_step = agent.policy.action(time_step)
             time_step = eval_env.step(action_step.action)
-            pbar.update()
+
+            if eval_step % 20 == 0:
+                pbar.set_description(f"Evaluation | Step: {eval_step}")
+                pbar.update(20)
 
 
 except KeyboardInterrupt:
