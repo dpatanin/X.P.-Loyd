@@ -67,7 +67,7 @@ def env_creator(df: pd.DataFrame, load_checkpoint: bool):
             fees_per_contract=0.25,
             streak_span=SEQ_LENGTH,
             streak_bonus_max=2,
-            streak_difficulty=14,
+            streak_difficulty=12,
             env_state_dir="logs/train" if load_checkpoint else None,
         )
     )
