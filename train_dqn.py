@@ -41,7 +41,7 @@ SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%2129
 
 SEQ_LENGTH = 15
 BATCH_SIZE = 512
-TRAIN_STEPS = 100000
+TRAIN_STEPS = 500000
 EVAL_MIN_STEPS = 23 * 60 * 31
 CHECKPOINT_INTERVAL = 15000  # Agent
 LOAD_CHECKPOINT = True
@@ -57,7 +57,7 @@ def update_pb(desc: str = None):
         pb.set_description(desc)
 
 
-def env_creator(df: pd.DataFrame, load_checkpoint: bool):
+def env_creator(df: pd.DataFrame, env_state_dir: str):
     return TFPyTradingEnvWrapper(
         TradingEnvironment(
             df=df,
@@ -67,14 +67,14 @@ def env_creator(df: pd.DataFrame, load_checkpoint: bool):
             fees_per_contract=0.25,
             streak_span=SEQ_LENGTH,
             streak_bonus_max=2,
-            streak_difficulty=12,
-            env_state_dir="logs/train" if load_checkpoint else None,
+            streak_difficulty=10,
+            env_state_dir=env_state_dir,
         )
     )
 
 
-train_env = env_creator(dp.train_df, LOAD_CHECKPOINT)
-eval_env = env_creator(dp.val_df, False)
+train_env = env_creator(dp.train_df, f"{LOG_DIR}/train" if LOAD_CHECKPOINT else None)
+eval_env = env_creator(dp.val_df, f"{LOG_DIR}/eval" if LOAD_CHECKPOINT else None)
 
 update_pb("Create network")
 categorical_q_net = categorical_q_network.CategoricalQNetwork(
@@ -181,6 +181,7 @@ try:
                 pbar.update(10)
 
     with tqdm(range(EVAL_MIN_STEPS), desc="Evaluation") as pbar:
+        eval_env.reset_checkpoints()
         time_step = eval_env.reset()
         eval_step = 0
 

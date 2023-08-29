@@ -1,1 +1,1 @@
-{"balance": 1010.0, "position": 0, "entryPrice": 0, "currentTick": 491901, "checkpoint": 470595, "ticksSinceLastAction": 210563, "streakMultiplier": 1.0, "tradeRewardWeight": 1.0, "balanceChangeWeight": 4.4e-323, "done": false, "truncated": false}
+{"balance": -62.25, "position": 1, "entryPrice": 2914.25, "currentTick": 791, "checkpoint": 15, "ticksSinceLastAction": 0, "streakMultiplier": 1.0, "tradeRewardWeight": 1.0, "balanceChangeWeight": 4.4e-323, "done": false, "truncated": true, "episodes": 118}

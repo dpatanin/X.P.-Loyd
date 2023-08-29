@@ -1,5 +1,6 @@
 from os import walk
 
+import numpy as np
 import pandas as pd
 from bokeh.io import curdoc
 from bokeh.layouts import column
@@ -128,7 +129,6 @@ def draw_price_figure(data: pd.DataFrame, df: pd.DataFrame, name: str):
     )
 
     positions = data.set_index(price_df.index)["position"]
-
     position_starts = price_df[positions.diff() != 0].index
     position_ends = position_starts[1:]
     position_starts = position_starts[:-1]
@@ -178,12 +178,19 @@ def draw_price_figure(data: pd.DataFrame, df: pd.DataFrame, name: str):
         f" Total Profits  | Short: {total_profit_short}  Long: {total_profit_long} "
     )
 
+    # Calculate sma pos identity -> shift by one, action follows last sma pos
+    agent_pos = data["position"][:-1].to_numpy()
+    sma_pos = price_df["SMA_position"][1:].to_numpy()
+    identical_count = np.sum(agent_pos == sma_pos)
+    identity_percent = (identical_count / len(data["position"][:-1])) * 100
+    identity = f" Identity to SMA position: {identity_percent:.2f}% "
+
     summary = Label(
         x=50,
         y=20,
         x_units="screen",
         y_units="screen",
-        text=f"\n{num_positions}\n{avg_durations}\n{total_profits}\n",
+        text=f"\n{num_positions}\n{avg_durations}\n{total_profits}\n{identity}\n",
         border_line_color="black",
         background_fill_color="white",
     )
@@ -194,9 +201,9 @@ def draw_price_figure(data: pd.DataFrame, df: pd.DataFrame, name: str):
 
 
 def visualize(dir: str, prices_df: pd.DataFrame):
-    output_file(filename=f"{dir}/visualization.html", title="DQN Results")
+    output_file(filename=f"{dir}/_visualization.html", title="DQN Results")
 
-    pb = tqdm(range(5), desc="Load episode history", position=0, leave=True)
+    pb = tqdm(range(4), desc="Load episode history", position=0, leave=True)
 
     def update_pb(desc: str = None):
         pb.update()
@@ -255,18 +262,21 @@ def visualize(dir: str, prices_df: pd.DataFrame):
             muted_alpha=0,
         )
 
+    # Efficiency
+    id_eps = [*enumerate(ep_history)]
+    longest_eps = sorted(id_eps[:-5], key=lambda id_df: len(id_df[1]), reverse=True)[
+        :10
+    ]
+    longest_eps.extend(id_eps[-5:])
     tabs = [
         TabPanel(
             child=draw_price_figure(data, prices_df, str(id + 1)), title=f"EP:{id+1}"
         )
-        for id, data, in enumerate(ep_history)
+        for id, data in longest_eps
     ]
 
     update_pb("Create profit & fees bar chart")
     pf_figure = draw_profit_fees(ep_history)
-
-    update_pb("Create streak figure")
-    # TODO
 
     update_pb("Build Html site")
     document = column(

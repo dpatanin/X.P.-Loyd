@@ -2,4 +2,4 @@
 .vs
 env
 __pycache__
-**/visualization.html
+**/_visualization.html
