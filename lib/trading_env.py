@@ -55,9 +55,6 @@ class TradingEnvironment(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape)
 
         self._initial_balance = balance
-        self._trade_reward_weight = 0.7
-        self._balance_change_weight = 0.3
-
         self._ticker = TradingEnvTicker(
             start_tick=window_size,
             end_tick=len(self._df) - 1,
@@ -101,7 +98,6 @@ class TradingEnvironment(gym.Env):
 
         self._update_observation(current_close_price)
         self._update_streak(profit)
-        self._update_weights(profit)
         reward = self._calculate_reward(profit, fees)
 
         info = self._get_info(profit, fees)
@@ -170,24 +166,6 @@ class TradingEnvironment(gym.Env):
             1 + np.exp(-k * (profit - x0))
         )
 
-    def _update_weights(self, profit: float):
-        # When balance is low, momentary gains are less important; when balance rises, should not overshadow momentary gains
-        # Calculate the ratio of trades to total net profit (+ 1 to avoid division by zero)
-        trade_balance_ratio = abs(profit / (self._balance - self._initial_balance + 1))
-
-        # Adjust weights based on the trade balance ratio
-        if trade_balance_ratio > 1.0:
-            self._trade_reward_weight *= 0.95
-            self._balance_change_weight *= 1.05
-        else:
-            self._trade_reward_weight *= 1.05
-            self._balance_change_weight *= 0.95
-
-        # Normalize the weights
-        total_weight = self._trade_reward_weight + self._balance_change_weight
-        self._trade_reward_weight /= total_weight
-        self._balance_change_weight /= total_weight
-
     def _calculate_reward(self, profit: float, fees: float):
         # Calculate the composite reward
         streak = self._streak_multiplier if profit >= 0 else 1
@@ -196,8 +174,9 @@ class TradingEnvironment(gym.Env):
         )
 
         return (
-            streak * (self._trade_reward_weight * (profit - fees))
-            + (self._balance_change_weight * (self._balance - self._initial_balance))
+            streak * (profit - fees)
+            + self._balance
+            - self._initial_balance
             - laziness_punishment
         )
 
@@ -229,8 +208,6 @@ class TradingEnvironment(gym.Env):
             "checkpoint": self._ticker.checkpoint,
             "ticksSinceLastAction": self._ticker.ticks_since_last_action,
             "streakMultiplier": self._streak_multiplier,
-            "tradeRewardWeight": self._trade_reward_weight,
-            "balanceChangeWeight": self._balance_change_weight,
             "done": self._done,
             "truncated": self._truncated,
             "episodes": len(self.history) + self._num_prev_eps,
@@ -248,8 +225,6 @@ class TradingEnvironment(gym.Env):
             self._ticker.checkpoint = state["checkpoint"]
             self._ticker.ticks_since_last_action = state["ticksSinceLastAction"]
             self._streak_multiplier = state["streakMultiplier"]
-            self._trade_reward_weight = state["tradeRewardWeight"]
-            self._balance_change_weight = state["balanceChangeWeight"]
             self._done = state["done"]
             self._truncated = state["truncated"]
             self._num_prev_eps = state["episodes"]
