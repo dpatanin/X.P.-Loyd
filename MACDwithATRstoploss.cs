@@ -88,6 +88,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		protected override void OnBarUpdate()
 		{
+			double atr = X*ATR(N)[0]*0.25;
+			SkipWeekends();
+
+			if(!AfterStopLoss)
+				UpdateATRBarrier(atr);
+
+			OutOfBoundsCheck(atr);
+
+			if(AfterStopLoss)
+				OutOfBoundsCheckAfterStopLoss();
+
+			Trade();
+		}
+		/// <summary>
+		/// Closes the current trading position on weekends,
+		/// specifically at 11:00 PM on Fridays, and then resumes trading once Mondays begin.
+		/// </summary>
+
+		private void SkipWeekends()
+		{
 			if(Time[0].DayOfWeek.ToString() == "Friday"
 				&& Time[0].TimeOfDay.Hours == 23)
 			{
@@ -95,90 +115,69 @@ namespace NinjaTrader.NinjaScript.Strategies
 				ExitShort();
 				return;
 			}
-			else if(Time[0].DayOfWeek.ToString() == "Monday")
-			{
-				AfterStopLoss = false;
-				startOfWeek = true;
-			}
-			else if(Time[0].DayOfWeek.ToString() == "Tuesday")
-			{
-				AfterStopLoss = true;
-				startOfWeek = false;
-			}
-			double atr = X*ATR(N)[0]*0.25;
-			if(Position.MarketPosition == MarketPosition.Long)//Long Position Exists
+		}
+
+		/// <summary>
+		/// Checks if StopLoss/TakeProfit signals are reached.
+		///
+		/// Case 1: Sell current position because of StopLoss.
+		/// Case 2: Slide ATR-Barrier in profitable direction.
+		/// Case 3: Barrier is not reached, ATR-Barrier is being updated.
+		/// </summary>
+		private void OutOfBoundsCheck(double atr)
+		{
+			//Long Position Exist
+			if(Position.MarketPosition == MarketPosition.Long)
 			{
 				//StopLoss Long
 				if(Close[0] < lower)
 				{
 					ExitLong();
 				}
-				//TakeProfit Long
+				//Slide ATR-Barrier in profitable direction
 				else if(Close[0] > upper)
 				{
 					lower = Close[0] - (atr / riskRewardRatio);
 					upper = Close[0] + atr;
 					PositionClosingPrice = Close[0];
 				}
-				else
-				{
-					lower = PositionClosingPrice - atr;
-					upper = PositionClosingPrice + atr;
-				}
 			}
-			else if(Position.MarketPosition == MarketPosition.Short)//Long Position Exists
+
+			//Short Position Exists
+			else if(Position.MarketPosition == MarketPosition.Short)
 			{
 				//StopLoss Short
 				if(Close[0] > upper)
 				{
 					ExitShort();
 				}
-				//TakeProfit Short
+				//Slide ATR-Barrier in profitable direction
 				else if(Close[0] < lower)
 				{
 					lower = Close[0] - atr;
 					upper = Close[0] + (atr / riskRewardRatio);
 					PositionClosingPrice = Close[0];
 				}
-				else
-				{
-					lower = PositionClosingPrice - atr;
-					upper = PositionClosingPrice + atr;
-				}
-			}
-
-			if(AfterStopLoss)
-				UpdateAfterStopLoss();
-
-			if(Position.MarketPosition == MarketPosition.Flat) //NoPositionExists
-			{
-				if(MACD(fast, slow, signal)[0] > MACD(fast, slow, signal).Avg[0]) //MACD line > Signal line
-				{
-					if(AfterStopLoss && Close[0] < upper2) //AfterStopLoss && (Current Price < PositionClosingPrice + y*ATR(N))
-						return;
-					else
-					{
-						EnterLong();
-					}
-				}
-				else if(MACD(fast, slow, signal)[0] < MACD(fast, slow, signal).Avg[0]) //MACD line < Signal line
-				{
-					if(AfterStopLoss && Close[0] > lower2) //AfterStopLoss && (Current Price > PositionClosingPrice - y*ATR(N))
-						return;
-					else
-					{
-						EnterShort();
-					}
-				}
-			}
-			else
-			{
-				Values[0][0] = upper;
-				Values[1][0] = lower;
 			}
 		}
 
-		private void UpdateAfterStopLoss()
+		/// <summary>
+		/// It updates the ATR Barrier and draws it on the chart using dots.
+		/// </summary>
+		private void UpdateATRBarrier(double atr)
+		{
+			//update
+			upper = PositionClosingPrice + atr;
+			lower = PositionClosingPrice - atr;
+			//draw
+			Values[0][0] = upper;
+			Values[1][0] = lower;
+		}
+
+		/// <summary>
+		/// This checks whether the price has moved beyond the specified limits after a StopLoss has been triggered
+		/// </summary>
+		private void OutOfBoundsCheckAfterStopLoss()
 		{
 			if(Close[0] < lower2)
 			{
@@ -190,6 +189,41 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			Values[2][0] = lower2;
 			Values[3][0] = upper2;
+		}
+
+		/// <summary>
+		/// Checks if the price is outside the AfterStopLoss-Barrier.
+		/// If it is, then go Long or Short depending on
+		/// the relationship between the MACD line and the Signal line
+		/// </summary>
+		private void Trade()
+		{
+			//NoPositionExists
+			if(Position.MarketPosition == MarketPosition.Flat)
+			{
+				//MACD line > Signal line
+				if(MACD(fast, slow, signal)[0] > MACD(fast, slow, signal).Avg[0])
+				{
+
+					if(AfterStopLoss && Close[0] < upper2)
+						return;
+					else
+					{
+						EnterLong();
+					}
+				}
+				//MACD line < Signal line
+				else if(MACD(fast, slow, signal)[0] < MACD(fast, slow, signal).Avg[0])
+				{
+					// If inside the AfterStopLoss-Barrier, then return, else go Short.
+					if(AfterStopLoss && Close[0] > lower2)
+						return;
+					else
+					{
+						EnterShort();
+					}
+				}
+			}
 		}
 
 		protected override void OnPositionUpdate(Cbi.Position position,
