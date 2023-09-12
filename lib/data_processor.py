@@ -44,6 +44,8 @@ class DataProcessor:
 
         for col in ["open", "close"]:
             df[f"{col}_pct"] = df[col].pct_change()
+            df[f"{col}_diff"] = df[col].diff()
+            
 
         self._update_pb("Calculate SMA Crossover")
         df["SMA_diff"] = self.SMA(df["close"], period_fast) / self.SMA(

@@ -23,14 +23,10 @@ from lib.trading_env import TFPyTradingEnvWrapper, TradingEnvironment
 from lib.visualize import visualize
 
 FEATURES = [
-    "day_sin",
-    "day_cos",
     "high_diff",
     "low_diff",
-    "open_pct",
-    "close_pct",
-    "SMA_diff",
-    "SMA_position",
+    "open_diff",
+    "close_diff",
     "volume",
 ]
 
@@ -41,7 +37,7 @@ SENTIMENT_DATA = "https://onedrive.live.com/download?resid=2ba9b2044e887de1%2129
 
 SEQ_LENGTH = 15
 BATCH_SIZE = 512
-TRAIN_STEPS = 1000000
+TRAIN_STEPS = 300000
 EVAL_MIN_STEPS = 23 * 60 * 31
 CHECKPOINT_INTERVAL = 15000  # Agent
 LOAD_CHECKPOINT = True
@@ -57,7 +53,7 @@ def update_pb(desc: str = None):
         pb.set_description(desc)
 
 
-def env_creator(df: pd.DataFrame, env_state_dir: str):
+def env_creator(df: pd.DataFrame, env_state_dir: str = None):
     return TFPyTradingEnvWrapper(
         TradingEnvironment(
             df=df,
@@ -73,8 +69,8 @@ def env_creator(df: pd.DataFrame, env_state_dir: str):
     )
 
 
-train_env = env_creator(dp.train_df, f"{LOG_DIR}/train" if LOAD_CHECKPOINT else None)
-eval_env = env_creator(dp.val_df, f"{LOG_DIR}/eval" if LOAD_CHECKPOINT else None)
+train_env = env_creator(dp.train_df,  f"{LOG_DIR}/train" if LOAD_CHECKPOINT else None)
+eval_env = env_creator(dp.val_df,  f"{LOG_DIR}/eval" if LOAD_CHECKPOINT else None)
 
 update_pb("Create network")
 categorical_q_net = categorical_q_network.CategoricalQNetwork(
@@ -201,8 +197,8 @@ except Exception as error:
     logging.error(error.with_traceback())
 finally:
     try:
-        eval_env.save(f"{LOG_DIR}/eval")
         train_env.save(f"{LOG_DIR}/train")
+        eval_env.save(f"{LOG_DIR}/eval")
     except Exception as error:
         logging.error(error)
 
