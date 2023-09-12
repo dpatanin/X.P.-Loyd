@@ -31,10 +31,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private double AfterClosingPrice;
 		private bool AfterStopLoss;
 		private bool startOfWeek;
-		private double upper;
-		private double lower;
-		private double upper2;
-		private double lower2;
+		private double activeUpper;
+		private double activeLower;
+		private double recoveryUpper;
+		private double recoveryLower;
 		private int fast;
 		private int slow;
 		private int signal;
@@ -63,9 +63,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				// Disable this property for performance gains in Strategy Analyzer optimizations
 				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration	= true;
-				VolatilityDampener		= 12;
-				ActiveBarrierScale		= 8;
-				RecoveryBarrierScale	= 4;
+				volatilityDampener		= 12;
+				activeBarrierScale		= 8;
+				recoveryBarrierScale	= 4;
 				riskRewardRatio			= 1;
 				multiplier				= 2; //MACD multiplier
 				fast					= 12; //MACD Period fast
@@ -82,13 +82,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 				slow *= multiplier;
 				signal *= multiplier;
 				AddChartIndicator(MACD(fast,slow,signal));
-				AddChartIndicator(ATR(VolatilityDampener));
+				AddChartIndicator(ATR(volatilityDampener));
 			}
 		}
 
 		protected override void OnBarUpdate()
 		{
-			double atr = ActiveBarrierScale*ATR(VolatilityDampener)[0]*0.25;
+			double atr = activeBarrierScale*ATR(volatilityDampener)[0]*0.25;
 			SkipWeekends();
 
 			if(!AfterStopLoss)
@@ -130,15 +130,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if(Position.MarketPosition == MarketPosition.Long)
 			{
 				//StopLoss Long
-				if(Close[0] < lower)
+				if(Close[0] < activeLower)
 				{
 					ExitLong();
 				}
 				//Slide ATR-Barrier in profitable direction
-				else if(Close[0] > upper)
+				else if(Close[0] > activeUpper)
 				{
-					lower = Close[0] - (atr / riskRewardRatio);
-					upper = Close[0] + atr;
+					activeLower = Close[0] - (atr / riskRewardRatio);
+					activeUpper = Close[0] + atr;
 					PositionClosingPrice = Close[0];
 				}
 			}
@@ -147,15 +147,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 			else if(Position.MarketPosition == MarketPosition.Short)
 			{
 				//StopLoss Short
-				if(Close[0] > upper)
+				if(Close[0] > activeUpper)
 				{
 					ExitShort();
 				}
 				//Slide ATR-Barrier in profitable direction
-				else if(Close[0] < lower)
+				else if(Close[0] < activeLower)
 				{
-					lower = Close[0] - atr;
-					upper = Close[0] + (atr / riskRewardRatio);
+					activeLower = Close[0] - atr;
+					activeUpper = Close[0] + (atr / riskRewardRatio);
 					PositionClosingPrice = Close[0];
 				}
 			}
@@ -167,11 +167,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void UpdateATRBarrier(double atr)
 		{
 			//update
-			upper = PositionClosingPrice + atr;
-			lower = PositionClosingPrice - atr;
+			activeUpper = PositionClosingPrice + atr;
+			activeLower = PositionClosingPrice - atr;
 			//draw
-			Values[0][0] = upper;
-			Values[1][0] = lower;
+			Values[0][0] = activeUpper;
+			Values[1][0] = activeLower;
 		}
 
 		/// <summary>
@@ -179,16 +179,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		/// </summary>
 		private void OutOfBoundsCheckAfterStopLoss()
 		{
-			if(Close[0] < lower2)
+			if(Close[0] < recoveryLower)
 			{
 				AfterStopLoss = false;
 			}
-			else if(Close[0] > upper2)
+			else if(Close[0] > recoveryUpper)
 			{
 				AfterStopLoss = false;
 			}
-			Values[2][0] = lower2;
-			Values[3][0] = upper2;
+			Values[2][0] = recoveryLower;
+			Values[3][0] = recoveryUpper;
 		}
 
 		/// <summary>
@@ -205,7 +205,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				if(MACD(fast, slow, signal)[0] > MACD(fast, slow, signal).Avg[0])
 				{
 
-					if(AfterStopLoss && Close[0] < upper2)
+					if(AfterStopLoss && Close[0] < recoveryUpper)
 						return;
 					else
 					{
@@ -216,7 +216,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				else if(MACD(fast, slow, signal)[0] < MACD(fast, slow, signal).Avg[0])
 				{
 					// If inside the AfterStopLoss-Barrier, then return, else go Short.
-					if(AfterStopLoss && Close[0] > lower2)
+					if(AfterStopLoss && Close[0] > recoveryLower)
 						return;
 					else
 					{
@@ -236,9 +236,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				AfterClosingPrice = Close[0];
 
 				//Sets red ATR-Barrier
-				double atr = RecoveryBarrierScale*ATR(VolatilityDampener)[0]*0.25;
-				lower2 = AfterClosingPrice - atr;
-				upper2 = AfterClosingPrice + atr;
+				double atr = recoveryBarrierScale*ATR(volatilityDampener)[0]*0.25;
+				recoveryLower = AfterClosingPrice - atr;
+				recoveryUpper = AfterClosingPrice + atr;
 			}
 
 			//Position Opened
@@ -252,19 +252,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
 		[Display(Name="VolatilityDampener", Description="ATR period; The greater, the less reactive to volatility.", Order=1, GroupName="Parameters")]
-		public int VolatilityDampener
+		public int volatilityDampener
 		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
 		[Display(Name="ActiveBarrierScale", Description="Green barriers", Order=2, GroupName="Parameters")]
-		public int ActiveBarrierScale
+		public int activeBarrierScale
 		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
 		[Display(Name="RecoveryBarrierScale", Description="Red barriers", Order=3, GroupName="Parameters")]
-		public int RecoveryBarrierScale
+		public int recoveryBarrierScale
 		{ get; set; }
 
 		[NinjaScriptProperty]
