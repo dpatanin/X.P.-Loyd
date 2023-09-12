@@ -63,14 +63,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 				// Disable this property for performance gains in Strategy Analyzer optimizations
 				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration	= true;
-				N					= 12;
-				X					= 8;
-				Y					= 4;
-				riskRewardRatio		= 1;
-				multiplier			= 2; //MACD multiplier
-				fast				= 12; //MACD Period fast
-				slow				= 26; //MACD Period slow
-				signal				= 9; //MACD Period signal
+				VolatilityDampener		= 12;
+				ActiveBarrierScale		= 8;
+				RecoveryBarrierScale	= 4;
+				riskRewardRatio			= 1;
+				multiplier				= 2; //MACD multiplier
+				fast					= 12; //MACD Period fast
+				slow					= 26; //MACD Period slow
+				signal					= 9; //MACD Period signal
 				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "Lower");
 				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "Upper");
 				AddPlot(new Stroke(Brushes.Red, 2), PlotStyle.Dot, "Lower2");
@@ -82,13 +82,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 				slow *= multiplier;
 				signal *= multiplier;
 				AddChartIndicator(MACD(fast,slow,signal));
-				AddChartIndicator(ATR(N));
+				AddChartIndicator(ATR(VolatilityDampener));
 			}
 		}
 
 		protected override void OnBarUpdate()
 		{
-			double atr = X*ATR(N)[0]*0.25;
+			double atr = ActiveBarrierScale*ATR(VolatilityDampener)[0]*0.25;
 			SkipWeekends();
 
 			if(!AfterStopLoss)
@@ -236,7 +236,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				AfterClosingPrice = Close[0];
 
 				//Sets red ATR-Barrier
-				double atr = Y*ATR(N)[0]*0.25;
+				double atr = RecoveryBarrierScale*ATR(VolatilityDampener)[0]*0.25;
 				lower2 = AfterClosingPrice - atr;
 				upper2 = AfterClosingPrice + atr;
 			}
@@ -251,20 +251,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region Properties
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="N", Description="ATR Period", Order=1, GroupName="Parameters")]
-		public int N
+		[Display(Name="VolatilityDampener", Description="ATR period; The greater, the less reactive to volatility.", Order=1, GroupName="Parameters")]
+		public int VolatilityDampener
 		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="X", Order=2, GroupName="Parameters")]
-		public int X
+		[Display(Name="ActiveBarrierScale", Description="Green barriers", Order=2, GroupName="Parameters")]
+		public int ActiveBarrierScale
 		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="Y", Order=3, GroupName="Parameters")]
-		public int Y
+		[Display(Name="RecoveryBarrierScale", Description="Red barriers", Order=3, GroupName="Parameters")]
+		public int RecoveryBarrierScale
 		{ get; set; }
 
 		[NinjaScriptProperty]
