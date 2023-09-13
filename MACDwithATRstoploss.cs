@@ -155,7 +155,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		/// </summary>
 		private void UpdateATRBarrier(MarketPosition pos, double atr, bool justEntered)
 		{
-
 			bool slideUp = pos == MarketPosition.Long && Close[0] > activeUpper;
 			bool slideDown = pos == MarketPosition.Short && Close[0] < activeLower;
 
@@ -168,6 +167,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			if (justEntered || slideUp || slideDown)
 				SetFocusBounds();
+			else
+				Focus();
 
 			//draw
 			Values[0][0] = activeUpper;
@@ -228,28 +229,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 
 
-		private double CalculateFocusDecline(double x, double strength, FocusType type)
+		private void Focus()
 		{
-			if (strength <= 0)
-			{
-				throw new ArgumentException("Strength must be greater than zero.");
-			}
+			double focusWidth = focusLimitUpper - focusLimitLower;
+			double initialDiff = (focusWidth / focusLimit - focusWidth) / 2;
 
-			switch (type)
+			double decline = 0;
+
+			switch (focusType)
 			{
 				case FocusType.Linear:
-					return x / strength;
-				case FocusType.Exponential:
-					return x * Math.Pow(strength, -1);
-				case FocusType.Logarithmic:
-					if (x <= 0)
-					{
-						throw new ArgumentException("x must be greater than zero for logarithmic focus.");
-					}
-					return x / Math.Log(x * strength);
+					decline = ((focusWidth / focusLimit) * focusStrength) / 2;
+					break;
+				case FocusType.FractionalExp:
+					double pctChange = FractExp(focusStrength, BarsSinceEntryExecution() - 1) - FractExp(focusStrength, BarsSinceEntryExecution());
+					decline = initialDiff * pctChange;
+					break;
 				default:
-					throw new ArgumentException("Invalid focus type.");
+					break;
 			}
+
+			activeUpper = Math.Max(activeUpper - decline, focusLimitUpper);
+			activeLower = Math.Min(activeLower + decline, focusLimitLower);
+		}
+
+		private double FractExp(double k, double x)
+		{
+			return 2.0 / (1.0 + Math.Exp(k * x));
 		}
 
 		#region Properties
@@ -294,7 +300,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 
 		[NinjaScriptProperty]
-		[Display(Name = "Focus Strength", Order = 8, Description = "Rate at which focus converges; Liner: percentage decline; Else: 0-1 where 0 is no decline.", GroupName = "Parameters")]
+		[Display(Name = "Focus Strength", Order = 8, Description = "Percentage at which focus converges; 0-1.", GroupName = "Parameters")]
 		public double focusStrength
 		{ get; set; }
 		#endregion
@@ -304,7 +310,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		None,
 		Linear,
-		Exponential,
-		Logarithmic
+		FractionalExp,
 	}
 }
