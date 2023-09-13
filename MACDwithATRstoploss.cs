@@ -35,6 +35,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private double activeLower;
 		private double recoveryUpper;
 		private double recoveryLower;
+		private double focusLimitUpper;
+		private double focusLimitLower;
 		private int fast;
 		private int slow;
 		private int signal;
@@ -93,7 +95,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			if (IsWeekend())
 			{
-				ExitPosition()
+				ExitPosition();
 				return;
 			}
 
@@ -103,19 +105,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			if (!IsRecovering)
 			{
-				bool pos = Position.MarketPosition
-				double atr = activeBarrierScale * ATR(volatilityDampener)[0] * 0.25;
-			
-				if (pos == MarketPosition.Flat)
-					EnterPosition();
+				bool justEntered = false;
+				MarketPosition pos = Position.MarketPosition;
+				double atr = ATR(volatilityDampener)[0] * 0.25;
 
-				if (ShouldExitActive(pos))
+				if (pos == MarketPosition.Flat)
+					justEntered = EnterPosition();
+				else if (ShouldExitActive(pos))
 				{
 					HandleExit(atr);
 					IsRecovering = true;
 				}
-				else
-					UpdateATRBarrier(pos, atr);
+
+				UpdateATRBarrier(pos, atr, justEntered);
 			}
 		}
 
@@ -130,7 +132,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		/// <summary>
 		/// Checks if StopLoss is reached and position should be exited.
 		/// </summary>
-		private bool ShouldExitActive(bool position)
+		private bool ShouldExitActive(MarketPosition position)
 		{
 			return position == MarketPosition.Long && Close[0] < activeLower || position == MarketPosition.Short && Close[0] > activeUpper;
 		}
@@ -142,34 +144,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 			ExitClosingPrice = Close[0];
 
 			//Sets red ATR-Barrier
-			double atr = recoveryBarrierScale * ATR(volatilityDampener)[0] * 0.25;
-			recoveryLower = ExitClosingPrice - atr;
-			recoveryUpper = ExitClosingPrice + atr;
+			double recoveryAtr = recoveryBarrierScale * atr;
+			recoveryLower = ExitClosingPrice - recoveryAtr;
+			recoveryUpper = ExitClosingPrice + recoveryAtr;
 		}
 
 		/// <summary>
 		/// Updates the ATR Barrier and draws it on the chart using dots.
-		/// Slides in profitable direction.
+		/// Slides in profitable direction & sets focus bounds.
 		/// </summary>
-		private void UpdateATRBarrier(bool pos, double atr)
+		private void UpdateATRBarrier(MarketPosition pos, double atr, bool justEntered)
 		{
-			if (pos == MarketPosition.Long && Close[0] > activeUpper)
-			{
-				activeLower = Close[0] - (atr / riskRewardRatio);
-				activeUpper = Close[0] + atr;
+
+			bool slideUp = pos == MarketPosition.Long && Close[0] > activeUpper;
+			bool slideDown = pos == MarketPosition.Short && Close[0] < activeLower;
+
+			if (slideUp || slideDown)
 				EntryClosingPrice = Close[0];
-			}
-			else if (pos == MarketPosition.Short && Close[0] < activeLower)
-			{
-				activeLower = Close[0] - atr;
-				activeUpper = Close[0] + (atr / riskRewardRatio);
-				EntryClosingPrice = Close[0];
-			}
-			else
-			{
-				activeUpper = EntryClosingPrice + atr;
-				activeLower = EntryClosingPrice - atr;
-			}
+			
+			double activeAtr = activeBarrierScale * atr;
+			activeUpper = EntryClosingPrice + (slideDown ? activeAtr / riskRewardRatio : activeAtr);
+			activeLower = EntryClosingPrice - (slideUp ? activeAtr / riskRewardRatio : activeAtr);
+
+			if (justEntered || slideUp || slideDown)
+				SetFocusBounds();
 
 			//draw
 			Values[0][0] = activeUpper;
@@ -177,7 +175,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 
 		/// <summary>
-		/// Checks whether the price has moved beyond the specified limits after a StopLoss has been triggered
+		/// Checks whether the price has moved beyond the specified limits after a StopLoss has been triggered.
 		/// </summary>
 		private void OutOfRecoveryBoundsCheck()
 		{
@@ -189,21 +187,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 
 		/// <summary>
-		/// Enter Long or Short depending on the relationship between the MACD line and the Signal line
+		/// Enter Long or Short depending on the relationship between the MACD line and the Signal line.
+		/// Returns true if position was entered.
 		/// </summary>
-		private void EnterPosition()
+		private bool EnterPosition()
 		{
-			bool MACDAboveSignal = MACD(fast, slow, signal)[0] > MACD(fast, slow, signal).Avg[0]
-			if (MACDAboveSignal && Close[0] > recoveryUpper)
+			bool goLong = MACD(fast, slow, signal)[0] > MACD(fast, slow, signal).Avg[0];
+			
+			if ((goLong && Close[0] > recoveryUpper) || (!goLong && Close[0] < recoveryLower))
 			{
-				EnterLong();
+				if (goLong)
+					EnterLong();
+				else
+					EnterShort();
+				
 				EntryClosingPrice = Close[0];
+				return true;
 			}
-			else if (!MACDAboveSignal && Close[0] < recoveryLower)
-			{
-				EnterShort();
-				EntryClosingPrice = Close[0];
-			}
+
+			return false;
 		}
 
 		private void ExitPosition()
@@ -212,6 +214,43 @@ namespace NinjaTrader.NinjaScript.Strategies
 			ExitShort();
 		}
 
+		/// <summary>
+		/// Sets the focused bounds after which no more narrowing should happen.
+		/// </summary>
+		private void SetFocusBounds()
+		{
+			double activeWidth = activeUpper - activeLower;
+			double focusedWidth = activeWidth * focusLimit;
+			double diff = (activeWidth - focusedWidth) / 2;
+
+			focusLimitUpper = activeUpper - diff;
+			focusLimitLower = activeLower + diff;
+		}
+
+
+		private double CalculateFocusDecline(double x, double strength, FocusType type)
+		{
+			if (strength <= 0)
+			{
+				throw new ArgumentException("Strength must be greater than zero.");
+			}
+
+			switch (type)
+			{
+				case FocusType.Linear:
+					return x / strength;
+				case FocusType.Exponential:
+					return x * Math.Pow(strength, -1);
+				case FocusType.Logarithmic:
+					if (x <= 0)
+					{
+						throw new ArgumentException("x must be greater than zero for logarithmic focus.");
+					}
+					return x / Math.Log(x * strength);
+				default:
+					throw new ArgumentException("Invalid focus type.");
+			}
+		}
 
 		#region Properties
 		[NinjaScriptProperty]
@@ -243,4 +282,29 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Display(Name = "Risk/Reward Ratio", Order = 5, GroupName = "Parameters")]
 		public int riskRewardRatio
 		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Display(Name = "Focus Type", Order = 6, GroupName = "Parameters")]
+		public FocusType focusType
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Display(Name = "Focus Limit", Order = 7, Description = "Percentage limit to which focus converges", GroupName = "Parameters")]
+		public double focusLimit
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Display(Name = "Focus Strength", Order = 8, Description = "Rate at which focus converges; Liner: percentage decline; Else: 0-1 where 0 is no decline.", GroupName = "Parameters")]
+		public double focusStrength
+		{ get; set; }
+		#endregion
+	}
+
+	public enum FocusType
+	{
+		None,
+		Linear,
+		Exponential,
+		Logarithmic
+	}
 }
