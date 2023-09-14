@@ -306,7 +306,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 
 		[NinjaScriptProperty]
-		[Display(Name = "Focus Limit", Order = 7, Description = "Percentage limit to which focus converges", GroupName = "Parameters")]
+		[Display(Name = "Focus Limit", Order = 7, Description = "Percentage limit to which focus converges (must be greater zero).", GroupName = "Parameters")]
 		public double focusLimit
 		{ get; set; }
 
