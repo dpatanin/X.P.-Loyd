@@ -37,6 +37,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private double recoveryLower;
 		private double focusLimitUpper;
 		private double focusLimitLower;
+		private double focusBarsCounter;
 		private int fast;
 		private int slow;
 		private int signal;
@@ -80,6 +81,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "ActiveUpper");
 				AddPlot(new Stroke(Brushes.Red, 2), PlotStyle.Dot, "RecoverLower");
 				AddPlot(new Stroke(Brushes.Red, 2), PlotStyle.Dot, "RecoverUpper");
+				AddPlot(new Stroke(Brushes.Blue, DashStyleHelper.Dash, 2), PlotStyle.Line, "FocusLower");
+				AddPlot(new Stroke(Brushes.Blue, DashStyleHelper.Dash, 2), PlotStyle.Line, "FocusUpper");
 			}
 			else if (State == State.Configure)
 			{
@@ -159,7 +162,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool slideDown = pos == MarketPosition.Short && Close[0] < activeLower;
 
 			if (slideUp || slideDown)
-				EntryClosingPrice = Close[0];
+				EntryClosingPrice = Close[0];		
 			
 			double activeAtr = activeBarrierScale * atr;
 			activeUpper = EntryClosingPrice + (slideDown ? activeAtr / riskRewardRatio : activeAtr);
@@ -173,6 +176,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			//draw
 			Values[0][0] = activeUpper;
 			Values[1][0] = activeLower;
+			Values[4][0] = focusLimitLower;
+			Values[5][0] = focusLimitUpper;
 		}
 
 		/// <summary>
@@ -183,8 +188,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 			IsRecovering = Close[0] > recoveryLower && Close[0] < recoveryUpper;
 
 			//draw
-			Values[2][0] = recoveryLower;
-			Values[3][0] = recoveryUpper;
+			if (IsRecovering)
+			{
+				Values[2][0] = recoveryLower;
+				Values[3][0] = recoveryUpper;
+			}
 		}
 
 		/// <summary>
@@ -220,6 +228,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		/// </summary>
 		private void SetFocusBounds()
 		{
+			focusBarsCounter = 0;
+			
 			double activeWidth = activeUpper - activeLower;
 			double focusedWidth = activeWidth * focusLimit;
 			double diff = (activeWidth - focusedWidth) / 2;
@@ -231,6 +241,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		private void Focus()
 		{
+			focusBarsCounter++;
 			double focusWidth = focusLimitUpper - focusLimitLower;
 			double initialDiff = (focusWidth / focusLimit - focusWidth) / 2;
 
@@ -239,10 +250,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			switch (focusType)
 			{
 				case FocusType.Linear:
-					decline = ((focusWidth / focusLimit) * focusStrength) / 2;
+					decline = ((focusWidth / focusLimit) * focusStrength * focusBarsCounter) / 2;
 					break;
 				case FocusType.FractionalExp:
-					double pctChange = FractExp(focusStrength, BarsSinceEntryExecution() - 1) - FractExp(focusStrength, BarsSinceEntryExecution());
+					double pctChange = FractExp(focusStrength, 0) - FractExp(focusStrength, focusBarsCounter);
 					decline = initialDiff * pctChange;
 					break;
 				default:
