@@ -41,12 +41,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private int fast;
 		private int slow;
 		private int signal;
+		private MACD macd;
+		private ATR atr;
 
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
 			{
-				Description = @"MACD with a constant ATR Stop Loss barrier zone";
+				Description = @"MACD with a moving ATR Stop Loss barrier zone";
 				Name = "MACDwithATRstoploss";
 				Calculate = Calculate.OnBarClose;
 				EntriesPerDirection = 1;
@@ -57,26 +59,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 				MaximumBarsLookBack = MaximumBarsLookBack.TwoHundredFiftySix;
 				OrderFillResolution = OrderFillResolution.Standard;
 				Slippage = 0;
-				StartBehavior = StartBehavior.WaitUntilFlat;
+				StartBehavior = StartBehavior.ImmediatelySubmit;
 				TimeInForce = TimeInForce.Gtc;
 				TraceOrders = false;
 				RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
 				StopTargetHandling = StopTargetHandling.PerEntryExecution;
 				BarsRequiredToTrade = 0;
-				// Disable this property for performance gains in Strategy Analyzer optimizations
-				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration = true;
-				focusType = FocusType.Linear;
-				focusLimit = 0.2;
+				
+				// Params
+				focusType = FocusType.FractionalExp;
+				focusLimit = 0.1;
 				focusStrength = 0.1;
-				volatilityDampener = 12;
-				activeBarrierScale = 8;
-				recoveryBarrierScale = 4;
+				volatilityDampener = 3;
+				activeBarrierScale = 21;
+				recoveryBarrierScale = 5;
 				riskRewardRatio = 1;
-				multiplier = 2; //MACD multiplier
-				fast = 12; //MACD Period fast
-				slow = 26; //MACD Period slow
-				signal = 9; //MACD Period signal
+				multiplier = 4; //MACD multiplier
+				
+				// Plots
 				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "ActiveLower");
 				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "ActiveUpper");
 				AddPlot(new Stroke(Brushes.Red, 2), PlotStyle.Dot, "RecoverLower");
@@ -86,11 +87,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			else if (State == State.Configure)
 			{
+				// Moved here due to instantiation during optimization
+				fast = 12; //MACD Period fast
+				slow = 26; //MACD Period slow
+				signal = 9; //MACD Period signal
+				
 				fast *= multiplier;
 				slow *= multiplier;
 				signal *= multiplier;
-				AddChartIndicator(MACD(fast, slow, signal));
-				AddChartIndicator(ATR(volatilityDampener));
+				
+				// Boosts performance in optimization mode
+				if (Category == Category.Optimize)
+					IsInstantiatedOnEachOptimizationIteration = false;
+			}
+			else if (State == State.DataLoaded)
+			{				
+				macd = MACD(Close, fast, slow, signal);
+				atr = ATR(volatilityDampener);
+				
+				AddChartIndicator(macd);
+				AddChartIndicator(atr);
 			}
 		}
 
@@ -101,26 +117,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 				ExitPosition();
 				return;
 			}
-
-
+			
 			if (IsRecovering)
 				OutOfRecoveryBoundsCheck();
 
 			if (!IsRecovering)
 			{
-				bool justEntered = false;
 				MarketPosition pos = Position.MarketPosition;
-				double atr = ATR(volatilityDampener)[0] * 0.25;
 
 				if (pos == MarketPosition.Flat)
-					justEntered = EnterPosition();
+					EnterPosition();
 				else if (ShouldExitActive(pos))
 				{
-					HandleExit(atr);
+					HandleExit();
 					IsRecovering = true;
 				}
 
-				UpdateATRBarrier(pos, atr, justEntered);
+				UpdateATRBarrier(pos);
 			}
 		}
 
@@ -140,44 +153,53 @@ namespace NinjaTrader.NinjaScript.Strategies
 			return position == MarketPosition.Long && Close[0] < activeLower || position == MarketPosition.Short && Close[0] > activeUpper;
 		}
 
-		private void HandleExit(double atr)
+		private void HandleExit()
 		{
 			ExitPosition();
 
 			ExitClosingPrice = Close[0];
 
 			//Sets red ATR-Barrier
-			double recoveryAtr = recoveryBarrierScale * atr;
-			recoveryLower = ExitClosingPrice - recoveryAtr;
-			recoveryUpper = ExitClosingPrice + recoveryAtr;
+			double recoveryAtr = recoveryBarrierScale * atr[0] * TickSize;
+			recoveryLower = ExitClosingPrice - recoveryAtr + macd.Diff[0];
+			recoveryUpper = ExitClosingPrice + recoveryAtr + macd.Diff[0];
 		}
 
 		/// <summary>
 		/// Updates the ATR Barrier and draws it on the chart using dots.
 		/// Slides in profitable direction & sets focus bounds.
 		/// </summary>
-		private void UpdateATRBarrier(MarketPosition pos, double atr, bool justEntered)
+		private void UpdateATRBarrier(MarketPosition pos)
 		{
 			bool slideUp = pos == MarketPosition.Long && Close[0] > activeUpper;
 			bool slideDown = pos == MarketPosition.Short && Close[0] < activeLower;
 
 			if (slideUp || slideDown)
-				EntryClosingPrice = Close[0];		
+			{
+				EntryClosingPrice = Close[0];	
+				focusBarsCounter = 0;
+			}
 			
-			double activeAtr = activeBarrierScale * atr;
-			activeUpper = EntryClosingPrice + (slideDown ? activeAtr / riskRewardRatio : activeAtr);
-			activeLower = EntryClosingPrice - (slideUp ? activeAtr / riskRewardRatio : activeAtr);
+			double activeAtr = activeBarrierScale * atr[0] * TickSize;
+			double scaledMacdDiff = activeBarrierScale * macd.Diff[0] * TickSize;
+			double upperBound = (slideDown ? activeAtr / riskRewardRatio : activeAtr);
+			double lowerBound = (slideUp ? activeAtr / riskRewardRatio : activeAtr);
+			
+			activeUpper = EntryClosingPrice + upperBound + scaledMacdDiff;
+			activeLower = EntryClosingPrice - lowerBound + scaledMacdDiff;
 
-			if (justEntered || slideUp || slideDown)
-				SetFocusBounds();
-			else
+			if (focusType != FocusType.None)
+			{
+				focusLimitUpper = EntryClosingPrice + upperBound * focusLimit + scaledMacdDiff;
+				focusLimitLower = EntryClosingPrice - lowerBound * focusLimit + scaledMacdDiff;
 				Focus();
-
-			//draw
+				
+				Values[4][0] = focusLimitLower;
+				Values[5][0] = focusLimitUpper;
+			}
+			
 			Values[0][0] = activeUpper;
 			Values[1][0] = activeLower;
-			Values[4][0] = focusLimitLower;
-			Values[5][0] = focusLimitUpper;
 		}
 
 		/// <summary>
@@ -199,9 +221,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		/// Enter Long or Short depending on the relationship between the MACD line and the Signal line.
 		/// Returns true if position was entered.
 		/// </summary>
-		private bool EnterPosition()
+		private void EnterPosition()
 		{
-			bool goLong = MACD(fast, slow, signal)[0] > MACD(fast, slow, signal).Avg[0];
+			bool goLong = macd[0] > macd.Avg[0];
 			
 			if ((goLong && Close[0] > recoveryUpper) || (!goLong && Close[0] < recoveryLower))
 			{
@@ -211,10 +233,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 					EnterShort();
 				
 				EntryClosingPrice = Close[0];
-				return true;
+				focusBarsCounter = 0;
 			}
-
-			return false;
 		}
 
 		private void ExitPosition()
@@ -223,38 +243,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 			ExitShort();
 		}
 
-		/// <summary>
-		/// Sets the focused bounds after which no more narrowing should happen.
-		/// </summary>
-		private void SetFocusBounds()
-		{
-			focusBarsCounter = 0;
-			
-			double activeWidth = activeUpper - activeLower;
-			double focusedWidth = activeWidth * focusLimit;
-			double diff = (activeWidth - focusedWidth) / 2;
-
-			focusLimitUpper = activeUpper - diff;
-			focusLimitLower = activeLower + diff;
-		}
-
 
 		private void Focus()
 		{
 			focusBarsCounter++;
-			double focusWidth = focusLimitUpper - focusLimitLower;
-			double initialDiff = (focusWidth / focusLimit - focusWidth) / 2;
-
+			double distance = (activeUpper - activeLower) / 2;
 			double decline = 0;
 
 			switch (focusType)
 			{
 				case FocusType.Linear:
-					decline = ((focusWidth / focusLimit) * focusStrength * focusBarsCounter) / 2;
+					decline = distance * focusStrength * focusBarsCounter;
 					break;
 				case FocusType.FractionalExp:
 					double pctChange = FractExp(focusStrength, 0) - FractExp(focusStrength, focusBarsCounter);
-					decline = initialDiff * pctChange;
+					decline = distance * pctChange;
 					break;
 				default:
 					break;
