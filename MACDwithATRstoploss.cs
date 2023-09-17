@@ -74,8 +74,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				volatilityDampener = 3;
 				activeBarrierScale = 21;
 				recoveryBarrierScale = 5;
-				riskRewardRatio = 1;
-				multiplier = 4; //MACD multiplier
+				riskRewardRatio = 4;
+				multiplier = 1; //MACD multiplier
 				
 				// Plots
 				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "ActiveLower");
