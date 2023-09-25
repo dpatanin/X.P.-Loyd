@@ -45,10 +45,9 @@ class DataProcessor:
         for col in ["open", "close"]:
             df[f"{col}_pct"] = df[col].pct_change()
             df[f"{col}_diff"] = df[col].diff()
-            
 
         self._update_pb("Calculate SMA Crossover")
-        df["SMA_diff"] = self.SMA(df["close"], period_fast) / self.SMA(
+        df["SMA_diff"] = self.sma(df["close"], period_fast) / self.sma(
             df["close"], period_slow
         )
         df["SMA_position"] = np.where(df["SMA_diff"] > 1, 1, 2)
@@ -64,8 +63,19 @@ class DataProcessor:
         self._update_pb("Data processed!")
         self._pb.close()
 
-    def SMA(self, data: pd.Series, period: int):
-        return data.rolling(window=period).mean()
+    def rma(self, s: pd.Series, period: int) -> pd.Series:
+        return s.ewm(alpha=1 / period).mean()
+
+    def atr(self, df: pd.DataFrame, length: int = 14) -> pd.Series:
+        # Ref: https://stackoverflow.com/a/74282809/
+        high, low, prev_close = df["high"], df["low"], df["close"].shift()
+        tr_all = [high - low, high - prev_close, low - prev_close]
+        tr_all = [tr.abs() for tr in tr_all]
+        tr = pd.concat(tr_all, axis=1).max(axis=1)
+        return self.rma(tr, length)
+
+    def sma(self, s: pd.Series, period: int) -> pd.Series:
+        return s.rolling(window=period).mean()
 
     def _is_local(self, url):
         url_parsed = urlparse(url)
