@@ -99,15 +99,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			else if (State == State.DataLoaded)
 			{				
-				// For optimization iterations handle initialization explicitely
 				TradeAmount = 1;
 				NumBarsInCurrentAtrSlide = 0;
-				if (Macd == null)
-					Macd = MACD(Fast, Slow, Signal);
-				if (Atr == null)
-					Atr = ATR(AtrPeriod);
-				
-				AtrReference = Close[0];
+				Macd = MACD(Fast, Slow, Signal);
+				Atr = ATR(AtrPeriod);
 				
 				AddChartIndicator(Macd);
 				AddChartIndicator(Atr);
