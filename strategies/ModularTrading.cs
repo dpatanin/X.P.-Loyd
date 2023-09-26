@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				EntriesPerDirection = 1;
 				EntryHandling = EntryHandling.AllEntries;
 				IsExitOnSessionCloseStrategy = true;
-				ExitOnSessionCloseSeconds = 30;
+				ExitOnSessionCloseSeconds = 930;
 				IsFillLimitOnTouch = false;
 				MaximumBarsLookBack = MaximumBarsLookBack.TwoHundredFiftySix;
 				OrderFillResolution = OrderFillResolution.Standard;
@@ -64,23 +64,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				WinStreakBonus = 0;
-				Fast = 12;
-				Slow = 26;
-				Signal = 9;
+				Fast = 1;
+				Slow = 395;
+				Signal = 435;
 				
 				EntryStyle = EntryType.Crossover;
 				ExitStyle = ExitType.Crossover;
 				
 				// ATR related params
-				AtrPeriod = 5;
-				TakeProfitBarrieScale = 12;
-				StopLossBarrierScale = 12;
+				AtrPeriod = 1;
+				TakeProfitBarrieScale = 32;
+				StopLossBarrierScale = 1;
 				RecoveryBarrierScale = 5;
 				
 				EnableSliding = true;
 				FocusStyle = FocusType.FractionalExp;
 				FocusLimit = 0.1;
-				FocusStrength = 0.1;
+				FocusStrength = 0.35;
 				MacdTrendFollow = 1;
 				
 				// Plots
