@@ -68,8 +68,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Slow = 395;
 				Signal = 435;
 				
-				EntryStyle = EntryType.Crossover;
-				ExitStyle = ExitType.Crossover;
+				EntryStyle = EntryType.HeikenAshi;
+				ExitStyle = ExitType.HeikenAshi;
 				
 				// ATR related params
 				AtrPeriod = 1;
@@ -82,6 +82,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				FocusLimit = 0.1;
 				FocusStrength = 0.35;
 				MacdTrendFollow = 1;
+				
+				// Heiken Ashi params
+				GradientBars = 2;
 				
 				// Plots
 				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "ActiveLowerATR");
@@ -134,6 +137,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 					case ExitType.ATR:
 						justExited = HandleAtrExit();
 						break;
+					case ExitType.HeikenAshi:
+						justExited = HandleHeikenAshiExit();
+						break;
 					default:
 						break;
 				}
@@ -149,6 +155,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 						break;
 					case EntryType.ATR:
 						HandleAtrEntry();
+						break;
+					case EntryType.HeikenAshi:
+						HandleHeikenAshiEntry();
 						break;
 					default:
 						break;
@@ -200,6 +209,43 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			
 			return false;
+		}
+		
+		private void HandleHeikenAshiEntry()
+		{
+			if (HeikenAshiGradient() > 0)
+				EnterLong(TradeAmount);
+			else
+				EnterShort(TradeAmount);
+		}
+		
+		private bool HandleHeikenAshiExit()
+		{
+			double gradient = HeikenAshiGradient();
+			MarketPosition pos = Position.MarketPosition;
+			
+			if (gradient > 0 && pos == MarketPosition.Short || gradient <= 0 && pos == MarketPosition.Long)
+			{
+				ExitShort();
+				ExitLong();
+				return true;
+			}
+			
+			return false;
+		}
+		
+		/// <summary>
+		/// Calculates overall gradient over a given period.
+		/// </summary>
+		private double HeikenAshiGradient()
+		{
+			double gradient = 0;
+			int gradientBars = Math.Min(GradientBars, CurrentBar+1);
+			
+			foreach (int i in Enumerable.Range(0, gradientBars - 1))
+				gradient += HeikenAshi8().HAClose[i] - HeikenAshi8().HAOpen[i];
+			
+			return gradient;
 		}
 		
 		private void HandleAtrEntry()
@@ -310,22 +356,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(ResourceType = typeof(Custom.Resource), Name = "Win Streak Bonus", Description="0 = trade only with 1 contract", GroupName = "Base Parameters", Order = 0)]
+		[Display(Name = "Win Streak Bonus", Description="0 = trade only with 1 contract", GroupName = "Base Parameters", Order = 0)]
 		public int WinStreakBonus
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(ResourceType = typeof(Custom.Resource), Name = "Fast", GroupName = "Base Parameters", Order = 1)]
+		[Display(Name = "Fast", GroupName = "Base Parameters", Order = 1)]
 		public int Fast
 		{ get; set; }
 
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(ResourceType = typeof(Custom.Resource), Name = "Slow", GroupName = "Base Parameters", Order = 2)]
+		[Display(Name = "Slow", GroupName = "Base Parameters", Order = 2)]
 		public int Slow
 		{ get; set; }
 
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(ResourceType = typeof(Custom.Resource), Name = "Signal", GroupName = "Base Parameters", Order = 3)]
+		[Display(Name = "Signal", GroupName = "Base Parameters", Order = 3)]
 		public int Signal
 		{ get; set; }
 		
@@ -368,7 +414,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Display(Name = "Focus Style", GroupName = "ATR Exit Parameters", Order = 3)]
 		public FocusType FocusStyle
 		{ get; set; }
-		#endregion
 		
 		[Range(0, 1), NinjaScriptProperty]
 		[Display(Name = "Focus Limit", Description = "Percentage limit to which focus converges", GroupName = "ATR Exit Parameters", Order = 4)]
@@ -384,18 +429,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Display(Name = "MACD Trend follow", Description = "Following the MACD.Diff trend (0 = no following)", GroupName = "ATR Exit Parameters", Order = 6)]
 		public double MacdTrendFollow
 		{ get; set; }
+		
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Gradient Bars", Description = "Num of bars used to determine Heiken Ashi gradient", GroupName = "Heiken Ashi Parameters", Order = 0)]
+		public int GradientBars
+		{ get; set; }
+		#endregion
 	}
 	
 	public enum EntryType
 	{
 		Crossover,
 		ATR,
+		HeikenAshi,
 	}
 	
 	public enum ExitType
 	{
 		Crossover,
 		ATR,
+		HeikenAshi,
 	}
 	
 	public enum FocusType
