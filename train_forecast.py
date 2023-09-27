@@ -16,10 +16,9 @@ EPOCHS = 10
 SEQ_LENGTH = 30
 PRED_LENGTH = 15
 BATCH_SIZE = 512
-EMA_PERIOD = 5
 
-dp_full = DataProcessor(FULL_DATA, EMA_PERIOD)
-dp_sentiment = DataProcessor(SENTIMENT_DATA, EMA_PERIOD)
+dp_full = DataProcessor(FULL_DATA)
+dp_sentiment = DataProcessor(SENTIMENT_DATA)
 
 
 def dataset_maker(wg: WindowGenerator, dp: DataProcessor):
@@ -83,7 +82,6 @@ lstm_close_columns = [
     "high_diff",
     "low_diff",
     "close_pct",
-    "close_ema",
     "volume",
 ]
 lstm_open_columns = [
@@ -92,11 +90,10 @@ lstm_open_columns = [
     "high_diff",
     "low_diff",
     "open_pct",
-    "open_ema",
     "volume",
 ]
-ar_columns = ["close_ema"]
-gru_columns = ["close_ema", "sentiment"]
+ar_columns = ["close_pct"]
+gru_columns = ["close_pct", "sentiment"]
 
 configs = [
     {
@@ -150,7 +147,7 @@ configs = [
                 label_width=PRED_LENGTH,
                 data_columns=gru_columns,
                 batch_size=BATCH_SIZE,
-                label_columns=["close_ema"],
+                label_columns=["close_pct"],
             ),
             dp_sentiment,
         ),
