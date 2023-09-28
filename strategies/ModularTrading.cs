@@ -119,15 +119,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 		/// </summary>
 		protected override void OnBarUpdate()
 		{
+			MarketPosition pos = Position.MarketPosition;
 			if (!IsTradingTime())
 			{
-				ExitLong();
-				ExitShort();
+				if (pos != MarketPosition.Flat)
+				{
+					ExitLong();
+					ExitShort();
+				}
+				
 				return;
 			}
 			
 			bool justExited = false;
-			if (Position.MarketPosition != MarketPosition.Flat)
+			if (pos != MarketPosition.Flat)
 			{
 				switch (ExitStyle)
 				{
@@ -146,7 +151,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			
 			// Exit & Enter may occur during same update; Positon does not update in time -> check through `jusExited`
-			if (Position.MarketPosition == MarketPosition.Flat || justExited)
+			if (pos == MarketPosition.Flat || justExited)
 			{
 				switch (EntryStyle)
 				{
