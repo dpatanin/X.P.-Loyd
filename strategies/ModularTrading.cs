@@ -50,7 +50,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				MaximumBarsLookBack = MaximumBarsLookBack.TwoHundredFiftySix;
 				OrderFillResolution = OrderFillResolution.Standard;
 				Slippage = 0;
-				StartBehavior = StartBehavior.ImmediatelySubmit;
+				StartBehavior = StartBehavior.ImmediatelySubmitSynchronizeAccount;
 				TimeInForce = TimeInForce.Gtc;
 				TraceOrders = false;
 				RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
@@ -60,7 +60,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Time Window
 				StartTime = DateTime.Parse("00:00", System.Globalization.CultureInfo.InvariantCulture);
-				EndTime = DateTime.Parse("23:00", System.Globalization.CultureInfo.InvariantCulture);
+				EndTime = DateTime.Parse("22:40", System.Globalization.CultureInfo.InvariantCulture);
 				
 				// Base Params
 				WinStreakBonus = 0;
