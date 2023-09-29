@@ -25,7 +25,7 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds Strategies in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class ModularTrading : Strategy
+	public class MACD_ATR : Strategy
 	{
 		private MACD Macd;
 		private ATR Atr;
@@ -37,8 +37,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			if (State == State.SetDefaults)
 			{
-				Description = @"All in one ensemble.";
-				Name = "Master Trader";
+				Description = @"MACD based strategy with ATR exits.";
+				Name = "MACD ATR";
 				
 				// NinjaTrader params
 				Calculate = Calculate.OnBarClose;
@@ -68,9 +68,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Slow = 395;
 				Signal = 435;
 				
-				EntryStyle = EntryType.HeikenAshi;
-				ExitStyle = ExitType.HeikenAshi;
-				
 				// ATR related params
 				AtrPeriod = 1;
 				TakeProfitBarrieScale = 32;
@@ -82,9 +79,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				FocusLimit = 0.1;
 				FocusStrength = 0.35;
 				MacdTrendFollow = 1;
-				
-				// Heiken Ashi params
-				GradientBars = 2;
 				
 				// Plots
 				AddPlot(new Stroke(Brushes.Green, 2), PlotStyle.Dot, "ActiveLowerATR");
@@ -111,12 +105,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				AddChartIndicator(Atr);
 			}
 		}
-
-		/// <summary>
-		/// Avoid the use of implicit behaviour such as position exits through entering the opposing position.
-		/// It is important to first exit a position properly so that a proper entry may occur within the same iteration.
-		/// This ensures that immediate position switches can be handled (such as in simple crossover strategies) while maintaining modularity.
-		/// </summary>
+		
 		protected override void OnBarUpdate()
 		{
 			MarketPosition pos = Position.MarketPosition;
@@ -131,49 +120,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 			
-			bool justExited = false;
 			if (pos != MarketPosition.Flat)
-			{
-				switch (ExitStyle)
-				{
-					case ExitType.Crossover:
-						justExited = HandleCrossoverExit();
-						break;
-					case ExitType.ATR:
-						justExited = HandleAtrExit();
-						break;
-					case ExitType.HeikenAshi:
-						justExited = HandleHeikenAshiExit();
-						break;
-					default:
-						break;
-				}
-			}
-			
-			// Exit & Enter may occur during same update; Positon does not update in time -> check through `jusExited`
-			if (pos == MarketPosition.Flat)
-			{
-				switch (EntryStyle)
-				{
-					case EntryType.Crossover:
-						HandleCrossoverEntry();
-						break;
-					case EntryType.ATR:
-						HandleAtrEntry();
-						break;
-					case EntryType.HeikenAshi:
-						HandleHeikenAshiEntry();
-						break;
-					default:
-						break;
-				}
-			}
+				HandleAtrExit();
+			else
+				HandleAtrEntry();
 		}
 		
-		/// <summary>
-		/// Due to the nature of this script, this method is for handling logic which may occur on each position update regardless of the chosen variants & parameters.
-		/// This is to prevent code duplication & unnecessary checks. Be careful when which variables are required and updated.
-		/// </summary>
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
 		{
 			if (position.MarketPosition == MarketPosition.Flat)
@@ -194,63 +146,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			int now = ToTime(Time[0]);
 			return now >= ToTime(StartTime) && now <= ToTime(EndTime);
-		}
-		
-		private void HandleCrossoverEntry()
-		{
-			if (CrossAbove(Macd, Macd.Avg, 1))
-				EnterLong(TradeAmount);
-			else if (CrossBelow(Macd, Macd.Avg, 1))
-				EnterShort(TradeAmount);
-		}
-		
-		private bool HandleCrossoverExit()
-		{
-			if (CrossAbove(Macd, Macd.Avg, 1) || CrossBelow(Macd, Macd.Avg, 1))
-			{
-				ExitShort();
-				ExitLong();
-				return true;
-			}
-			
-			return false;
-		}
-		
-		private void HandleHeikenAshiEntry()
-		{
-			if (HeikenAshiGradient() > 0)
-				EnterLong(TradeAmount);
-			else
-				EnterShort(TradeAmount);
-		}
-		
-		private bool HandleHeikenAshiExit()
-		{
-			double gradient = HeikenAshiGradient();
-			MarketPosition pos = Position.MarketPosition;
-			
-			if (gradient > 0 && pos == MarketPosition.Short || gradient <= 0 && pos == MarketPosition.Long)
-			{
-				ExitShort();
-				ExitLong();
-				return true;
-			}
-			
-			return false;
-		}
-		
-		/// <summary>
-		/// Calculates overall gradient over a given period.
-		/// </summary>
-		private double HeikenAshiGradient()
-		{
-			double gradient = 0;
-			int gradientBars = Math.Min(GradientBars, CurrentBar+1);
-			
-			foreach (int i in Enumerable.Range(0, gradientBars - 1))
-				gradient += HeikenAshi8().HAClose[i] - HeikenAshi8().HAOpen[i];
-			
-			return gradient;
 		}
 		
 		private void HandleAtrEntry()
@@ -380,80 +275,51 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public int Signal
 		{ get; set; }
 		
-		[NinjaScriptProperty]
-		[Display(Name = "Entry Style", GroupName = "Base Parameters", Order = 4)]
-		public EntryType EntryStyle
-		{ get; set; }
-
-		[NinjaScriptProperty]
-		[Display(Name = "Exit Style", GroupName = "Base Parameters", Order = 5)]
-		public ExitType ExitStyle
-		{ get; set; }
-		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "ATR Weight / Period", Description="Higher means lesser susceptible to volatility", GroupName = "ATR Base Parameters", Order = 0)]
+		[Display(Name = "ATR Weight / Period", Description="Higher means lesser susceptible to volatility", GroupName = "ATR Parameters", Order = 0)]
 		public int AtrPeriod
 		{ get; set; }
 		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Recovery Barrier Scale", Description="0 = no recovery period", GroupName = "ATR Entry Parameters", Order = 0)]
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Recovery Barrier Scale", GroupName = "ATR Parameters", Order = 1)]
 		public int RecoveryBarrierScale
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Take Profit Barrier Scale", Description="The lower, the safer.", GroupName = "ATR Exit Parameters", Order = 0)]
+		[Display(Name = "Take Profit Barrier Scale", Description="The lower, the safer.", GroupName = "ATR Parameters", Order = 2)]
 		public int TakeProfitBarrieScale
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Stop Loss Barrier Scale", Description="The lower, the safer.", GroupName = "ATR Exit Parameters", Order = 1)]
+		[Display(Name = "Stop Loss Barrier Scale", Description="The lower, the safer.", GroupName = "ATR Parameters", Order = 3)]
 		public int StopLossBarrierScale
 		{ get; set; }
 		
 		[NinjaScriptProperty]
-		[Display(Name = "Enable Sliding", Description="Slides active ATR barriers on crossing take profit instead of exiting", GroupName = "ATR Exit Parameters", Order = 2)]
+		[Display(Name = "Enable Sliding", Description="Slides active ATR barriers on crossing take profit instead of exiting", GroupName = "ATR Parameters", Order = 4)]
 		public bool EnableSliding
 		{ get; set; }
 		
 		[NinjaScriptProperty]
-		[Display(Name = "Focus Style", GroupName = "ATR Exit Parameters", Order = 3)]
+		[Display(Name = "Focus Style", GroupName = "ATR Parameters", Order = 3)]
 		public FocusType FocusStyle
 		{ get; set; }
 		
 		[Range(0, 1), NinjaScriptProperty]
-		[Display(Name = "Focus Limit", Description = "Percentage limit to which focus converges", GroupName = "ATR Exit Parameters", Order = 4)]
+		[Display(Name = "Focus Limit", Description = "Percentage limit to which focus converges", GroupName = "ATR Parameters", Order = 5)]
 		public double FocusLimit
 		{ get; set; }
 
 		[Range(0, 1), NinjaScriptProperty]
-		[Display(Name = "Focus Strength", Description = "Percentage rate at which focus converges", GroupName = "ATR Exit Parameters", Order = 5)]
+		[Display(Name = "Focus Strength", Description = "Percentage rate at which focus converges", GroupName = "ATR Parameters", Order = 6)]
 		public double FocusStrength
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "MACD Trend follow", Description = "Following the MACD.Diff trend (0 = no following)", GroupName = "ATR Exit Parameters", Order = 6)]
+		[Display(Name = "MACD Trend follow", Description = "Following the MACD.Diff trend (0 = no following)", GroupName = "ATR Parameters", Order = 7)]
 		public double MacdTrendFollow
 		{ get; set; }
-		
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Gradient Bars", Description = "Num of bars used to determine Heiken Ashi gradient", GroupName = "Heiken Ashi Parameters", Order = 0)]
-		public int GradientBars
-		{ get; set; }
 		#endregion
-	}
-	
-	public enum EntryType
-	{
-		Crossover,
-		ATR,
-		HeikenAshi,
-	}
-	
-	public enum ExitType
-	{
-		Crossover,
-		ATR,
-		HeikenAshi,
 	}
 	
 	public enum FocusType
