@@ -84,7 +84,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			if (!IsTradingTime())
 			{
-				if (pos != MarketPosition.Flat)
+				if (Position.MarketPosition != MarketPosition.Flat)
 				{
 					ExitLong();
 					ExitShort();
