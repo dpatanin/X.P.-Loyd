@@ -301,22 +301,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[NinjaScriptProperty]
-		[Display(Name = "Focus Style", GroupName = "ATR Parameters", Order = 3)]
+		[Display(Name = "Focus Style", GroupName = "ATR Parameters", Order = 5)]
 		public FocusType FocusStyle
 		{ get; set; }
 		
 		[Range(0, 1), NinjaScriptProperty]
-		[Display(Name = "Focus Limit", Description = "Percentage limit to which focus converges", GroupName = "ATR Parameters", Order = 5)]
+		[Display(Name = "Focus Limit", Description = "Percentage limit to which focus converges", GroupName = "ATR Parameters", Order = 6)]
 		public double FocusLimit
 		{ get; set; }
 
 		[Range(0, 1), NinjaScriptProperty]
-		[Display(Name = "Focus Strength", Description = "Percentage rate at which focus converges", GroupName = "ATR Parameters", Order = 6)]
+		[Display(Name = "Focus Strength", Description = "Percentage rate at which focus converges", GroupName = "ATR Parameters", Order = 7)]
 		public double FocusStrength
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "MACD Trend follow", Description = "Following the MACD.Diff trend (0 = no following)", GroupName = "ATR Parameters", Order = 7)]
+		[Display(Name = "MACD Trend follow", Description = "Following the MACD.Diff trend (0 = no following)", GroupName = "ATR Parameters", Order = 8)]
 		public double MacdTrendFollow
 		{ get; set; }
 		#endregion
