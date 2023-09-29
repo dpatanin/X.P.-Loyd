@@ -69,15 +69,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Signal = 435;
 				
 				// ATR related params
-				AtrPeriod = 1;
-				TakeProfitBarrieScale = 32;
-				StopLossBarrierScale = 1;
+				AtrPeriod = 12;
+				TakeProfitBarrieScale = 21;
+				StopLossBarrierScale = 8;
 				RecoveryBarrierScale = 5;
 				
 				EnableSliding = true;
 				FocusStyle = FocusType.FractionalExp;
 				FocusLimit = 0.1;
-				FocusStrength = 0.35;
+				FocusStrength = 0.1;
 				MacdTrendFollow = 1;
 				
 				// Plots
@@ -194,7 +194,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double lowerBarrier = AtrReference - lowerBound + scaledMacdDiff;
 			double upperBarrier = AtrReference + upperBound + scaledMacdDiff;
 			
-			if (EnableSliding && (isLong && High[0] > upperBarrier || !isLong && Low[0] < lowerBarrier))
+			if (EnableSliding && (isLong && Close[0] > upperBarrier || !isLong && Close[0] < lowerBarrier))
 			{
 				NumBarsInCurrentAtrSlide = 0;
 				AtrReference = Close[0];
