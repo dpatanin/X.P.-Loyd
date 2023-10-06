@@ -25,18 +25,18 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds Strategies in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class Stoopid : Strategy
+	public class HeikenRSI : Strategy
 	{
-		private EMA EClose;
-		private EMA EOpen;
 		private int TradeAmount;
+		private CustomRSI Rsi;
+		private CustomHeikenAshi Heiken;
 		
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
 			{
-				Description = @"Stoopid";
-				Name = "Stoopid";
+				Description = @"HeikenRSI";
+				Name = "HeikenRSI";
 				
 				// NinjaTrader params
 				Calculate = Calculate.OnBarClose;
@@ -62,50 +62,40 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				WinStreakBonus = 0;
-				GradientBars = 9;
-				Period = 31;
-				StopLossCurrency = 30;
-				RecoverPeriod = 5;
+				Threshold = 2;
+				Period = 5;
+				Smooth = 5;
+				BarsLookBack = 2;
 			}
-			else if (State == State.Configure)
-			{	
-				// Boosts performance in optimization mode
-				if (Category == Category.Optimize)
-					IsInstantiatedOnEachOptimizationIteration = false;
-				
-				SetStopLoss(CalculationMode.Currency, StopLossCurrency);
-			}
+			else if (State == State.Configure && Category == Category.Optimize)
+				IsInstantiatedOnEachOptimizationIteration = false;
 			else if (State == State.DataLoaded)
-			{				
+			{
 				TradeAmount = 1;
-				EClose = EMA(Close, Period);
-				EOpen = EMA(Open, Period);
-				
-				AddChartIndicator(EClose);
-				AddChartIndicator(EOpen);
+				Heiken = CustomHeikenAshi();
+				Rsi = CustomRSI(Heiken.HAClose, Period, Smooth, Threshold);
+
+				AddChartIndicator(Rsi);
+				AddChartIndicator(Heiken);
 			}
 		}
 
 		protected override void OnBarUpdate()
 		{
-			double grad = Gradient();
-			int numTrades = SystemPerformance.AllTrades.Count;
-			Trade lastTrade = numTrades >= 1 ? SystemPerformance.AllTrades[numTrades-1] : null;
-			
 			if (!IsTradingTime())
 			{
 				ExitLong();
 				ExitShort();
 			}
-			else if (grad >= 0 && (lastTrade == null || lastTrade.Entry.MarketPosition != MarketPosition.Short))
-				EnterShort(TradeAmount);
-			else if (lastTrade == null || lastTrade.Entry.MarketPosition != MarketPosition.Long)
+			else if (Rsi[0] > Rsi.Avg[0] && Rsi.Diff[0] > Threshold)
 				EnterLong(TradeAmount);
+			else if (Rsi[0] < Rsi.Avg[0] && Rsi.Diff[0] < -Threshold)
+				EnterShort(TradeAmount);		
 		}
 		
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
 		{
-			if (position.MarketPosition == MarketPosition.Flat)
+			if (SystemPerformance.AllTrades.Count > 0)
 			{
 				Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
 
@@ -120,27 +110,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			int now = ToTime(Time[0]);
 			return now >= ToTime(StartTime) && now <= ToTime(EndTime);
-		}
-		
-		private bool IsRecovering()
-		{
-			int numBars = BarsSinceExitExecution();
-			return numBars <= RecoverPeriod && numBars >= 0;
-		}
-		
-		
-		/// <summary>
-		/// Calculates overall gradient over a given period.
-		/// </summary>
-		private double Gradient()
-		{
-			double gradient = 0;
-			int gradientBars = Math.Min(GradientBars, CurrentBar+1);
-			
-			foreach (int i in Enumerable.Range(0, gradientBars-1))
-				gradient += EClose[i] - EOpen[i];
-			
-			return gradient;
 		}
 
 		#region Properties
@@ -161,24 +130,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public int WinStreakBonus
 		{ get; set; }
 		
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "GradientBars", GroupName = "Parameters", Order = 1)]
-		public int GradientBars
+		[Range(0, 49), NinjaScriptProperty]
+		[Display(Name = "Threshold", GroupName = "Parameters", Order = 1)]
+		public double Threshold
 		{ get; set; }
-
+		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
 		[Display(Name = "Period", GroupName = "Parameters", Order = 2)]
 		public int Period
 		{ get; set; }
 		
-		[Range(5, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Stop Loss Currency", GroupName = "Parameters", Order = 3)]
-		public double StopLossCurrency
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Smooth", GroupName = "Parameters", Order = 3)]
+		public int Smooth
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Recover Period", GroupName = "Parameters", Order = 4)]
-		public int RecoverPeriod
+		[Display(Name = "Bars Look Back", GroupName = "Parameters", Order = 4)]
+		public int BarsLookBack
 		{ get; set; }
 		#endregion
 	}

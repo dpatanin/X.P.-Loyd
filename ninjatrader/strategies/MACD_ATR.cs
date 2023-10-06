@@ -111,16 +111,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			MarketPosition pos = Position.MarketPosition;
 			if (!IsTradingTime())
 			{
-				if (pos != MarketPosition.Flat)
-				{
-					ExitLong();
-					ExitShort();
-				}
-				
-				return;
+				ExitLong();
+				ExitShort();
 			}
-			
-			if (pos != MarketPosition.Flat)
+			else if (pos != MarketPosition.Flat)
 				HandleAtrExit();
 			else
 				HandleAtrEntry();

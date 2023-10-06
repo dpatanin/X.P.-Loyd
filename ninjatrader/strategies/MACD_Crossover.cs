@@ -84,16 +84,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			if (!IsTradingTime())
 			{
-				if (Position.MarketPosition != MarketPosition.Flat)
-				{
-					ExitLong();
-					ExitShort();
-				}
-				
-				return;
+				ExitLong();
+				ExitShort();
 			}
-			
-			if (CrossAbove(Macd, Macd.Avg, 1))
+			else if (CrossAbove(Macd, Macd.Avg, 1))
 				EnterLong(TradeAmount);
 			else if (CrossBelow(Macd, Macd.Avg, 1))
 				EnterShort(TradeAmount);
