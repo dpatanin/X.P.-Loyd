@@ -62,13 +62,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 				// Base Params
 				WinStreakBonus = 0;
 				Period = 2;
+				Smooth = 2;
 			}
 			else if (State == State.Configure && Category == Category.Optimize)
 				IsInstantiatedOnEachOptimizationIteration = false;
 			else if (State == State.DataLoaded)
 			{
 				TradeAmount = 1;
-				Heiken = HeikenGrad(Period, Threshold);
+				Heiken = HeikenGrad(Period, Smooth, Threshold);
 				
 				AddChartIndicator(CustomHeikenAshi());
 				AddChartIndicator(Heiken);
@@ -82,9 +83,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				ExitLong();
 				ExitShort();
 			}
-			else if (Heiken.Grad[0] > 0 && Heiken.AvgGrad[0] > Threshold)
+			else if (Heiken[0] > Heiken.Avg[0] && Heiken.Avg[0] > 0)
 				EnterLong(TradeAmount);
-			else if (Heiken.Grad[0] < 0 && Heiken.AvgGrad[0] < -Threshold)
+			else if (Heiken[0] < Heiken.Avg[0] && Heiken.Avg[0] < 0)
 				EnterShort(TradeAmount);		
 		}
 		
@@ -133,6 +134,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Range(1, int.MaxValue), NinjaScriptProperty]
 		[Display(Name = "Period", GroupName = "Parameters", Order = 2)]
 		public int Period
+		{ get; set; }
+		
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Smooth", GroupName = "Parameters", Order = 3)]
+		public int Smooth
 		{ get; set; }
 		#endregion
 	}
