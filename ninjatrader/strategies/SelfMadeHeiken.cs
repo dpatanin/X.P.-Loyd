@@ -25,20 +25,18 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds Strategies in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class Stoopid : Strategy
+	public class SelfMadeHeiken : Strategy
 	{
-		private EMA EClose;
-		private EMA EOpen;
-		private MACD Macd;
-		private ATR Atr;
 		private int TradeAmount;
+		private HeikenGrad Heiken;
+		private Sigmoid Sig;
 		
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
 			{
-				Description = @"Stoopid";
-				Name = "Stoopid";
+				Description = @"Heiken Ashi Calculation but self made";
+				Name = "SelfMadeHeiken";
 				
 				// NinjaTrader params
 				Calculate = Calculate.OnBarClose;
@@ -64,52 +62,59 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				WinStreakBonus = 0;
-				GradientBars = 9;
-				Period = 31;
+				Period = 2;
+				Smooth = 2;
+				Signal = 1;
+				Threshold = 0.5;
 			}
-			else if (State == State.Configure)
-			{	
-				// Boosts performance in optimization mode
-				if (Category == Category.Optimize)
-					IsInstantiatedOnEachOptimizationIteration = false;
-			}
+			else if (State == State.Configure && Category == Category.Optimize)
+				IsInstantiatedOnEachOptimizationIteration = false;
 			else if (State == State.DataLoaded)
-			{				
+			{
 				TradeAmount = 1;
-				EClose = EMA(Close, Period);
-				EOpen = EMA(Open, Period);
-				Macd = MACD(1, Period, Period);
-				Atr = ATR(Period);
+				Heiken = HeikenGrad(Period, Smooth);
+				Sig = Sigmoid(Heiken.Avg, Signal, Threshold);
 				
-				AddChartIndicator(EClose);
-				AddChartIndicator(EOpen);
-				AddChartIndicator(Macd);
-				AddChartIndicator(Atr);
+				AddChartIndicator(CustomHeikenAshi());
+				AddChartIndicator(Heiken);
+				AddChartIndicator(Sig);
 			}
 		}
 
 		protected override void OnBarUpdate()
 		{
-			double grad = Gradient();
-				
+			bool longOpen = Sig[0] > -Threshold;
+			bool shortOpen = Sig[0] < Threshold;
+			
+			bool accLong = Heiken.Pitch[0] > 0;
+			bool accShort = Heiken.Pitch[0] < 0;
+			bool velLong = Heiken[0] > 0;
+			bool velShort = Heiken[0] < 0;
+			bool steepAcc = Math.Abs(Heiken.Pitch[0]) > Math.Abs(Heiken[0]);
+			
+			bool steepLong = accLong && steepAcc;
+			bool steepShort = accShort && steepAcc;
+			bool shallowLong = accLong && velLong;
+			bool shallowShort = accShort && velShort;
+					
 			if (!IsTradingTime())
 			{
 				ExitLong();
 				ExitShort();
 			}
-			else if (grad >= 0)
-				EnterShort(TradeAmount);
-			else
+			else if (longOpen && (steepShort || !steepLong && shallowShort || !shallowLong && velShort))
 				EnterLong(TradeAmount);
+			else if (shortOpen && (steepLong || !steepShort && shallowLong || !shallowShort && velLong))
+				EnterShort(TradeAmount);		
 		}
 		
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
 		{
-			if (position.MarketPosition == MarketPosition.Flat)
+			if (SystemPerformance.AllTrades.Count > 0)
 			{
 				Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
 
-				if (lastTrade.ProfitCurrency > 0)
+				if(lastTrade.ProfitCurrency > 0)
 				   TradeAmount += WinStreakBonus;
 				else
 				   TradeAmount = 1;
@@ -120,18 +125,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			int now = ToTime(Time[0]);
 			return now >= ToTime(StartTime) && now <= ToTime(EndTime);
-		}
-		
-		private double Gradient()
-		{
-			double gradient = 0;
-			if (GradientBars >= CurrentBar)
-				return gradient;
-			
-			foreach (int i in Enumerable.Range(0, GradientBars-1))
-				gradient += EClose[i] - EOpen[i+1];
-			
-			return gradient;
 		}
 
 		#region Properties
@@ -153,13 +146,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "GradientBars", GroupName = "Parameters", Order = 1)]
-		public int GradientBars
-		{ get; set; }
-
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Period", GroupName = "Parameters", Order = 2)]
+		[Display(Name = "Period", GroupName = "Parameters", Order = 1)]
 		public int Period
+		{ get; set; }
+		
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Smooth", GroupName = "Parameters", Order = 2)]
+		public int Smooth
+		{ get; set; }
+		
+		[Range(0, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Signal", GroupName = "Parameters", Order = 3)]
+		public double Signal
+		{ get; set; }
+		
+		[Range(0, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Threshold", GroupName = "Parameters", Order = 4)]
+		public double Threshold
 		{ get; set; }
 		#endregion
 	}

@@ -29,8 +29,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		private MACD Macd;
 		private int TradeAmount;
-		private HeikenGrad Heiken;
-		private Sigmoid Sig;
 		
 		protected override void OnStateChange()
 		{
@@ -63,39 +61,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				WinStreakBonus = 0;
-				Period = 2;
-				Smooth = 2;
-				Signal = 1;
-				Threshold = 0.5;
+				Fast = 1;
+				Slow = 395;
+				Signal = 435;
+			}
+			else if (State == State.Configure)
+			{	
+				// Boosts performance in optimization mode
+				if (Category == Category.Optimize)
+					IsInstantiatedOnEachOptimizationIteration = false;
 			}
 			else if (State == State.DataLoaded)
 			{				
 				TradeAmount = 1;
-				Heiken = HeikenGrad(Period, Smooth);
-				Sig = Sigmoid(Heiken.Avg, Signal, Threshold);
+				Macd = MACD(Fast, Slow, Signal);
 				
-				AddChartIndicator(CustomHeikenAshi());
-				AddChartIndicator(Heiken);
-				AddChartIndicator(Sig);
+				AddChartIndicator(Macd);
 			}
 		}
 
 		protected override void OnBarUpdate()
 		{
-			bool longOpen = Sig[0] > -Threshold;
-			bool shortOpen = Sig[0] < Threshold;
-			
-			bool accLong = Heiken.Pitch[0] > 0;
-			bool accShort = Heiken.Pitch[0] < 0;
-			bool velLong = Heiken[0] > 0;
-			bool velShort = Heiken[0] < 0;
-			bool steepAcc = Math.Abs(Heiken.Pitch[0]) > Math.Abs(Heiken[0]);
-			
-			bool steepLong = accLong && steepAcc;
-			bool steepShort = accShort && steepAcc;
-			bool shallowLong = accLong && velLong;
-			bool shallowShort = accShort && velShort;
-					
 			if (!IsTradingTime())
 			{
 				if (Position.MarketPosition != MarketPosition.Flat)
@@ -106,10 +92,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				return;
 			}
-			else if (longOpen && (steepLong || !steepShort && shallowLong || !shallowShort && velLong))
+			
+			if (CrossAbove(Macd, Macd.Avg, 1))
 				EnterLong(TradeAmount);
-			else if (shortOpen && (steepShort || !steepLong && shallowShort || !shallowLong && velShort))
-				EnterShort(TradeAmount);		
+			else if (CrossBelow(Macd, Macd.Avg, 1))
+				EnterShort(TradeAmount);
 		}
 		
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
@@ -150,23 +137,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Period", GroupName = "Parameters", Order = 1)]
-		public int Period
+		[Display(Name = "Fast", GroupName = "Base Parameters", Order = 1)]
+		public int Fast
 		{ get; set; }
 
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Smooth", GroupName = "Parameters", Order = 2)]
-		public int Smooth
+		[Display(Name = "Slow", GroupName = "Base Parameters", Order = 2)]
+		public int Slow
 		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Signal", GroupName = "Parameters", Order = 3)]
-		public double Signal
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Threshold", GroupName = "Parameters", Order = 4)]
-		public double Threshold
+
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Signal", GroupName = "Base Parameters", Order = 3)]
+		public int Signal
 		{ get; set; }
 		#endregion
 	}

@@ -99,7 +99,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			
 			data.position = GetPosition();
 			data.entryPrice = Position.AveragePrice;
-			data.balance = GetAccountBalance();
+			data.balance = 10000.0;
 		}
 		
 		private void ClearData()
