@@ -38,11 +38,13 @@ namespace NinjaTrader.NinjaScript.Indicators
 				BarsRequiredToPlot					= 1;
 				
 				Signal = 1;
-				Threshold = 0.5;
-				AddPlot(Brushes.MediumVioletRed, "Sigmoid");
+				Threshold = 0.9;
+				UserDefinedBrush = Brushes.MediumVioletRed;
+				AddPlot(UserDefinedBrush, "Sigmoid");
 			}
 			if (State == State.DataLoaded)
 			{
+				Plots[0].Brush = UserDefinedBrush;
 				Draw.HorizontalLine(this, "Zero", 0, Brushes.WhiteSmoke);
 				Draw.HorizontalLine(this, "Upper Threshold", Threshold, Brushes.DarkCyan);
 				Draw.HorizontalLine(this, "Lower Threshold", 0-Threshold, Brushes.DarkCyan);
@@ -66,6 +68,19 @@ namespace NinjaTrader.NinjaScript.Indicators
 		public double Threshold
 		{ get; set; }
 		
+		[NinjaScriptProperty]
+		[XmlIgnore]
+		[Display(Name="UserDefinedBrush", GroupName="Parameters", Order=2)]
+		public Brush UserDefinedBrush
+		{ get; set; }
+
+		[Browsable(false)]
+		public string UserDefinedBrushSerializable
+		{
+		get { return Serialize.BrushToString(UserDefinedBrush); }
+		set { UserDefinedBrush = Serialize.StringToBrush(value); }
+		}
+		
 		[Browsable(false)]
 		[XmlIgnore()]
 		public Series<double> Default
@@ -84,18 +99,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private Sigmoid[] cacheSigmoid;
-		public Sigmoid Sigmoid(double signal, double threshold)
+		public Sigmoid Sigmoid(double signal, double threshold, Brush userDefinedBrush)
 		{
-			return Sigmoid(Input, signal, threshold);
+			return Sigmoid(Input, signal, threshold, userDefinedBrush);
 		}
 
-		public Sigmoid Sigmoid(ISeries<double> input, double signal, double threshold)
+		public Sigmoid Sigmoid(ISeries<double> input, double signal, double threshold, Brush userDefinedBrush)
 		{
 			if (cacheSigmoid != null)
 				for (int idx = 0; idx < cacheSigmoid.Length; idx++)
-					if (cacheSigmoid[idx] != null && cacheSigmoid[idx].Signal == signal && cacheSigmoid[idx].Threshold == threshold && cacheSigmoid[idx].EqualsInput(input))
+					if (cacheSigmoid[idx] != null && cacheSigmoid[idx].Signal == signal && cacheSigmoid[idx].Threshold == threshold && cacheSigmoid[idx].UserDefinedBrush == userDefinedBrush && cacheSigmoid[idx].EqualsInput(input))
 						return cacheSigmoid[idx];
-			return CacheIndicator<Sigmoid>(new Sigmoid(){ Signal = signal, Threshold = threshold }, input, ref cacheSigmoid);
+			return CacheIndicator<Sigmoid>(new Sigmoid(){ Signal = signal, Threshold = threshold, UserDefinedBrush = userDefinedBrush }, input, ref cacheSigmoid);
 		}
 	}
 }
@@ -104,14 +119,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.Sigmoid Sigmoid(double signal, double threshold)
+		public Indicators.Sigmoid Sigmoid(double signal, double threshold, Brush userDefinedBrush)
 		{
-			return indicator.Sigmoid(Input, signal, threshold);
+			return indicator.Sigmoid(Input, signal, threshold, userDefinedBrush);
 		}
 
-		public Indicators.Sigmoid Sigmoid(ISeries<double> input , double signal, double threshold)
+		public Indicators.Sigmoid Sigmoid(ISeries<double> input , double signal, double threshold, Brush userDefinedBrush)
 		{
-			return indicator.Sigmoid(input, signal, threshold);
+			return indicator.Sigmoid(input, signal, threshold, userDefinedBrush);
 		}
 	}
 }
@@ -120,14 +135,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.Sigmoid Sigmoid(double signal, double threshold)
+		public Indicators.Sigmoid Sigmoid(double signal, double threshold, Brush userDefinedBrush)
 		{
-			return indicator.Sigmoid(Input, signal, threshold);
+			return indicator.Sigmoid(Input, signal, threshold, userDefinedBrush);
 		}
 
-		public Indicators.Sigmoid Sigmoid(ISeries<double> input , double signal, double threshold)
+		public Indicators.Sigmoid Sigmoid(ISeries<double> input , double signal, double threshold, Brush userDefinedBrush)
 		{
-			return indicator.Sigmoid(input, signal, threshold);
+			return indicator.Sigmoid(input, signal, threshold, userDefinedBrush);
 		}
 	}
 }

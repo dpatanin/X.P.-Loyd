@@ -29,7 +29,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		private int TradeAmount;
 		private HeikenGrad Heiken;
-		private Sigmoid Sig;
+		private Sigmoid SigAvg;
+		private Sigmoid SigAcc;
+		private Sigmoid SigVel;
+		private SigmoidGate Gate;
 		
 		protected override void OnStateChange()
 		{
@@ -62,10 +65,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				WinStreakBonus = 0;
-				Period = 2;
+				Period = 5;
 				Smooth = 2;
-				Signal = 1;
-				Threshold = 0.5;
+				SignalAvg = 10;
+				SignalVel = 10;
+				SignalAcc = 10;
+				Threshold = 0.9;
 			}
 			else if (State == State.Configure && Category == Category.Optimize)
 				IsInstantiatedOnEachOptimizationIteration = false;
@@ -73,38 +78,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				TradeAmount = 1;
 				Heiken = HeikenGrad(Period, Smooth);
-				Sig = Sigmoid(Heiken.Avg, Signal, Threshold);
 				
-				AddChartIndicator(CustomHeikenAshi());
+				SigAvg = Sigmoid(Heiken.Avg, SignalAvg, Threshold, Brushes.Gold);
+				SigVel = Sigmoid(Heiken, SignalVel, Threshold, Brushes.RoyalBlue);
+				SigAcc = Sigmoid(Heiken.Pitch, SignalAcc, Threshold, Brushes.Violet);
+				
+				List<ISeries<double>> signals = new List<ISeries<double>>{SigAvg.Default, SigVel.Default, SigAcc.Default};
+				Gate = SigmoidGate(signals, Threshold);
+				
+				AddChartIndicator(Heiken.Heiken);
 				AddChartIndicator(Heiken);
-				AddChartIndicator(Sig);
+				AddChartIndicator(SigAvg);
+				AddChartIndicator(SigVel);
+				AddChartIndicator(SigAcc);
+				AddChartIndicator(Gate);
 			}
 		}
 
 		protected override void OnBarUpdate()
-		{
-			bool longOpen = Sig[0] > -Threshold;
-			bool shortOpen = Sig[0] < Threshold;
-			
-			bool accLong = Heiken.Pitch[0] > 0;
-			bool accShort = Heiken.Pitch[0] < 0;
-			bool velLong = Heiken[0] > 0;
-			bool velShort = Heiken[0] < 0;
-			bool steepAcc = Math.Abs(Heiken.Pitch[0]) > Math.Abs(Heiken[0]);
-			
-			bool steepLong = accLong && steepAcc;
-			bool steepShort = accShort && steepAcc;
-			bool shallowLong = accLong && velLong;
-			bool shallowShort = accShort && velShort;
-					
-			if (!IsTradingTime())
+		{			
+			if (!IsTradingTime() || Gate[0] == 0)
 			{
 				ExitLong();
 				ExitShort();
 			}
-			else if (longOpen && (steepShort || !steepLong && shallowShort || !shallowLong && velShort))
+			else if (Gate[0] == 1)
 				EnterLong(TradeAmount);
-			else if (shortOpen && (steepLong || !steepShort && shallowLong || !shallowShort && velLong))
+			else if (Gate[0] == -1)
 				EnterShort(TradeAmount);		
 		}
 		
@@ -156,12 +156,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Signal", GroupName = "Parameters", Order = 3)]
-		public double Signal
+		[Display(Name = "SignalAvg", GroupName = "Parameters", Order = 3)]
+		public double SignalAvg
+		{ get; set; }
+
+		[Range(0, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "SignalVel", GroupName = "Parameters", Order = 4)]
+		public double SignalVel
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Threshold", GroupName = "Parameters", Order = 4)]
+		[Display(Name = "SignalAcc", GroupName = "Parameters", Order = 5)]
+		public double SignalAcc
+		{ get; set; }		
+		
+		[Range(0, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Threshold", GroupName = "Parameters", Order = 6)]
 		public double Threshold
 		{ get; set; }
 		#endregion
