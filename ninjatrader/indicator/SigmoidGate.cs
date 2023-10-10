@@ -26,6 +26,9 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public class SigmoidGate : Indicator
 	{
+		private int QueuedOutput;
+		private int QueuedCount;
+		
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
@@ -38,34 +41,61 @@ namespace NinjaTrader.NinjaScript.Indicators
 				BarsRequiredToPlot					= 1;
 				
 				Threshold = 0.9;
-				AddPlot(Brushes.Turquoise, "Signal");
+				Imperviousness = 0;
+				
+				UserDefinedBrush  = Brushes.Turquoise;
+				AddPlot(UserDefinedBrush, "Signal");
 			}
 			if (State == State.DataLoaded)
 			{
+				QueuedCount = 0;
+				QueuedOutput = 0;
+				Plots[0].Brush = UserDefinedBrush;
 				Draw.HorizontalLine(this, "Zero", 0, Brushes.WhiteSmoke);
 			}
 		}
 
 		protected override void OnBarUpdate()
 		{
-			int lowerCount = 0;
-			int upperCount = 0;
+			int countLong = 0;
+			int countShort = 0;
+			int countStay = 0;
 			
 			foreach (Series<double> signal in Signals)
 			{
 				if (signal[0] < -Threshold)
-					lowerCount++;
+					countShort++;
 				else if (signal[0] > Threshold)
-					upperCount++;
+					countLong++;
+				else
+					countStay++;
 			}
 			
 			int output = 0;
-			if (upperCount > lowerCount)
+			int highestCount = Math.Max(countLong, Math.Max(countShort, countStay));
+			
+			if (highestCount == countLong)
 				output = 1;
-			else if (lowerCount > upperCount)
+			else if (highestCount == countShort)
 				output = -1;
 			
-			Default[0] = output;
+			if (CurrentBar < 1 || output == Default[1] || QueuedCount == Imperviousness)
+			{
+				Default[0] = output;
+				QueuedOutput = output;
+				QueuedCount = 0;
+			}
+			else if (output != Default[1] && output != QueuedOutput)
+			{
+				Default[0] = Default[1];
+				QueuedOutput = output;
+				QueuedCount = 0;
+			}
+			else if (output == QueuedOutput)
+			{
+				Default[0] = Default[1];
+				QueuedCount++;
+			}
 		}
 
 		#region Properties
@@ -78,6 +108,24 @@ namespace NinjaTrader.NinjaScript.Indicators
 		[Display(Name = "Threshold", GroupName = "Parameters", Order = 1)]
 		public double Threshold
 		{ get; set; }
+		
+		[Range(0, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Imperviousness", GroupName = "Parameters", Order = 2)]
+		public double Imperviousness
+		{ get; set; }
+		
+		[NinjaScriptProperty]
+		[XmlIgnore]
+		[Display(Name="UserDefinedBrush", GroupName="Parameters", Order=3)]
+		public Brush UserDefinedBrush
+		{ get; set; }
+		
+		[Browsable(false)]
+		public string UserDefinedBrushSerializable
+		{
+		get { return Serialize.BrushToString(UserDefinedBrush); }
+		set { UserDefinedBrush = Serialize.StringToBrush(value); }
+		}
 		
 		[Browsable(false)]
 		[XmlIgnore()]
@@ -97,18 +145,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private SigmoidGate[] cacheSigmoidGate;
-		public SigmoidGate SigmoidGate(List<ISeries<double>> signals, double threshold)
+		public SigmoidGate SigmoidGate(List<ISeries<double>> signals, double threshold, double imperviousness, Brush userDefinedBrush)
 		{
-			return SigmoidGate(Input, signals, threshold);
+			return SigmoidGate(Input, signals, threshold, imperviousness, userDefinedBrush);
 		}
 
-		public SigmoidGate SigmoidGate(ISeries<double> input, List<ISeries<double>> signals, double threshold)
+		public SigmoidGate SigmoidGate(ISeries<double> input, List<ISeries<double>> signals, double threshold, double imperviousness, Brush userDefinedBrush)
 		{
 			if (cacheSigmoidGate != null)
 				for (int idx = 0; idx < cacheSigmoidGate.Length; idx++)
-					if (cacheSigmoidGate[idx] != null && cacheSigmoidGate[idx].Signals == signals && cacheSigmoidGate[idx].Threshold == threshold && cacheSigmoidGate[idx].EqualsInput(input))
+					if (cacheSigmoidGate[idx] != null && cacheSigmoidGate[idx].Signals == signals && cacheSigmoidGate[idx].Threshold == threshold && cacheSigmoidGate[idx].Imperviousness == imperviousness && cacheSigmoidGate[idx].UserDefinedBrush == userDefinedBrush && cacheSigmoidGate[idx].EqualsInput(input))
 						return cacheSigmoidGate[idx];
-			return CacheIndicator<SigmoidGate>(new SigmoidGate(){ Signals = signals, Threshold = threshold }, input, ref cacheSigmoidGate);
+			return CacheIndicator<SigmoidGate>(new SigmoidGate(){ Signals = signals, Threshold = threshold, Imperviousness = imperviousness, UserDefinedBrush = userDefinedBrush }, input, ref cacheSigmoidGate);
 		}
 	}
 }
@@ -117,14 +165,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.SigmoidGate SigmoidGate(List<ISeries<double>> signals, double threshold)
+		public Indicators.SigmoidGate SigmoidGate(List<ISeries<double>> signals, double threshold, double imperviousness, Brush userDefinedBrush)
 		{
-			return indicator.SigmoidGate(Input, signals, threshold);
+			return indicator.SigmoidGate(Input, signals, threshold, imperviousness, userDefinedBrush);
 		}
 
-		public Indicators.SigmoidGate SigmoidGate(ISeries<double> input , List<ISeries<double>> signals, double threshold)
+		public Indicators.SigmoidGate SigmoidGate(ISeries<double> input , List<ISeries<double>> signals, double threshold, double imperviousness, Brush userDefinedBrush)
 		{
-			return indicator.SigmoidGate(input, signals, threshold);
+			return indicator.SigmoidGate(input, signals, threshold, imperviousness, userDefinedBrush);
 		}
 	}
 }
@@ -133,14 +181,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.SigmoidGate SigmoidGate(List<ISeries<double>> signals, double threshold)
+		public Indicators.SigmoidGate SigmoidGate(List<ISeries<double>> signals, double threshold, double imperviousness, Brush userDefinedBrush)
 		{
-			return indicator.SigmoidGate(Input, signals, threshold);
+			return indicator.SigmoidGate(Input, signals, threshold, imperviousness, userDefinedBrush);
 		}
 
-		public Indicators.SigmoidGate SigmoidGate(ISeries<double> input , List<ISeries<double>> signals, double threshold)
+		public Indicators.SigmoidGate SigmoidGate(ISeries<double> input , List<ISeries<double>> signals, double threshold, double imperviousness, Brush userDefinedBrush)
 		{
-			return indicator.SigmoidGate(input, signals, threshold);
+			return indicator.SigmoidGate(input, signals, threshold, imperviousness, userDefinedBrush);
 		}
 	}
 }

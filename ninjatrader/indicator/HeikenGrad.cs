@@ -26,7 +26,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public class HeikenGrad : Indicator
 	{
-        private CustomHeikenAshi Heiken;
+        public CustomHeikenAshi Heiken;
 		private EMA EHClose;
 		private EMA EHOpen;
 		
@@ -45,14 +45,14 @@ namespace NinjaTrader.NinjaScript.Indicators
 				
 				Period = 2;
 				Smooth = 1;
+				Heiken = CustomHeikenAshi();
 				
 				AddPlot(Brushes.RoyalBlue, "Gradient");
-				AddPlot(Brushes.Yellow, "Average Gradient");
+				AddPlot(Brushes.Gold, "Average Gradient");
 				AddPlot(Brushes.Violet, "Pitch of Gradient");
 			}
 			else if (State == State.DataLoaded)
 			{
-				Heiken = CustomHeikenAshi();
 				EHClose = EMA(Heiken.HAClose, Smooth);
 				EHOpen = EMA(Heiken.HAOpen, Smooth);
 				
