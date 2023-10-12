@@ -74,9 +74,9 @@ namespace NinjaTrader.NinjaScript.Indicators
 			int output = 0;
 			int highestCount = Math.Max(countLong, Math.Max(countShort, countStay));
 			
-			if (highestCount == countLong)
+			if (highestCount == countLong && highestCount != 0)
 				output = 1;
-			else if (highestCount == countShort)
+			else if (highestCount == countShort && highestCount != 0)
 				output = -1;
 			
 			if (CurrentBar < 1 || output == Default[1] || QueuedCount == Imperviousness)

@@ -27,10 +27,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class Stoopid : Strategy
 	{
-		private EMA EClose;
-		private EMA EOpen;
-		private MACD Macd;
-		private ATR Atr;
+		private Darvas Darv;
 		private int TradeAmount;
 		
 		protected override void OnStateChange()
@@ -64,8 +61,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				WinStreakBonus = 0;
-				GradientBars = 9;
-				Period = 31;
 			}
 			else if (State == State.Configure)
 			{	
@@ -76,31 +71,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 			else if (State == State.DataLoaded)
 			{				
 				TradeAmount = 1;
-				EClose = EMA(Close, Period);
-				EOpen = EMA(Open, Period);
-				Macd = MACD(1, Period, Period);
-				Atr = ATR(Period);
-				
-				AddChartIndicator(EClose);
-				AddChartIndicator(EOpen);
-				AddChartIndicator(Macd);
-				AddChartIndicator(Atr);
+				Darv = Darvas();
+				AddChartIndicator(Darv);
 			}
 		}
 
 		protected override void OnBarUpdate()
 		{
-			double grad = Gradient();
-				
 			if (!IsTradingTime())
 			{
 				ExitLong();
 				ExitShort();
 			}
-			else if (grad >= 0)
-				EnterShort(TradeAmount);
-			else
+			else if (Darv.BuySignal)
 				EnterLong(TradeAmount);
+			else if (Darv.SellSignal)
+				EnterShort(TradeAmount);
+			
 		}
 		
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
@@ -121,18 +108,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			int now = ToTime(Time[0]);
 			return now >= ToTime(StartTime) && now <= ToTime(EndTime);
 		}
-		
-		private double Gradient()
-		{
-			double gradient = 0;
-			if (GradientBars >= CurrentBar)
-				return gradient;
-			
-			foreach (int i in Enumerable.Range(0, GradientBars-1))
-				gradient += EClose[i] - EOpen[i+1];
-			
-			return gradient;
-		}
 
 		#region Properties
 		[NinjaScriptProperty]
@@ -150,16 +125,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Range(0, int.MaxValue), NinjaScriptProperty]
 		[Display(Name = "Win Streak Bonus", Description="0 = trade only with 1 contract", GroupName = "Parameters", Order = 0)]
 		public int WinStreakBonus
-		{ get; set; }
-		
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "GradientBars", GroupName = "Parameters", Order = 1)]
-		public int GradientBars
-		{ get; set; }
-
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Period", GroupName = "Parameters", Order = 2)]
-		public int Period
 		{ get; set; }
 		#endregion
 	}
