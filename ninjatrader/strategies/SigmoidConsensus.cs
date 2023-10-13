@@ -400,6 +400,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{	
 				CurrentBestPrice = Close[0];
 				
+				RemoveDrawObject(CBPTag);
 				if(pos == MarketPosition.Long)
 					Draw.TriangleDown(this, CBPTag, true, 0, hclose+1, Brushes.Turquoise);
 				else
