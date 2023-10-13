@@ -27,8 +27,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class SigmoidConsensus : Strategy
 	{
-		private int TradeAmount;
 		private int StopLossCount;
+		private double CurrentBestPrice;
+		private string CBPTag;
 		
 		#region Indicators
 		// Inhibitor
@@ -113,13 +114,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 				EndTime = DateTime.Parse("22:40", System.Globalization.CultureInfo.InvariantCulture);
 				
 				// Base Params
+				TradeAmount 	= 1;
 				WinStreakBonus 	= 0; // 1
 				Period 			= 14;
 				Smooth 			= 3;
 				Threshold 		= 0.9;
 				Imperviousness 	= 2;
-				StopLossTicks 	= 11;
+				StopLoss	 	= 11;
 				StopLossBreak 	= 8; // 7
+				
+				AddPlot(new Stroke(Brushes.OrangeRed, DashStyleHelper.Dash, 2), PlotStyle.Line, "StopLoss");
 				
 				#region Indicators
 				// Inhibitor
@@ -175,8 +179,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				IsInstantiatedOnEachOptimizationIteration = false;
 			else if (State == State.DataLoaded)
 			{
-				TradeAmount = 1;
 				StopLossCount = 0;
+				CurrentBestPrice = 0;
+				CBPTag = "";
 				Heiken = HeikenGrad(Period, Smooth);
 				
 				List<ISeries<double>> activeSignals = InitActivationIndicators();
@@ -335,14 +340,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		protected override void OnBarUpdate()
 		{
+			MarketPosition pos = Position.MarketPosition;
+			if (pos != MarketPosition.Flat)
+				UpdateStopLoss(pos);
 			bool blockSignal = Inhibitor[0] != 0;
-			
-			if (Position.MarketPosition != MarketPosition.Flat)
-			{
-				double profitLoss = Position.GetUnrealizedProfitLoss(PerformanceUnit.Ticks, Close[0]);
-				if (profitLoss < -StopLossTicks)
-					StopLossCount = 1;
-			}
 			
 			if (!IsTradingTime() || Activator[0] == 0 || StopLossCount >= 1 && StopLossCount <= StopLossBreak)
 			{
@@ -352,7 +353,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				if (StopLossCount > StopLossBreak)
 					StopLossCount = 0;
 				else if (StopLossCount >= 1)
+				{	
 					StopLossCount++;
+					BackBrush = Brushes.Gray;
+				}
 			}
 			else if (Activator[0] == 1 && !blockSignal)
 				EnterLong(TradeAmount);
@@ -363,14 +367,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
 		{
-			if (SystemPerformance.AllTrades.Count > 0)
+			if (Position.MarketPosition == MarketPosition.Flat)
 			{
-				Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+				if (SystemPerformance.AllTrades.Count > 0)
+				{
+					Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
 
-				if(lastTrade.ProfitCurrency > 0)
-				   TradeAmount += WinStreakBonus;
-				else
-				   TradeAmount = 1;
+					if(lastTrade.ProfitCurrency > 0)
+					   TradeAmount += WinStreakBonus;
+					else
+					   TradeAmount = 1;
+				}
+			}
+			else
+			{
+				CurrentBestPrice = Position.AveragePrice;
+				CBPTag = DateTime.Now.Ticks.ToString();
 			}
 		}
 
@@ -378,6 +390,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			int now = ToTime(Time[0]);
 			return now >= ToTime(StartTime) && now <= ToTime(EndTime);
+		}
+		
+		private void UpdateStopLoss(MarketPosition pos)
+		{
+			double hclose = Heiken.Heiken.HAClose[0];
+			
+			if (pos == MarketPosition.Long && hclose >= CurrentBestPrice || pos == MarketPosition.Short && hclose <= CurrentBestPrice)
+			{	
+				CurrentBestPrice = Close[0];
+				
+				if(pos == MarketPosition.Long)
+					Draw.TriangleDown(this, CBPTag, true, 0, hclose+1, Brushes.Turquoise);
+				else
+					Draw.TriangleUp(this, CBPTag, true, 0, hclose-1, Brushes.Turquoise);
+			}
+			else if (Math.Abs(CurrentBestPrice - hclose) >= StopLoss)
+				StopLossCount = 1;
+			
+			Value[0] = CurrentBestPrice + (StopLoss * (pos == MarketPosition.Long ? -1 : 1));
 		}
 
 		#region Parameters
@@ -394,37 +425,42 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Win Streak Bonus", Description="0 = trade only with 1 contract", GroupName = "Parameters", Order = 0)]
+		[Display(Name = "TradeAmount (Base)", GroupName = "Parameters", Order = 0)]
+		public int TradeAmount
+		{ get; set; }
+		
+		[Range(0, int.MaxValue), NinjaScriptProperty]
+		[Display(Name = "Win Streak Bonus", Description="0 = trade only with base amount", GroupName = "Parameters", Order = 1)]
 		public int WinStreakBonus
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Period", GroupName = "Parameters", Order = 1)]
+		[Display(Name = "Period", GroupName = "Parameters", Order = 2)]
 		public int Period
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Smooth", GroupName = "Parameters", Order = 2)]
+		[Display(Name = "Smooth", GroupName = "Parameters", Order = 3)]
 		public int Smooth
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Threshold", GroupName = "Parameters", Order = 3)]
+		[Display(Name = "Threshold", GroupName = "Parameters", Order = 4)]
 		public double Threshold
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Imperviousness", GroupName = "Parameters", Order = 4)]
+		[Display(Name = "Imperviousness", GroupName = "Parameters", Order = 5)]
 		public double Imperviousness
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Stop Loss (Ticks)", GroupName = "Parameters", Order = 5)]
-		public double StopLossTicks
+		[Display(Name = "Stop Loss (Price diff)", GroupName = "Parameters", Order = 6)]
+		public double StopLoss
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Stop Break (Bars suration)", GroupName = "Parameters", Order = 6)]
+		[Display(Name = "Stop Break (Bars suration)", GroupName = "Parameters", Order = 7)]
 		public double StopLossBreak
 		{ get; set; }
 		#endregion
