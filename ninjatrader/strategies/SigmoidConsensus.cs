@@ -29,7 +29,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		private int StopLossCount;
 		private double CurrentBestPrice;
-		private string CBPTag;
 		
 		#region Indicators
 		// Inhibitor
@@ -115,13 +114,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				TradeAmount 	= 1;
-				WinStreakBonus 	= 0; // 1
+				WinStreakBonus 	= 0;
 				Period 			= 14;
 				Smooth 			= 3;
 				Threshold 		= 0.9;
 				Imperviousness 	= 2;
-				StopLoss	 	= 11;
-				StopLossBreak 	= 8; // 7
+				StopLoss	 	= 4;
+				StopLossBreak 	= 1;
 				
 				AddPlot(new Stroke(Brushes.OrangeRed, DashStyleHelper.Dash, 2), PlotStyle.Line, "StopLoss");
 				
@@ -181,7 +180,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				StopLossCount = 0;
 				CurrentBestPrice = 0;
-				CBPTag = "";
 				Heiken = HeikenGrad(Period, Smooth);
 				
 				List<ISeries<double>> activeSignals = InitActivationIndicators();
@@ -380,10 +378,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				}
 			}
 			else
-			{
 				CurrentBestPrice = Position.AveragePrice;
-				CBPTag = DateTime.Now.Ticks.ToString();
-			}
 		}
 
 		private bool IsTradingTime()
@@ -397,15 +392,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double hclose = Heiken.Heiken.HAClose[0];
 			
 			if (pos == MarketPosition.Long && hclose >= CurrentBestPrice || pos == MarketPosition.Short && hclose <= CurrentBestPrice)
-			{	
 				CurrentBestPrice = Close[0];
-				
-				RemoveDrawObject(CBPTag);
-				if(pos == MarketPosition.Long)
-					Draw.TriangleDown(this, CBPTag, true, 0, hclose+1, Brushes.Turquoise);
-				else
-					Draw.TriangleUp(this, CBPTag, true, 0, hclose-1, Brushes.Turquoise);
-			}
 			else if (Math.Abs(CurrentBestPrice - hclose) >= StopLoss)
 				StopLossCount = 1;
 			
