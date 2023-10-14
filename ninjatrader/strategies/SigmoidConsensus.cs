@@ -41,7 +41,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private Sigmoid SigR2;
 		
 		// Activator
-		private HeikenGrad Heiken;
 		private Momentum Moment;
 		private MFI Mfi;
 		private PFE Pfe;
@@ -59,8 +58,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private TSI Tsi;
 		private UltimateOscillator Ult;
 		
-		private Sigmoid SigAVG;
-		private Sigmoid SigVEL;
 		private Sigmoid SigMOM;
 		private Sigmoid SigMFI;
 		private Sigmoid SigPFE;
@@ -119,8 +116,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Smooth 			= 3;
 				Threshold 		= 0.9;
 				Imperviousness 	= 2;
-				StopLoss	 	= 4;
-				StopLossBreak 	= 1;
+				StopLoss	 	= 9;
+				StopLossBreak 	= 2;
 				
 				AddPlot(new Stroke(Brushes.OrangeRed, DashStyleHelper.Dash, 2), PlotStyle.Line, "StopLoss");
 				
@@ -132,12 +129,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				UseVOL 			= false;
 				UseCHOP			= false;
-				UseR2 			= false;
+				UseR2 			= true;
 				
 				// Activator
-				SignalAVG 		= 16;
-				SignalVEL 		= 30;
-				SignalMOM 		= 6;
+				SignalMOM 		= 4;
 				SignalMFI 		= 4;
 				SignalPFE 		= 8;
 				SignalBOP 		= 5;
@@ -146,7 +141,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				SignalEOM 		= 0.01;
 				SignalFISH 		= 5;
 				SignalFOSC 		= 16;
-				SignalLSLOPE 	= 4;
+				SignalLSLOPE 	= 10;
 				SignalMFOSC 	= 15;
 				SignalPSY 		= 0.06;
 				SignalRSS 		= 0.36;
@@ -154,9 +149,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				SignalTSI 		= 0.08;
 				SignalULT 		= 0.94;
 				
-				UseAVG 			= false;
-				UseVEL 			= false;
-				UseMOM 			= true;
+				UseMOM 			= false;
 				UseMFI 			= false;
 				UsePFE 			= false;
 				UseBOP 			= false;
@@ -164,13 +157,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 				UseDSTOCH 		= true;
 				UseEOM 			= false;
 				UseFISH 		= false;
-				UseFOSC 		= false;
+				UseFOSC 		= true;
 				UseLSLOPE 		= false;
 				UseMFOSC 		= false;
 				UsePSY 			= false;
-				UseRSS 			= false;
+				UseRSS 			= true;
 				UseRVI 			= true;
-				UseTSI 			= true;
+				UseTSI 			= false;
 				UseULT 			= false;
 				#endregion
 			}
@@ -180,15 +173,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				StopLossCount = 0;
 				CurrentBestPrice = 0;
-				Heiken = HeikenGrad(Period, Smooth);
 				
 				List<ISeries<double>> activeSignals = InitActivationIndicators();
 				List<ISeries<double>> inhibitorSignals = InitInhibitionIndicators();
 				
 				Activator = SigmoidGate(activeSignals, Threshold, Imperviousness, Brushes.Turquoise);
 				Inhibitor = SigmoidGate(inhibitorSignals, Threshold, Imperviousness, Brushes.Crimson);
-				
-				AddChartIndicator(Heiken.Heiken);
+
 				AddChartIndicator(Inhibitor);
 				AddChartIndicator(Activator);
 			}
@@ -198,20 +189,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private List<ISeries<double>> InitActivationIndicators()
 		{
 			List<ISeries<double>> activeSignals = new List<ISeries<double>>();
-			
-			if (UseAVG)
-			{
-				SigAVG = Sigmoid(Heiken.Avg, SignalAVG, Threshold, 0, Brushes.Gold);
-				activeSignals.Add(SigAVG.Default);
-			}
-			if (UseVEL)
-			{
-				SigVEL = Sigmoid(Heiken, SignalVEL, Threshold, 0, Brushes.RoyalBlue);
-				activeSignals.Add(SigVEL.Default);
-			}
+
 			if (UseMOM)
 			{
-				Moment = Momentum(Heiken, Period);
+				Moment = Momentum(Period);
 				SigMOM = Sigmoid(Moment, SignalMOM, Threshold,  0, Brushes.DarkCyan);
 				activeSignals.Add(SigMOM.Default);
 			}
@@ -223,7 +204,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			if (UsePFE)
 			{
-				Pfe = PFE(Heiken, Period, Smooth);
+				Pfe = PFE(Period, Smooth);
 				SigPFE = Sigmoid(Pfe, SignalPFE, Threshold, 0, Brushes.SlateBlue);
 				activeSignals.Add(SigPFE.Default);
 			}
@@ -265,7 +246,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			if (UseLSLOPE)
 			{
-				LSlope = LinRegSlope(Heiken, Period);
+				LSlope = LinRegSlope(Period);
 				SigLSLOPE = Sigmoid(LSlope, SignalLSLOPE, Threshold, 0, Brushes.Yellow);
 				activeSignals.Add(SigLSLOPE.Default);
 			}
@@ -315,7 +296,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			
 			if (UseVOL)
 			{
-				ChaiVol = ChaikinVolatility(Heiken, Period, Period);
+				ChaiVol = ChaikinVolatility(Period, Period);
 				SigVOL = Sigmoid(ChaiVol, SignalVOL, Threshold, 0, Brushes.Crimson);
 				inhibitorSignals.Add(SigVOL.Default);
 			}
@@ -389,11 +370,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		private void UpdateStopLoss(MarketPosition pos)
 		{
-			double hclose = Heiken.Heiken.HAClose[0];
-			
-			if (pos == MarketPosition.Long && hclose >= CurrentBestPrice || pos == MarketPosition.Short && hclose <= CurrentBestPrice)
+			if (pos == MarketPosition.Long && Close[0] >= CurrentBestPrice || pos == MarketPosition.Short && Close[0] <= CurrentBestPrice)
 				CurrentBestPrice = Close[0];
-			else if (Math.Abs(CurrentBestPrice - hclose) >= StopLoss)
+			else if (Math.Abs(CurrentBestPrice - Close[0]) >= StopLoss)
 				StopLossCount = 1;
 			
 			Value[0] = CurrentBestPrice + (StopLoss * (pos == MarketPosition.Long ? -1 : 1));
@@ -448,189 +427,169 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Stop Break (Bars suration)", GroupName = "Parameters", Order = 7)]
+		[Display(Name = "Stop Break (Bars duration)", GroupName = "Parameters", Order = 7)]
 		public double StopLossBreak
 		{ get; set; }
 		#endregion
 		
 		#region Amplifier (Activator)
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Heiken AVG", GroupName = "Amplifier (Activator)", Order = 0)]
-		public bool UseAVG
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalAVG", GroupName = "Amplifier (Activator)", Order = 1)]
-		public double SignalAVG
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Heiken VEL", GroupName = "Amplifier (Activator)", Order = 2)]
-		public bool UseVEL
-		{ get; set; }
-
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalVEL", GroupName = "Amplifier (Activator)", Order = 3)]
-		public double SignalVEL
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Momentum", GroupName = "Amplifier (Activator)", Order = 4)]
+		[Display(Name = "Use Momentum", GroupName = "Amplifier (Activator)", Order = 0)]
 		public bool UseMOM
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalMOM", GroupName = "Amplifier (Activator)", Order = 5)]
+		[Display(Name = "SignalMOM", GroupName = "Amplifier (Activator)", Order = 1)]
 		public double SignalMOM
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use MFI", GroupName = "Amplifier (Activator)", Order = 6)]
+		[Display(Name = "Use MFI", GroupName = "Amplifier (Activator)", Order = 2)]
 		public bool UseMFI
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalMFI", GroupName = "Amplifier (Activator)", Order = 7)]
+		[Display(Name = "SignalMFI", GroupName = "Amplifier (Activator)", Order = 3)]
 		public double SignalMFI
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use PFE", GroupName = "Amplifier (Activator)", Order = 8)]
+		[Display(Name = "Use PFE", GroupName = "Amplifier (Activator)", Order = 4)]
 		public bool UsePFE
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalPFE", GroupName = "Amplifier (Activator)", Order = 9)]
+		[Display(Name = "SignalPFE", GroupName = "Amplifier (Activator)", Order = 5)]
 		public double SignalPFE
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use BOP", GroupName = "Amplifier (Activator)", Order = 10)]
+		[Display(Name = "Use BOP", GroupName = "Amplifier (Activator)", Order = 6)]
 		public bool UseBOP
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalBOP", GroupName = "Amplifier (Activator)", Order = 11)]
+		[Display(Name = "SignalBOP", GroupName = "Amplifier (Activator)", Order = 7)]
 		public double SignalBOP
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use DMI", GroupName = "Amplifier (Activator)", Order = 12)]
+		[Display(Name = "Use DMI", GroupName = "Amplifier (Activator)", Order = 8)]
 		public bool UseDMI
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalDMI", GroupName = "Amplifier (Activator)", Order = 13)]
+		[Display(Name = "SignalDMI", GroupName = "Amplifier (Activator)", Order = 9)]
 		public double SignalDMI
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Double Stochastics", GroupName = "Amplifier (Activator)", Order = 14)]
+		[Display(Name = "Use Double Stochastics", GroupName = "Amplifier (Activator)", Order = 10)]
 		public bool UseDSTOCH
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalDSTOCH", GroupName = "Amplifier (Activator)", Order = 15)]
+		[Display(Name = "SignalDSTOCH", GroupName = "Amplifier (Activator)", Order = 11)]
 		public double SignalDSTOCH
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Ease of Movement", GroupName = "Amplifier (Activator)", Order = 16)]
+		[Display(Name = "Use Ease of Movement", GroupName = "Amplifier (Activator)", Order = 12)]
 		public bool UseEOM
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalEOM", GroupName = "Amplifier (Activator)", Order = 17)]
+		[Display(Name = "SignalEOM", GroupName = "Amplifier (Activator)", Order = 13)]
 		public double SignalEOM
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Fisher transform", GroupName = "Amplifier (Activator)", Order = 18)]
+		[Display(Name = "Use Fisher transform", GroupName = "Amplifier (Activator)", Order = 14)]
 		public bool UseFISH
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalFISH", GroupName = "Amplifier (Activator)", Order = 19)]
+		[Display(Name = "SignalFISH", GroupName = "Amplifier (Activator)", Order = 15)]
 		public double SignalFISH
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Forecast Osc.", GroupName = "Amplifier (Activator)", Order = 20)]
+		[Display(Name = "Use Forecast Osc.", GroupName = "Amplifier (Activator)", Order = 16)]
 		public bool UseFOSC
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalFOSC", GroupName = "Amplifier (Activator)", Order = 21)]
+		[Display(Name = "SignalFOSC", GroupName = "Amplifier (Activator)", Order = 17)]
 		public double SignalFOSC
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Lin. R. Slope", GroupName = "Amplifier (Activator)", Order = 22)]
+		[Display(Name = "Use Lin. R. Slope", GroupName = "Amplifier (Activator)", Order = 18)]
 		public bool UseLSLOPE
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalLSLOPE", GroupName = "Amplifier (Activator)", Order = 23)]
+		[Display(Name = "SignalLSLOPE", GroupName = "Amplifier (Activator)", Order = 19)]
 		public double SignalLSLOPE
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Money Flow Osc.", GroupName = "Amplifier (Activator)", Order = 24)]
+		[Display(Name = "Use Money Flow Osc.", GroupName = "Amplifier (Activator)", Order = 20)]
 		public bool UseMFOSC
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalMFOSC", GroupName = "Amplifier (Activator)", Order = 25)]
+		[Display(Name = "SignalMFOSC", GroupName = "Amplifier (Activator)", Order = 21)]
 		public double SignalMFOSC
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Psychological Line", GroupName = "Amplifier (Activator)", Order = 26)]
+		[Display(Name = "Use Psychological Line", GroupName = "Amplifier (Activator)", Order = 22)]
 		public bool UsePSY
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalPSY", GroupName = "Amplifier (Activator)", Order = 27)]
+		[Display(Name = "SignalPSY", GroupName = "Amplifier (Activator)", Order = 23)]
 		public double SignalPSY
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use RSS", GroupName = "Amplifier (Activator)", Order = 28)]
+		[Display(Name = "Use RSS", GroupName = "Amplifier (Activator)", Order = 24)]
 		public bool UseRSS
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalRSS", GroupName = "Amplifier (Activator)", Order = 29)]
+		[Display(Name = "SignalRSS", GroupName = "Amplifier (Activator)", Order = 25)]
 		public double SignalRSS
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use RVI", GroupName = "Amplifier (Activator)", Order = 30)]
+		[Display(Name = "Use RVI", GroupName = "Amplifier (Activator)", Order = 26)]
 		public bool UseRVI
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalRVI", GroupName = "Amplifier (Activator)", Order = 31)]
+		[Display(Name = "SignalRVI", GroupName = "Amplifier (Activator)", Order = 27)]
 		public double SignalRVI
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use TSI", GroupName = "Amplifier (Activator)", Order = 32)]
+		[Display(Name = "Use TSI", GroupName = "Amplifier (Activator)", Order = 28)]
 		public bool UseTSI
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalTSI", GroupName = "Amplifier (Activator)", Order = 33)]
+		[Display(Name = "SignalTSI", GroupName = "Amplifier (Activator)", Order = 29)]
 		public double SignalTSI
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Ultimate Osc.", GroupName = "Amplifier (Activator)", Order = 34)]
+		[Display(Name = "Use Ultimate Osc.", GroupName = "Amplifier (Activator)", Order = 30)]
 		public bool UseULT
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalULT", GroupName = "Amplifier (Activator)", Order = 35)]
+		[Display(Name = "SignalULT", GroupName = "Amplifier (Activator)", Order = 31)]
 		public double SignalULT
 		{ get; set; }
 		#endregion
