@@ -133,21 +133,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Activator
 				SignalMOM 		= 4;
-				SignalMFI 		= 4;
-				SignalPFE 		= 8;
-				SignalBOP 		= 5;
-				SignalDMI 		= 5;
-				SignalDSTOCH 	= 1;
-				SignalEOM 		= 0.01;
+				SignalMFI 		= 13;
+				SignalPFE 		= 6;
+				SignalBOP 		= 30;
+				SignalDMI 		= 8;
+				SignalDSTOCH 	= 2;
+				SignalEOM 		= 18;
 				SignalFISH 		= 5;
-				SignalFOSC 		= 16;
+				SignalFOSC 		= 172;
 				SignalLSLOPE 	= 10;
-				SignalMFOSC 	= 15;
-				SignalPSY 		= 0.06;
-				SignalRSS 		= 0.36;
-				SignalRVI 		= 0.49;
-				SignalTSI 		= 0.08;
-				SignalULT 		= 0.94;
+				SignalMFOSC 	= 38;
+				SignalPSY 		= 0.23;
+				SignalRSS 		= 0.35;
+				SignalRVI 		= 0.52;
+				SignalTSI 		= 0.18;
+				SignalULT 		= 0.92;
 				
 				UseMOM 			= false;
 				UseMFI 			= false;
