@@ -116,8 +116,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Smooth 			= 3;
 				Threshold 		= 0.9;
 				Imperviousness 	= 2;
-				StopLoss	 	= 9;
-				StopLossBreak 	= 2;
+				StopLoss	 	= 13;
+				StopLossBreak 	= 1;
 				
 				AddPlot(new Stroke(Brushes.OrangeRed, DashStyleHelper.Dash, 2), PlotStyle.Line, "StopLoss");
 				
@@ -157,12 +157,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 				UseDSTOCH 		= true;
 				UseEOM 			= false;
 				UseFISH 		= false;
-				UseFOSC 		= true;
+				UseFOSC 		= false;
 				UseLSLOPE 		= false;
 				UseMFOSC 		= false;
 				UsePSY 			= false;
 				UseRSS 			= true;
-				UseRVI 			= true;
+				UseRVI 			= false;
 				UseTSI 			= false;
 				UseULT 			= false;
 				#endregion
