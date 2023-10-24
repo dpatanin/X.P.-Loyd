@@ -53,7 +53,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				IsInstantiatedOnEachOptimizationIteration	= true;
 				RSIPeriod					= 14;
 				RSISmooth					= 3;
-				ProfitTarget					= 12;
+				ProfitTarget				= 12;
 				StopLoss					= 6;
 			}
 			else if (State == State.Configure)
@@ -71,7 +71,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     		return;
  
 			if(CrossAbove(RSI(RSIPeriod, RSISmooth), 20, 1))
-			EnterLong();
+				EnterLong();
 		}
 
 		#region Properties

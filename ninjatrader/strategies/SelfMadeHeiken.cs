@@ -25,17 +25,17 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds Strategies in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class MACD_Crossover : Strategy
+	public class SelfMadeHeiken : Strategy
 	{
-		private MACD Macd;
 		private int TradeAmount;
+		private HeikenGrad Heiken;
 		
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
 			{
-				Description = @"MACD Crossover Strategy";
-				Name = "MACD Crossover";
+				Description = @"Heiken Ashi Calculation but self made";
+				Name = "SelfMadeHeiken";
 				
 				// NinjaTrader params
 				Calculate = Calculate.OnBarClose;
@@ -61,41 +61,37 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				WinStreakBonus = 0;
-				Fast = 1;
-				Slow = 395;
-				Signal = 435;
+				Period = 2;
+				Smooth = 2;
 			}
-			else if (State == State.Configure)
-			{	
-				// Boosts performance in optimization mode
-				if (Category == Category.Optimize)
-					IsInstantiatedOnEachOptimizationIteration = false;
-			}
+			else if (State == State.Configure && Category == Category.Optimize)
+				IsInstantiatedOnEachOptimizationIteration = false;
 			else if (State == State.DataLoaded)
-			{				
+			{
 				TradeAmount = 1;
-				Macd = MACD(Fast, Slow, Signal);
+				Heiken = HeikenGrad(Period, Smooth, Threshold);
 				
-				AddChartIndicator(Macd);
+				AddChartIndicator(CustomHeikenAshi());
+				AddChartIndicator(Heiken);
 			}
 		}
 
 		protected override void OnBarUpdate()
-		{
+		{			
 			if (!IsTradingTime())
 			{
 				ExitLong();
 				ExitShort();
 			}
-			else if (CrossAbove(Macd, Macd.Avg, 1))
+			else if (Heiken[0] > Heiken.Avg[0] && Heiken.Avg[0] > 0)
 				EnterLong(TradeAmount);
-			else if (CrossBelow(Macd, Macd.Avg, 1))
-				EnterShort(TradeAmount);
+			else if (Heiken[0] < Heiken.Avg[0] && Heiken.Avg[0] < 0)
+				EnterShort(TradeAmount);		
 		}
 		
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
 		{
-			if (position.MarketPosition == MarketPosition.Flat)
+			if (SystemPerformance.AllTrades.Count > 0)
 			{
 				Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
 
@@ -126,23 +122,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Win Streak Bonus", Description="0 = trade only with 1 contract", GroupName = "Base Parameters", Order = 0)]
+		[Display(Name = "Win Streak Bonus", Description="0 = trade only with 1 contract", GroupName = "Parameters", Order = 0)]
 		public int WinStreakBonus
 		{ get; set; }
 		
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Fast", GroupName = "Base Parameters", Order = 1)]
-		public int Fast
+		[Range(0, 49), NinjaScriptProperty]
+		[Display(Name = "Threshold", GroupName = "Parameters", Order = 1)]
+		public double Threshold
 		{ get; set; }
-
+		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Slow", GroupName = "Base Parameters", Order = 2)]
-		public int Slow
+		[Display(Name = "Period", GroupName = "Parameters", Order = 2)]
+		public int Period
 		{ get; set; }
-
+		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Signal", GroupName = "Base Parameters", Order = 3)]
-		public int Signal
+		[Display(Name = "Smooth", GroupName = "Parameters", Order = 3)]
+		public int Smooth
 		{ get; set; }
 		#endregion
 	}
