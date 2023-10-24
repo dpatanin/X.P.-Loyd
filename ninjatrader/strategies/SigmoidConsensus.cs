@@ -28,19 +28,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 	public class SigmoidConsensus : Strategy
 	{
 		private int StopLossCount;
+		private int PositionIncrease;
 		private double CurrentBestPrice;
+		private SigmoidGate Activator;
 		
 		#region Indicators
-		// Inhibitor
-		private ChaikinVolatility ChaiVol;
-		private ChoppinessIndex Chop;
-		private RSquared R2;
-		
-		private Sigmoid SigVOL;
-		private Sigmoid SigCHOP;
-		private Sigmoid SigR2;
-		
-		// Activator
 		private Momentum Moment;
 		private MFI Mfi;
 		private PFE Pfe;
@@ -76,9 +68,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private Sigmoid SigULT;
 		#endregion
 		
-		// Gates
-		private SigmoidGate Activator;
-		private SigmoidGate Inhibitor;
 		
 		protected override void OnStateChange()
 		{
@@ -90,7 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				// NinjaTrader params
 				Calculate = Calculate.OnBarClose;
 				EntriesPerDirection = 1;
-				EntryHandling = EntryHandling.AllEntries;
+				EntryHandling = EntryHandling.UniqueEntries;
 				IsExitOnSessionCloseStrategy = true;
 				ExitOnSessionCloseSeconds = 930;
 				IsFillLimitOnTouch = false;
@@ -111,7 +100,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				TradeAmount 	= 1;
-				WinStreakBonus 	= 0;
 				Period 			= 14;
 				Smooth 			= 3;
 				Threshold 		= 0.9;
@@ -122,16 +110,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				AddPlot(new Stroke(Brushes.OrangeRed, DashStyleHelper.Dash, 2), PlotStyle.Line, "StopLoss");
 				
 				#region Indicators
-				// Inhibitor
-				SignalVOL 		= 0.15;
-				SignalCHOP 		= 0.04;
-				SignalR2 		= 2;
-				
-				UseVOL 			= false;
-				UseCHOP			= false;
-				UseR2 			= true;
-				
-				// Activator
 				SignalMOM 		= 4;
 				SignalMFI 		= 13;
 				SignalPFE 		= 6;
@@ -173,14 +151,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				StopLossCount = 0;
 				CurrentBestPrice = 0;
+				PositionIncrease = 0;
 				
 				List<ISeries<double>> activeSignals = InitActivationIndicators();
-				List<ISeries<double>> inhibitorSignals = InitInhibitionIndicators();
-				
 				Activator = SigmoidGate(activeSignals, Threshold, Imperviousness, Brushes.Turquoise);
-				Inhibitor = SigmoidGate(inhibitorSignals, Threshold, Imperviousness, Brushes.Crimson);
-
-				AddChartIndicator(Inhibitor);
 				AddChartIndicator(Activator);
 			}
 		}
@@ -289,40 +263,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 			
 			return activeSignals;
 		}
-		
-		private List<ISeries<double>> InitInhibitionIndicators()
-		{
-			List<ISeries<double>> inhibitorSignals = new List<ISeries<double>>();
-			
-			if (UseVOL)
-			{
-				ChaiVol = ChaikinVolatility(Period, Period);
-				SigVOL = Sigmoid(ChaiVol, SignalVOL, Threshold, 0, Brushes.Crimson);
-				inhibitorSignals.Add(SigVOL.Default);
-			}
-			if (UseCHOP)
-			{
-				Chop = ChoppinessIndex(Period);
-				SigCHOP = Sigmoid(Chop, SignalCHOP, Threshold, 100, Brushes.Red);
-				inhibitorSignals.Add(SigCHOP.Default);
-			}
-			if (UseVOL)
-			{
-				R2 = RSquared(Period);
-				SigR2 = Sigmoid(R2, SignalR2, Threshold, -1, Brushes.Salmon);
-				inhibitorSignals.Add(SigR2.Default);
-			}
-			
-			return inhibitorSignals;
-		}
 		#endregion
 
 		protected override void OnBarUpdate()
 		{
-			MarketPosition pos = Position.MarketPosition;
-			if (pos != MarketPosition.Flat)
-				UpdateStopLoss(pos);
-			bool blockSignal = Inhibitor[0] != 0;
+			if (Position.MarketPosition != MarketPosition.Flat)
+				UpdateStopLoss();
 			
 			if (!IsTradingTime() || Activator[0] == 0 || StopLossCount >= 1 && StopLossCount <= StopLossBreak)
 			{
@@ -337,29 +283,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 					BackBrush = Brushes.Gray;
 				}
 			}
-			else if (Activator[0] == 1 && !blockSignal)
-				EnterLong(TradeAmount);
-			else if (Activator[0] == -1 && !blockSignal)
-				EnterShort(TradeAmount);		
+			else if (Activator[0] == 1)
+				EnterLong(TradeAmount, "Base Long");
+			else if (Activator[0] == -1)
+				EnterShort(TradeAmount, "Base Short");		
 			
 		}
 		
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
 		{
-			if (Position.MarketPosition == MarketPosition.Flat)
-			{
-				if (SystemPerformance.AllTrades.Count > 0)
-				{
-					Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-
-					if(lastTrade.ProfitCurrency > 0)
-					   TradeAmount += WinStreakBonus;
-					else
-					   TradeAmount = 1;
-				}
-			}
-			else
+			if (Position.MarketPosition != MarketPosition.Flat)
 				CurrentBestPrice = Position.AveragePrice;
+			else
+				PositionIncrease = 0;
 		}
 
 		private bool IsTradingTime()
@@ -368,8 +304,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			return now >= ToTime(StartTime) && now <= ToTime(EndTime);
 		}
 		
-		private void UpdateStopLoss(MarketPosition pos)
+		private void UpdateStopLoss()
 		{
+			MarketPosition pos = Position.MarketPosition;
+			
 			if (pos == MarketPosition.Long && Close[0] >= CurrentBestPrice || pos == MarketPosition.Short && Close[0] <= CurrentBestPrice)
 				CurrentBestPrice = Close[0];
 			else if (Math.Abs(CurrentBestPrice - Close[0]) >= StopLoss)
@@ -392,42 +330,37 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "TradeAmount (Base)", GroupName = "Parameters", Order = 0)]
+		[Display(Name = "TradeAmount", GroupName = "Parameters", Order = 0)]
 		public int TradeAmount
 		{ get; set; }
 		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Win Streak Bonus", Description="0 = trade only with base amount", GroupName = "Parameters", Order = 1)]
-		public int WinStreakBonus
-		{ get; set; }
-		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Period", GroupName = "Parameters", Order = 2)]
+		[Display(Name = "Period", GroupName = "Parameters", Order = 1)]
 		public int Period
 		{ get; set; }
 		
 		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Smooth", GroupName = "Parameters", Order = 3)]
+		[Display(Name = "Smooth", GroupName = "Parameters", Order = 2)]
 		public int Smooth
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Threshold", GroupName = "Parameters", Order = 4)]
+		[Display(Name = "Threshold", GroupName = "Parameters", Order = 3)]
 		public double Threshold
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Imperviousness", GroupName = "Parameters", Order = 5)]
+		[Display(Name = "Imperviousness", GroupName = "Parameters", Order = 4)]
 		public double Imperviousness
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Stop Loss (Price diff)", GroupName = "Parameters", Order = 6)]
+		[Display(Name = "Stop Loss (Price diff)", GroupName = "Parameters", Order = 5)]
 		public double StopLoss
 		{ get; set; }
 		
 		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Stop Break (Bars duration)", GroupName = "Parameters", Order = 7)]
+		[Display(Name = "Stop Break (Bars duration)", GroupName = "Parameters", Order = 6)]
 		public double StopLossBreak
 		{ get; set; }
 		#endregion
@@ -593,37 +526,5 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public double SignalULT
 		{ get; set; }
 		#endregion
-		
-		#region Amplifier (Inhibitor)
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Chaikan Volatility", GroupName = "Amplifier (Inhibitor)", Order = 0)]
-		public bool UseVOL
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalVOL", GroupName = "Amplifier (Inhibitor)", Order = 1)]
-		public double SignalVOL
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use Choppiness Index", GroupName = "Amplifier (Inhibitor)", Order = 2)]
-		public bool UseCHOP
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalCHOP", GroupName = "Amplifier (Inhibitor)", Order = 3)]
-		public double SignalCHOP
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Use RSquared", GroupName = "Amplifier (Inhibitor)", Order = 4)]
-		public bool UseR2
-		{ get; set; }
-		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "SignalR2", GroupName = "Amplifier (Inhibitor)", Order = 5)]
-		public double SignalR2
-		{ get; set; }
-		#endregion
-	}
+		}
 }
