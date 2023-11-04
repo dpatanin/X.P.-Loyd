@@ -25,18 +25,17 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds Strategies in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class HeikenRSI : Strategy
+	public class Stoopid : Strategy
 	{
+		private Darvas Darv;
 		private int TradeAmount;
-		private CustomRSI Rsi;
-		private CustomHeikenAshi Heiken;
 		
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
 			{
-				Description = @"HeikenRSI";
-				Name = "HeikenRSI";
+				Description = @"Stoopid";
+				Name = "Stoopid";
 				
 				// NinjaTrader params
 				Calculate = Calculate.OnBarClose;
@@ -62,21 +61,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
 				// Base Params
 				WinStreakBonus = 0;
-				Threshold = 2;
-				Period = 5;
-				Smooth = 5;
-				BarsLookBack = 2;
 			}
-			else if (State == State.Configure && Category == Category.Optimize)
-				IsInstantiatedOnEachOptimizationIteration = false;
+			else if (State == State.Configure)
+			{	
+				// Boosts performance in optimization mode
+				if (Category == Category.Optimize)
+					IsInstantiatedOnEachOptimizationIteration = false;
+			}
 			else if (State == State.DataLoaded)
-			{
+			{				
 				TradeAmount = 1;
-				Heiken = CustomHeikenAshi();
-				Rsi = CustomRSI(Heiken.HAClose, Period, Smooth, Threshold);
-
-				AddChartIndicator(Rsi);
-				AddChartIndicator(Heiken);
+				Darv = Darvas();
+				AddChartIndicator(Darv);
 			}
 		}
 
@@ -87,19 +83,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 				ExitLong();
 				ExitShort();
 			}
-			else if (Rsi[0] > Rsi.Avg[0] && Rsi.Diff[0] > Threshold)
+			else if (Darv.BuySignal)
 				EnterLong(TradeAmount);
-			else if (Rsi[0] < Rsi.Avg[0] && Rsi.Diff[0] < -Threshold)
-				EnterShort(TradeAmount);		
+			else if (Darv.SellSignal)
+				EnterShort(TradeAmount);
+			
 		}
 		
 		protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
 		{
-			if (SystemPerformance.AllTrades.Count > 0)
+			if (position.MarketPosition == MarketPosition.Flat)
 			{
 				Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
 
-				if(lastTrade.ProfitCurrency > 0)
+				if (lastTrade.ProfitCurrency > 0)
 				   TradeAmount += WinStreakBonus;
 				else
 				   TradeAmount = 1;
@@ -128,26 +125,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Range(0, int.MaxValue), NinjaScriptProperty]
 		[Display(Name = "Win Streak Bonus", Description="0 = trade only with 1 contract", GroupName = "Parameters", Order = 0)]
 		public int WinStreakBonus
-		{ get; set; }
-		
-		[Range(0, 49), NinjaScriptProperty]
-		[Display(Name = "Threshold", GroupName = "Parameters", Order = 1)]
-		public double Threshold
-		{ get; set; }
-		
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Period", GroupName = "Parameters", Order = 2)]
-		public int Period
-		{ get; set; }
-		
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Smooth", GroupName = "Parameters", Order = 3)]
-		public int Smooth
-		{ get; set; }
-		
-		[Range(1, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Bars Look Back", GroupName = "Parameters", Order = 4)]
-		public int BarsLookBack
 		{ get; set; }
 		#endregion
 	}

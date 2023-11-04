@@ -26,7 +26,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public class HeikenGrad : Indicator
 	{
-        private CustomHeikenAshi Heiken;
+        public CustomHeikenAshi Heiken;
 		private EMA EHClose;
 		private EMA EHOpen;
 		
@@ -45,19 +45,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 				
 				Period = 2;
 				Smooth = 1;
+				Heiken = CustomHeikenAshi();
 				
 				AddPlot(Brushes.RoyalBlue, "Gradient");
-				AddPlot(Brushes.Yellow, "Average Gradient");
+				AddPlot(Brushes.Gold, "Average Gradient");
+				AddPlot(Brushes.Violet, "Pitch of Gradient");
 			}
 			else if (State == State.DataLoaded)
 			{
-				Heiken = CustomHeikenAshi();
 				EHClose = EMA(Heiken.HAClose, Smooth);
 				EHOpen = EMA(Heiken.HAOpen, Smooth);
 				
 				Draw.HorizontalLine(this, "Zero", 0, Brushes.WhiteSmoke, false);
-				Draw.HorizontalLine(this, "Upper Threshold", Threshold, Brushes.DarkCyan, false);
-				Draw.HorizontalLine(this, "Lower Threshold", 0-Threshold, Brushes.DarkCyan, false);
 			}
 		}
 
@@ -65,6 +64,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 		{
 			Default[0] = Gradient(1);
 			Avg[0] = Gradient(Period) / Period;
+			Pitch[0] = CurrentBar >= 1 ? Default[0] - Default[1] : 0;
 		}
 		
 		private double Gradient(int bars)
@@ -91,11 +91,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 		public int Smooth
 		{ get; set; }
 		
-		[Range(0, int.MaxValue), NinjaScriptProperty]
-		[Display(Name = "Threshold", GroupName = "Parameters", Order = 2)]
-		public double Threshold
-		{ get; set; }
-		
 		[Browsable(false)]
 		[XmlIgnore()]
 		public Series<double> Default
@@ -109,6 +104,13 @@ namespace NinjaTrader.NinjaScript.Indicators
 		{
 			get { return Values[1]; }
 		}
+		
+		[Browsable(false)]
+		[XmlIgnore()]
+		public Series<double> Pitch
+		{
+			get { return Values[2]; }
+		}
 		#endregion
 	
 		}
@@ -121,18 +123,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private HeikenGrad[] cacheHeikenGrad;
-		public HeikenGrad HeikenGrad(int period, int smooth, double threshold)
+		public HeikenGrad HeikenGrad(int period, int smooth)
 		{
-			return HeikenGrad(Input, period, smooth, threshold);
+			return HeikenGrad(Input, period, smooth);
 		}
 
-		public HeikenGrad HeikenGrad(ISeries<double> input, int period, int smooth, double threshold)
+		public HeikenGrad HeikenGrad(ISeries<double> input, int period, int smooth)
 		{
 			if (cacheHeikenGrad != null)
 				for (int idx = 0; idx < cacheHeikenGrad.Length; idx++)
-					if (cacheHeikenGrad[idx] != null && cacheHeikenGrad[idx].Period == period && cacheHeikenGrad[idx].Smooth == smooth && cacheHeikenGrad[idx].Threshold == threshold && cacheHeikenGrad[idx].EqualsInput(input))
+					if (cacheHeikenGrad[idx] != null && cacheHeikenGrad[idx].Period == period && cacheHeikenGrad[idx].Smooth == smooth && cacheHeikenGrad[idx].EqualsInput(input))
 						return cacheHeikenGrad[idx];
-			return CacheIndicator<HeikenGrad>(new HeikenGrad(){ Period = period, Smooth = smooth, Threshold = threshold }, input, ref cacheHeikenGrad);
+			return CacheIndicator<HeikenGrad>(new HeikenGrad(){ Period = period, Smooth = smooth }, input, ref cacheHeikenGrad);
 		}
 	}
 }
@@ -141,14 +143,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.HeikenGrad HeikenGrad(int period, int smooth, double threshold)
+		public Indicators.HeikenGrad HeikenGrad(int period, int smooth)
 		{
-			return indicator.HeikenGrad(Input, period, smooth, threshold);
+			return indicator.HeikenGrad(Input, period, smooth);
 		}
 
-		public Indicators.HeikenGrad HeikenGrad(ISeries<double> input , int period, int smooth, double threshold)
+		public Indicators.HeikenGrad HeikenGrad(ISeries<double> input , int period, int smooth)
 		{
-			return indicator.HeikenGrad(input, period, smooth, threshold);
+			return indicator.HeikenGrad(input, period, smooth);
 		}
 	}
 }
@@ -157,14 +159,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.HeikenGrad HeikenGrad(int period, int smooth, double threshold)
+		public Indicators.HeikenGrad HeikenGrad(int period, int smooth)
 		{
-			return indicator.HeikenGrad(Input, period, smooth, threshold);
+			return indicator.HeikenGrad(Input, period, smooth);
 		}
 
-		public Indicators.HeikenGrad HeikenGrad(ISeries<double> input , int period, int smooth, double threshold)
+		public Indicators.HeikenGrad HeikenGrad(ISeries<double> input , int period, int smooth)
 		{
-			return indicator.HeikenGrad(input, period, smooth, threshold);
+			return indicator.HeikenGrad(input, period, smooth);
 		}
 	}
 }
