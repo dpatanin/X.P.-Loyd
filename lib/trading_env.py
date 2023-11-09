@@ -19,9 +19,9 @@ class TradingEnvironment(gym.Env):
         df: pd.DataFrame,
         window_size: int,
         features: list[str],
-        trade_volume=1,
-        balance=10000.00,
-        tick_ratio=12.5 / 0.25,
+        balance=100.00,
+        tick_size=0.25,
+        tick_value=12.5,
         fees_per_contract=0.00,
         max_ticks_without_action=23 * 60,
         checkpoint_length: int = 23 * 60 * 31,
@@ -29,17 +29,18 @@ class TradingEnvironment(gym.Env):
     ):
         """
         If `episode_history` is not None, the latest checkpoint will be loaded from it and training continues at that point.
+        `fees_per_contract` are percent of profit of 1 contract on 1 tick difference.
         """
         super(TradingEnvironment, self).__init__()
 
         self._df = df
         self._window_size = window_size
         self._features = features
-        self._trade_volume = trade_volume
 
         self._max_ticks_without_action = max_ticks_without_action
-        self._tick_ratio = tick_ratio
-        self._fees_per_contract = fees_per_contract
+        self._tick_size = tick_size
+        self._tick_ratio = tick_size / tick_value
+        self._fees = fees_per_contract * self._tick_ratio
 
         self.action_space = spaces.Discrete(3)  # 0 = No position; 1 = Long; 2 = Short
 
@@ -138,11 +139,10 @@ class TradingEnvironment(gym.Env):
         )
 
     def _update_balance(self, price_diff: float):
-        fees = self._trade_volume * self._fees_per_contract
-        profit = self._trade_volume * price_diff * self._tick_ratio
+        profit = (price_diff / self._tick_size) * self._tick_ratio
 
-        self._balance += profit - fees
-        return (profit, fees)
+        self._balance += profit - self._fees
+        return (profit, self._fees)
 
     def _calculate_reward(self, profit: float, fees: float):
         # Calculate the composite reward

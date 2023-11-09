@@ -59,18 +59,16 @@ def env_creator(df: pd.DataFrame, env_state_dir: str = None):
             df=df,
             window_size=SEQ_LENGTH,
             features=FEATURES,
-            balance=1000.00,
-            fees_per_contract=0.25,
-            streak_span=SEQ_LENGTH,
-            streak_bonus_max=2,
-            streak_difficulty=10,
+            tick_size=0.25,
+            tick_value=12.5,
+            fees_per_contract=0.1,
             env_state_dir=env_state_dir,
         )
     )
 
 
-train_env = env_creator(dp.train_df,  f"{LOG_DIR}/train" if LOAD_CHECKPOINT else None)
-eval_env = env_creator(dp.val_df,  f"{LOG_DIR}/eval" if LOAD_CHECKPOINT else None)
+train_env = env_creator(dp.train_df, f"{LOG_DIR}/train" if LOAD_CHECKPOINT else None)
+eval_env = env_creator(dp.val_df, f"{LOG_DIR}/eval" if LOAD_CHECKPOINT else None)
 
 update_pb("Create network")
 categorical_q_net = categorical_q_network.CategoricalQNetwork(
