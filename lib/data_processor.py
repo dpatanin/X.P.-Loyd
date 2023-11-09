@@ -14,7 +14,7 @@ class DataProcessor:
     Splits into train (70%), validation (20%) & test (10%) datasets.
     """
 
-    def __init__(self, src: str, period_fast=3, period_slow=5) -> None:
+    def __init__(self, src: str, period=14, smooth=3) -> None:
         download = None if self._is_local(src) else wget.download(src)
 
         self._pb = tqdm(range(7), desc="Load data")
@@ -37,20 +37,15 @@ class DataProcessor:
         df["day_cos"] = np.cos(timestamp_s * (2 * np.pi / day))
         df.set_index(date_time, inplace=True)
 
-        self._update_pb("Process prices")
+        self._update_pb("Calculate RSS")
         # Preprocess price data
-        for col in ["high", "low"]:
-            df[f"{col}_diff"] = (df[col] - df["close"]).abs()
+        df["rss"] = self.rss(df["close"])
 
-        for col in ["open", "close"]:
-            df[f"{col}_pct"] = df[col].pct_change()
-            df[f"{col}_diff"] = df[col].diff()
+        self._update_pb("Calculate DMI")
+        df["dmi"] = self.dmi(df["close"], df["high"], df["low"], period)
 
-        self._update_pb("Calculate SMA Crossover")
-        df["SMA_diff"] = self.sma(df["close"], period_fast) / self.sma(
-            df["close"], period_slow
-        )
-        df["SMA_position"] = np.where(df["SMA_diff"] > 1, 1, 2)
+        self._update_pb("Calculate double stochastic")
+        
 
         df.fillna(0, inplace=True)
 
@@ -63,19 +58,39 @@ class DataProcessor:
         self._update_pb("Data processed!")
         self._pb.close()
 
+    def sma(self, s: pd.Series, period: int) -> pd.Series:
+        return s.rolling(window=period).mean()
+
     def rma(self, s: pd.Series, period: int) -> pd.Series:
         return s.ewm(alpha=1 / period).mean()
 
-    def atr(self, df: pd.DataFrame, length: int = 14) -> pd.Series:
-        # Ref: https://stackoverflow.com/a/74282809/
-        high, low, prev_close = df["high"], df["low"], df["close"].shift()
-        tr_all = [high - low, high - prev_close, low - prev_close]
-        tr_all = [tr.abs() for tr in tr_all]
-        tr = pd.concat(tr_all, axis=1).max(axis=1)
-        return self.rma(tr, length)
+    def rss(self, s: pd.Series) -> pd.Series:
+        spread = s.ewm(span = 10) - s.ewm(span = 40)
+        rsi = self.rsi(spread, 5)
+        
+        return self.sma(rsi, 5)
 
-    def sma(self, s: pd.Series, period: int) -> pd.Series:
-        return s.rolling(window=period).mean()
+    def rsi(self, s: pd.Series, period: int) -> pd.Series:
+        change = s.diff()
+        gain = self.rma(change.mask(change < 0, 0.0), period)
+        loss = self.rma(-change.mask(change > 0, -0.0), period)
+        
+        return 100 - (100 / (1 + (gain / loss)))
+
+    def dmi(self, close: pd.Series, high: pd.Series, low: pd.Series, period: int) -> pd.Series:
+        sma_tr = self.sma(np.maximum(high - low, np.maximum((high - close).abs(), (low - close).abs())), period)
+        low_diff = low.diff()
+        low_diff = low_diff.mask(low_diff > 0, 0)
+        high_diff = -high.diff()
+        high_diff = high_diff.mask(high_diff > 0, 0)
+        
+        sma_dm_minus = self.sma(low_diff.mask(low_diff > high_diff, 0), period)
+        sma_dm_plus = self.sma(high_diff.mask(high_diff > low_diff , 0), period)
+                
+        di_minus = sma_dm_minus  / sma_tr
+        di_plus = sma_dm_plus  / sma_tr
+        
+        return (di_plus - di_minus) / (di_plus + di_minus)
 
     def _is_local(self, url):
         url_parsed = urlparse(url)
