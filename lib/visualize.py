@@ -227,14 +227,6 @@ def visualize(dir: str, prices_df: pd.DataFrame):
     )
     balance_figure.add_tools(simple_hover)
 
-    streak_figure = figure(
-        title="Streak per timestep",
-        x_axis_label="Time Steps",
-        y_axis_label="Streak multiplier",
-        **common_args,
-    )
-    streak_figure.add_tools(simple_hover)
-
     for id, data in enumerate(
         tqdm(ep_history, desc="Draw lines", position=1, leave=False)
     ):
@@ -245,16 +237,6 @@ def visualize(dir: str, prices_df: pd.DataFrame):
         balance_figure.line(
             index,
             data["balance"].values,
-            line_width=2,
-            name=name,
-            color=color,
-            muted_color=color,
-            muted_alpha=0,
-        )
-
-        streak_figure.line(
-            index,
-            data["streak"].values,
             line_width=2,
             name=name,
             color=color,
@@ -283,7 +265,6 @@ def visualize(dir: str, prices_df: pd.DataFrame):
         [
             Tabs(tabs=tabs, sizing_mode="stretch_width"),
             balance_figure,
-            streak_figure,
             pf_figure,
         ],
         sizing_mode="stretch_width",

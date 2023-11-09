@@ -23,17 +23,12 @@ class TradingEnvironment(gym.Env):
         balance=10000.00,
         tick_ratio=12.5 / 0.25,
         fees_per_contract=0.00,
-        streak_span=15,
-        streak_bonus_max=5.00,
-        streak_difficulty=1.00,
         max_ticks_without_action=23 * 60,
         checkpoint_length: int = 23 * 60 * 31,
         env_state_dir: str = None,
     ):
         """
         If `episode_history` is not None, the latest checkpoint will be loaded from it and training continues at that point.
-        `streak_bonus_max` is the upper bound of the streak bonus multiplier.
-        `streak_span` is the durational threshold for streaks.
         """
         super(TradingEnvironment, self).__init__()
 
@@ -42,9 +37,6 @@ class TradingEnvironment(gym.Env):
         self._features = features
         self._trade_volume = trade_volume
 
-        self._streak_span = streak_span
-        self._streak_bonus_max = streak_bonus_max
-        self._streak_difficulty = streak_difficulty
         self._max_ticks_without_action = max_ticks_without_action
         self._tick_ratio = tick_ratio
         self._fees_per_contract = fees_per_contract
@@ -73,7 +65,6 @@ class TradingEnvironment(gym.Env):
         self._done = False
         self._truncated = False
         self._balance = self._initial_balance
-        self._streak_multiplier = 1
         self._position = 0
         self.history.append(self._new_history_ep())
         self._ticker.reset_to_checkpoint()
@@ -97,7 +88,6 @@ class TradingEnvironment(gym.Env):
         self._position = action
 
         self._update_observation(current_close_price)
-        self._update_streak(profit)
         reward = self._calculate_reward(profit, fees)
 
         info = self._get_info(profit, fees)
@@ -154,30 +144,14 @@ class TradingEnvironment(gym.Env):
         self._balance += profit - fees
         return (profit, fees)
 
-    def _update_streak(self, profit: float):
-        profits = self.history[-1]["profit"][-self._streak_span + 1 :].to_list() + [
-            profit
-        ]
-        positive_count = sum(profit > 0 for profit in profits)
-
-        x0 = self._trade_volume * self._tick_ratio * self._streak_difficulty
-        k = self._streak_span + self._streak_difficulty - positive_count
-        self._streak_multiplier = 1 + self._streak_bonus_max / (
-            1 + np.exp(-k * (profit - x0))
-        )
-
     def _calculate_reward(self, profit: float, fees: float):
         # Calculate the composite reward
-        streak = self._streak_multiplier if profit >= 0 else 1
         laziness_punishment = max(
             self._ticker.ticks_since_last_action - self._max_ticks_without_action, 0
         )
 
         return (
-            streak * (profit - fees)
-            + self._balance
-            - self._initial_balance
-            - laziness_punishment
+            profit - fees + self._balance - self._initial_balance - laziness_punishment
         )
 
     def _get_info(self, profit, fees):
@@ -186,7 +160,6 @@ class TradingEnvironment(gym.Env):
             "fees": fees,
             "balance": self._balance,
             "position": self._position,
-            "streak": self._streak_multiplier,
         }
 
     def _new_history_ep(self):
@@ -207,7 +180,6 @@ class TradingEnvironment(gym.Env):
             "currentTick": self._ticker.current_tick,
             "checkpoint": self._ticker.checkpoint,
             "ticksSinceLastAction": self._ticker.ticks_since_last_action,
-            "streakMultiplier": self._streak_multiplier,
             "done": self._done,
             "truncated": self._truncated,
             "episodes": len(self.history) + self._num_prev_eps,
@@ -224,7 +196,6 @@ class TradingEnvironment(gym.Env):
             self._ticker.current_tick = state["currentTick"]
             self._ticker.checkpoint = state["checkpoint"]
             self._ticker.ticks_since_last_action = state["ticksSinceLastAction"]
-            self._streak_multiplier = state["streakMultiplier"]
             self._done = state["done"]
             self._truncated = state["truncated"]
             self._num_prev_eps = state["episodes"]
