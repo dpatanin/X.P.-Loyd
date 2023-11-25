@@ -23,11 +23,11 @@ from lib.trading_env import TFPyTradingEnvWrapper, TradingEnvironment
 from lib.visualize import visualize
 
 FEATURES = [
-    "high_diff",
-    "low_diff",
-    "open_diff",
-    "close_diff",
-    "volume",
+    "day_sin",
+    "day_cos",
+    "rss",
+    "dmi",
+    "double_stochastic",
 ]
 
 LOG_DIR = "logs"

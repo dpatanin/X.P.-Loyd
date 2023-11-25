@@ -14,18 +14,18 @@ class DataProcessor:
     Splits into train (70%), validation (20%) & test (10%) datasets.
     """
 
-    def __init__(self, src: str, period=14, smooth=3) -> None:
+    def __init__(self, src: str, period=14) -> None:
         download = None if self._is_local(src) else wget.download(src)
 
-        self._pb = tqdm(range(7), desc="Load data")
+        self._pb = tqdm(range(8), desc="Load data")
         df = pd.read_csv(download or src)
         if download:
             os.remove(download)
 
         self.num_features = df.shape[1]
 
-        self._update_pb("Transform dateTime")
         # Transform dateTime into periodic frequencies
+        self._update_pb("Transform dateTime")
         date_time = pd.to_datetime(df.pop("dateTime"), format="%Y-%m-%d %H:%M:%S")
         self._update_pb()
 
@@ -38,14 +38,15 @@ class DataProcessor:
         df.set_index(date_time, inplace=True)
 
         self._update_pb("Calculate RSS")
-        # Preprocess price data
         df["rss"] = self.rss(df["close"])
 
         self._update_pb("Calculate DMI")
         df["dmi"] = self.dmi(df["close"], df["high"], df["low"], period)
 
         self._update_pb("Calculate double stochastic")
-        
+        df["double_stochastic"] = self.double_stochastic(
+            df["close"], df["high"], df["low"], period
+        )
 
         df.fillna(0, inplace=True)
 
@@ -61,36 +62,59 @@ class DataProcessor:
     def sma(self, s: pd.Series, period: int) -> pd.Series:
         return s.rolling(window=period).mean()
 
+    def ema(self, s: pd.Series, period: int) -> pd.Series:
+        return s.ewm(span=period).mean()
+
     def rma(self, s: pd.Series, period: int) -> pd.Series:
         return s.ewm(alpha=1 / period).mean()
-
-    def rss(self, s: pd.Series) -> pd.Series:
-        spread = s.ewm(span = 10) - s.ewm(span = 40)
-        rsi = self.rsi(spread, 5)
-        
-        return self.sma(rsi, 5)
 
     def rsi(self, s: pd.Series, period: int) -> pd.Series:
         change = s.diff()
         gain = self.rma(change.mask(change < 0, 0.0), period)
         loss = self.rma(-change.mask(change > 0, -0.0), period)
-        
+
         return 100 - (100 / (1 + (gain / loss)))
 
-    def dmi(self, close: pd.Series, high: pd.Series, low: pd.Series, period: int) -> pd.Series:
-        sma_tr = self.sma(np.maximum(high - low, np.maximum((high - close).abs(), (low - close).abs())), period)
+    def rss(self, s: pd.Series) -> pd.Series:
+        spread = self.ema(s, 10) - self.ema(s, 40)
+        rsi = self.rsi(spread, 5)
+
+        return self.sma(rsi, 5)
+
+    def dmi(
+        self, close: pd.Series, high: pd.Series, low: pd.Series, period: int
+    ) -> pd.Series:
+        sma_tr = self.sma(
+            np.maximum(
+                high - low, np.maximum((high - close).abs(), (low - close).abs())
+            ),
+            period,
+        )
         low_diff = low.diff()
         low_diff = low_diff.mask(low_diff > 0, 0)
         high_diff = -high.diff()
         high_diff = high_diff.mask(high_diff > 0, 0)
-        
+
         sma_dm_minus = self.sma(low_diff.mask(low_diff > high_diff, 0), period)
-        sma_dm_plus = self.sma(high_diff.mask(high_diff > low_diff , 0), period)
-                
-        di_minus = sma_dm_minus  / sma_tr
-        di_plus = sma_dm_plus  / sma_tr
-        
+        sma_dm_plus = self.sma(high_diff.mask(high_diff > low_diff, 0), period)
+
+        di_minus = sma_dm_minus / sma_tr
+        di_plus = sma_dm_plus / sma_tr
+
         return (di_plus - di_minus) / (di_plus + di_minus)
+
+    def double_stochastic(
+        self, close: pd.Series, high: pd.Series, low: pd.Series, period: int
+    ) -> pd.Series:
+        max_high = high.rolling(window=period).max()
+        min_low = low.rolling(window=period).min()
+
+        pct_k = ((close - min_low) / (max_high - min_low)) * 100
+        pct_d = self.sma(pct_k, period)
+
+        diff = pct_k - pct_d
+
+        return ((diff - diff.min()) / (diff.max() - diff.min())) * 100
 
     def _is_local(self, url):
         url_parsed = urlparse(url)
