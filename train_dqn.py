@@ -60,8 +60,9 @@ def env_creator(df: pd.DataFrame, env_state_dir: str = None):
             window_size=SEQ_LENGTH,
             features=FEATURES,
             tick_size=0.25,
-            tick_value=12.5,
-            fees_per_contract=0.1,
+            tick_value=1.25,
+            balance=1000.00,
+            fees_per_trade=0.1,
             env_state_dir=env_state_dir,
         )
     )

@@ -19,10 +19,10 @@ class TradingEnvironment(gym.Env):
         df: pd.DataFrame,
         window_size: int,
         features: list[str],
-        balance=100.00,
+        balance=10000.00,
         tick_size=0.25,
         tick_value=12.5,
-        fees_per_contract=0.00,
+        fees_per_trade=0.00,
         max_ticks_without_action=23 * 60,
         checkpoint_length: int = 23 * 60 * 31,
         env_state_dir: str = None,
@@ -38,9 +38,8 @@ class TradingEnvironment(gym.Env):
         self._features = features
 
         self._max_ticks_without_action = max_ticks_without_action
-        self._tick_size = tick_size
-        self._tick_ratio = tick_size / tick_value
-        self._fees = fees_per_contract * self._tick_ratio
+        self._tick_ratio = tick_value / tick_size
+        self._fees = fees_per_trade
 
         self.action_space = spaces.Discrete(3)  # 0 = No position; 1 = Long; 2 = Short
 
@@ -139,7 +138,7 @@ class TradingEnvironment(gym.Env):
         )
 
     def _update_balance(self, price_diff: float):
-        profit = (price_diff / self._tick_size) * self._tick_ratio
+        profit = price_diff * self._tick_ratio
 
         self._balance += profit - self._fees
         return (profit, self._fees)
